@@ -376,10 +376,6 @@ func isDigitOrUnderscore(c byte) bool {
 	return IsDigit(c) || c == '_'
 }
 
-func IsHexDigitOrUnderscore(c byte) bool {
-	return IsHexDigit(c) || c == '_'
-}
-
 func isHexDigitOrUnderscore(c byte) bool {
 	return IsHexDigit(c) || c == '_'
 }
