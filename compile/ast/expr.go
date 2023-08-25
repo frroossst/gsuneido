@@ -8,13 +8,14 @@ import (
 	"math"
 	"strings"
 
+	"slices"
+
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	"github.com/apmckinlay/gsuneido/options"
 	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/str"
-	"golang.org/x/exp/slices"
 )
 
 // Note: Stored fields ignore rules.
@@ -58,6 +59,7 @@ func (a *Unary) eval(val Value) Value {
 	case tok.Sub:
 		return OpUnaryMinus(val)
 	case tok.Not:
+		// TODO eval raw e.g. not Number?(x)
 		return OpNot(val)
 	case tok.BitNot:
 		return OpBitNot(val)
@@ -203,6 +205,17 @@ func (a *Trinary) Columns() []string {
 }
 
 // Nary -------------------------------------------------------------
+
+func (a *Nary) CanEvalRaw(flds []string) bool {
+	if a.Tok == tok.Or || a.Tok == tok.And {
+		for _, e := range a.Exprs {
+			if e.CanEvalRaw(flds) {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 func (a *Nary) Eval(c *Context) Value {
 	exprs := a.Exprs
@@ -435,7 +448,29 @@ func (a *Mem) Columns() []string {
 	return set.Union(a.E.Columns(), a.M.Columns())
 }
 
+func (a *Call) CanEvalRaw(flds []string) bool {
+	fn, ok := a.Fn.(*Ident)
+	a.evalRaw = ok && len(a.Args) == 1 && IsColumn(a.Args[0].E, flds) &&
+		(fn.Name == "Number?" || fn.Name == "String?" || fn.Name == "Date?")
+	return a.evalRaw
+}
+
 func (a *Call) Eval(c *Context) Value {
+	if a.evalRaw {
+		fn := a.Fn.(*Ident).Name
+		id := a.Args[0].E.(*Ident).Name
+		x := c.Row.GetRaw(c.Hdr, id)
+		result := false
+		switch fn {
+		case "Number?":
+			result = len(x) > 0 && (x[0] == PackMinus || x[0] == PackPlus)
+		case "String?":
+			result = x == "" || x[0] == PackString
+		case "Date?":
+			result = len(x) > 0 && x[0] == PackDate
+		}
+		return SuBool(result)
+	}
 	as := argspec(a.Args) //TODO cache
 	args := make([]Value, len(a.Args))
 	for i, a := range a.Args {
