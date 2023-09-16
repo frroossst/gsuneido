@@ -32,6 +32,8 @@ const (
 	Unknown_t
 )
 
+
+// This function returns a string representation of the given type_t slice.
 func TypeTString(t []type_t) string {
 	str := ""
 	for _, v := range t {
@@ -127,10 +129,23 @@ func removeTrueAndFalse(returnTypes []type_t) []type_t {
 }
 
 func main() {
-	code := "function() { if true { return 1 } else if  { return '2' } else if { return a } else { return true } return false }"
+	code := `
+		function() 
+			{ 
+			a = 2
+			if true 
+				{ return 1 } 
+			else if  
+				{ return '2' } 
+			else if 
+				{ return a } 
+			else 
+				{ return true } 
+			return false 
+			}`
 
 	p := compile.AstParser(code)
 	explicitReturns := captureExplicitReturns(p)
-	returnTypes := assembleReturnTypes(explicitReturns)
-	fmt.Println(TypeTString(returnTypes))
+	firstPass := assembleReturnTypes(explicitReturns)
+	fmt.Println(TypeTString(firstPass))
 }
