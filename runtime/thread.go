@@ -15,7 +15,6 @@ import (
 	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/runtime/trace"
 	myatomic "github.com/apmckinlay/gsuneido/util/generic/atomic"
-	"github.com/apmckinlay/gsuneido/util/generic/ord"
 	"github.com/apmckinlay/gsuneido/util/regex"
 	"github.com/apmckinlay/gsuneido/util/str"
 	"github.com/apmckinlay/gsuneido/util/tr"
@@ -178,6 +177,7 @@ func (th *Thread) Reset() {
 	th.InHandler = false
 	th.Suneido.Store(nil)
 	th.session.Store("")
+	th.ReturnThrow = false
 }
 
 // GetState and RestoreState are used by callbacks_windows.go
@@ -245,8 +245,8 @@ func (th *Thread) TraceStack() {
 	th.printStack(trace.Writer, 6)
 }
 
-func (th *Thread) printStack(w io.Writer, max int) {
-	limit := ord.Max(th.fp-max, 0)
+func (th *Thread) printStack(w io.Writer, levels int) {
+	limit := max(th.fp-levels, 0)
 	for i := th.fp - 1; i >= limit; i-- {
 		frame := th.frames[i]
 		fmt.Fprintln(w, frame.fn)

@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"strings"
 
+	"slices"
+
 	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/hacks"
@@ -74,7 +76,7 @@ func (e *Encoder) String() string {
 }
 
 func (e *Encoder) Dup() *Encoder {
-	return &Encoder{buf: append([]byte(nil), e.buf...)}
+	return &Encoder{buf: slices.Clone(e.buf)}
 }
 
 // Key builds a key from a data Record using a Spec.

@@ -161,7 +161,7 @@ func (th *Thread) interp(catchJump, catchSp *int) (ret Value) {
 loop:
 	for fr.ip < len(code) {
 		profileOpCount++
-		// fmt.Println("stack:", t.sp, t.stack[ord.Max(0, t.sp-3):t.sp])
+		// fmt.Println("stack:", t.sp, t.stack[max(0, t.sp-3):t.sp])
 		// _, da := Disasm1(fr.fn, fr.ip)
 		// fmt.Printf("%d: %d: %s\n", t.fp, fr.ip, da)
 		if th.UIThread {
@@ -496,15 +496,18 @@ loop:
 			result := f.Call(th, nil, argSpec)
 			th.sp = base
 			if th.ReturnThrow {
-				if fr.ip < len(code) && op.Opcode(code[fr.ip]) != op.Return {
-					th.ReturnThrow = false
-				}
-				if oc == op.CallFuncDiscard &&
-					result != EmptyStr && result != True {
-					if s, ok := result.ToStr(); ok {
-						panic(s)
+				// NOTE: this code should be kept in sync with CallMeth
+				th.ReturnThrow = false // default is to clear the flag
+				if oc == op.CallFuncDiscard {
+					if result != EmptyStr && result != True {
+						if s, ok := result.ToStr(); ok {
+							panic(s)
+						}
+						panic("return value not checked")
 					}
-					panic("return value not checked")
+				} else if fr.ip >= len(code) ||
+					op.Opcode(code[fr.ip]) == op.Return {
+					th.ReturnThrow = true // propagate if returning result
 				}
 			}
 			pushResult(result)
@@ -547,15 +550,18 @@ loop:
 					result := f.Call(th, this, argSpec)
 					th.sp = base
 					if th.ReturnThrow {
-						if fr.ip < len(code) && op.Opcode(code[fr.ip]) != op.Return {
-							th.ReturnThrow = false
-						}
-						if oc == op.CallFuncDiscard &&
-							result != EmptyStr && result != True {
-							if s, ok := result.ToStr(); ok {
-								panic(s)
+						// NOTE: this code should be kept in sync with CallFunc
+						th.ReturnThrow = false // default is to clear the flag
+						if oc == op.CallMethDiscard {
+							if result != EmptyStr && result != True {
+								if s, ok := result.ToStr(); ok {
+									panic(s)
+								}
+								panic("return value not checked")
 							}
-							panic("return value not checked")
+						} else if fr.ip >= len(code) ||
+							op.Opcode(code[fr.ip]) == op.Return {
+							th.ReturnThrow = true // propagate if returning result
 						}
 					}
 					pushResult(result)

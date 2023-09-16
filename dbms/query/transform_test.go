@@ -4,6 +4,7 @@
 package query
 
 import (
+	"strings"
 	"testing"
 
 	. "github.com/apmckinlay/gsuneido/runtime"
@@ -21,25 +22,24 @@ func TestTransform(t *testing.T) {
 		}
 		q := ParseQuery(from, testTran{}, nil)
 		q = q.Transform()
-		assert.T(t).This(str.ToLower(q.String())).Is(str.ToLower(expected))
+		actual := str.ToLower(q.String())
+		// *1 depends on whether optInit runs, e.g. if Nrows is called
+		actual = strings.ReplaceAll(actual, "where*1", "where")
+		assert.T(t).This(actual).Is(str.ToLower(expected))
 	}
-	test("table", "")
-	test("table rename a to x, c to y", "")
-	test("table rename a to x rename b to y rename c to z",
-		"table rename a to x, b to y, c to z")
-	test("table rename a to x rename x to y rename y to z",
-		"table rename a to z")
-	test("table rename a to aa, b to bb rename bb to b, aa to a",
-		"table")
 
+	test("table", "")
+
+	// TablesLookup
+	test("tables where table is 'foo'", "tables(foo)")
+
+	test("table rename a to x, c to y", "")
 	test("table remove c, d, e",
 		"table project a,b")
 	test("table remove x, y, z",
 		"table")
 	test("table project a, b, c",
 		"table")
-	test("table project a, b project b",
-		"table project b")
 	test("withdeps remove b",
 		"withdeps project a,c,c_deps")
 	test("withdeps remove b_deps, c_deps",
@@ -50,26 +50,44 @@ func TestTransform(t *testing.T) {
 	// combine extend's
 	test("customer extend a = 5 extend b = 6",
 		"customer EXTEND a = 5, b = 6")
+	test("customer extend a = 5 extend b = 6 where id > 5",
+		"customer WHERE id > 5 EXTEND a = 5, b = 6")
 	// combine project's
+	test("table project a, b project b",
+		"table project b")
 	test("customer project id, name project id",
 		"customer PROJECT id")
+	test("customer project id, name where id > 5 project id",
+		"customer WHERE id > 5 PROJECT id")
+	test("customer project id, name project id where id > 5",
+		"customer WHERE id > 5 PROJECT id")
 	// combine rename's
+	test("table rename a to x rename b to y rename c to z",
+		"table rename a to x, b to y, c to z")
+	test("table rename a to x rename x to y rename y to z",
+		"table rename a to x, x to y, y to z")
+	test("table rename a to aa, b to bb rename bb to b, aa to a",
+		"table rename a to aa, b to bb, bb to b, aa to a")
+	test("table rename a to x rename c to a",
+		"table rename a to x, c to a")
 	test("customer rename id to x rename name to y",
-		"customer RENAME id to x, name to y")
+		"customer rename id to x, name to y")
+	test("table rename a to x rename x to y",
+		"table rename a to x, x to y")
 	// combine where's
 	test("customer where id is 5 where city is 6 where name is 7",
 		"customer WHERE id is 5 and city is 6 and name is 7")
 	// leftjoin to join
-	test("cus leftjoin task where cnum is 1 and tnum is 2",
-		"cus where*1 cnum is 1 join 1:1 by(cnum) (task where*1 cnum is 1 and tnum is 2)")
-	test("cus leftjoin task where cnum is 1 where tnum is 2",
-		"cus where*1 cnum is 1 join 1:1 by(cnum) (task where*1 cnum is 1 and tnum is 2)")
+	test("(cus leftjoin task) where cnum is 1 where tnum is 2",
+		"cus where cnum is 1 join 1:1 by(cnum) (task where tnum is 2)")
+	test("(cus leftjoin task) where tnum is 2 where cnum is 1",
+		"cus where cnum is 1 join 1:1 by(cnum) (task where tnum is 2 and cnum is 1)")
 
 	// remove projects of all fields
 	test("customer project id, city, name", "customer")
 	// remove disjoint difference
 	test("(customer where id is 3) minus (customer where id is 5)",
-		"customer WHERE*1 id is 3")
+		"customer WHERE id is 3")
 	// remove empty extends
 	test("customer extend zone = 3 project id, city",
 		"customer PROJECT id,city")
@@ -80,6 +98,8 @@ func TestTransform(t *testing.T) {
 	// move project before rename
 	test("customer rename id to num, name to nom project num, city",
 		"customer PROJECT id,city RENAME id to num")
+	test("customer rename id to id2, id2 to id3 remove id3",
+        "customer PROJECT name,city")
 	// move project before rename & remove empty rename
 	test("customer rename id to num, name to nom project city",
 		"customer PROJECT city")
@@ -115,6 +135,8 @@ func TestTransform(t *testing.T) {
 	// move where before project
 	test("trans project id,cost where id is 5",
 		"trans WHERE id is 5 PROJECT id,cost")
+	test("table project a,b where a is 5 project b",
+		"table where a is 5 project b")
 	// move where before rename
 	test("trans where cost is 200 rename cost to x where id is 5",
 		"trans WHERE cost is 200 and id is 5 RENAME cost to x")
