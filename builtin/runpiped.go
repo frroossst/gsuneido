@@ -23,6 +23,7 @@ type suRunPiped struct {
 }
 
 var nRunPiped atomic.Int32
+var _ = AddInfo("builtin.nRunPiped", &nRunPiped)
 
 var _ = builtin(RunPiped, "(command, block=false)")
 
@@ -140,9 +141,8 @@ var _ = method(runpiped_ExitValue, "()")
 
 func runpiped_ExitValue(this Value) Value {
 	rp := rpOpen(this)
+	defer rp.close()
 	cmd := rp.cmd
-	rp.r = nil
-	rp.w = nil
 	err := cmd.Wait()
 	if err != nil {
 		if _, ok := err.(*exec.ExitError); !ok {

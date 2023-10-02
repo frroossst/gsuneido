@@ -5,7 +5,6 @@ package query
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -31,6 +30,7 @@ type Summarize struct {
 	wholeRow bool
 	rewound  bool
 	unique   bool
+	hint     sumHint
 }
 
 type summarizeApproach struct {
@@ -40,6 +40,12 @@ type summarizeApproach struct {
 }
 
 type sumStrategy int
+
+type sumHint string
+const (
+	sumSmall sumHint = "small"
+	sumLarge sumHint = "large"
+)
 
 const (
 	// sumSeq reads in order of 'by', and groups consecutive, like projSeq
@@ -53,7 +59,7 @@ const (
 	sumTbl
 )
 
-func NewSummarize(src Query, by, cols, ops, ons []string) *Summarize {
+func NewSummarize(src Query, hint sumHint, by, cols, ops, ons []string) *Summarize {
 	if !set.Subset(src.Columns(), by) {
 		panic("summarize: nonexistent columns: " +
 			str.Join(", ", set.Difference(by, src.Columns())))
@@ -65,7 +71,7 @@ func NewSummarize(src Query, by, cols, ops, ons []string) *Summarize {
 			cols[i] = defaultColName(ops[i], ons[i])
 		}
 	}
-	su := &Summarize{by: by, cols: cols, ops: ops, ons: ons}
+	su := &Summarize{hint: hint, by: by, cols: cols, ops: ops, ons: ons}
 	su.source = src
 	sort.Stable(su)
 	su.unique = hasKey(cols, src.Keys(), src.Fixed())
@@ -164,7 +170,7 @@ func (su *Summarize) string2() string {
 }
 
 func (su *Summarize) format() string {
-	return "summarize" + su.string2()
+	return "summarize" + str.Opt("/*", string(su.hint), "*/") + su.string2()
 }
 
 func (su *Summarize) getNrows() (int, int) {
@@ -190,16 +196,16 @@ func (*Summarize) Output(*Thread, Record) {
 }
 
 func (su *Summarize) Transform() Query {
-	if p, ok := su.source.(*Project); ok && p.unique {
-		// remove project-copy
-		su = NewSummarize(p.source, su.by, su.cols, su.ops, su.ons)
-	}
 	src := su.source.Transform()
 	if _, ok := src.(*Nothing); ok {
 		return NewNothing(su.Columns())
 	}
+	if p, ok := src.(*Project); ok && p.unique {
+		// remove project-copy
+		return NewSummarize(p.source, su.hint, su.by, su.cols, su.ops, su.ons)
+	}
 	if src != su.source {
-		return NewSummarize(src, su.by, su.cols, su.ops, su.ons)
+		return NewSummarize(src, su.hint, su.by, su.cols, su.ops, su.ons)
 	}
 	return su
 }
@@ -257,7 +263,8 @@ func (su *Summarize) idxCost(mode Mode) (Cost, Cost, any) {
 func (su *Summarize) mapCost(mode Mode, index []string, _ float64) (Cost, Cost, any) {
 	//FIXME technically, map should only be allowed in ReadMode
 	nrows, _ := su.Nrows()
-	if index != nil || nrows > mapLimit {
+	if index != nil || su.hint == sumLarge ||
+		(nrows > mapLimit && su.hint != sumSmall) {
 		return impossible, impossible, nil
 	}
 	fixcost, varcost := Optimize(su.source, mode, nil, 1)
@@ -425,7 +432,7 @@ func (su *Summarize) buildMap(th *Thread) []mapPair {
 			if !warned && sumMap.Size() > mapLimit {
 				// log inside loop in case we run out of memory
 				warned = true
-				log.Printf("WARNING summarize-map large (> %d)", mapLimit)
+				Warning("summarize-map large >", mapLimit)
 			}
 		}
 		su.addToSums(sums, row, th, su.st)

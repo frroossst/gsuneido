@@ -60,7 +60,7 @@ func suneido_GoMetric(th *Thread, args []Value) Value {
 	case metrics.KindUint64:
 		return Int64Val(int64(sample[0].Value.Uint64()))
 	case metrics.KindFloat64:
-		return SuDnum{Dnum: dnum.FromFloat(float64(sample[0].Value.Float64()))}
+		return SuDnum{Dnum: dnum.FromFloat(sample[0].Value.Float64())}
 	default:
 		return False
 	}
@@ -107,4 +107,30 @@ var _ = staticMethod(suneido_StrictCompareDb, "(bool)")
 func suneido_StrictCompareDb(x Value) Value {
 	options.StrictCompareDb = ToBool(x)
 	return nil
+}
+
+var _ = staticMethod(suneido_WarningsThrow, "(bool = true)")
+
+func suneido_WarningsThrow(x Value) Value {
+	switch x {
+	case True:
+		options.WarningsThrow = options.AllWarningsThrow
+	case False:
+		options.WarningsThrow = options.NoWarningsThrow
+	default:
+		options.WarningsThrow = regex.Compile(ToStr(x))
+	}
+	return nil
+}
+
+var _ = staticMethod(suneido_Info, "(name)")
+
+func suneido_Info(x Value) Value {
+	return SuStr(InfoStr(ToStr(x)))
+}
+
+var _ = staticMethod(suneido_InfoList, "()")
+
+func suneido_InfoList() Value {
+	return SuObjectOfStrs(InfoList())
 }

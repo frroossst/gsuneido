@@ -15,6 +15,7 @@ import (
 	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/runtime/trace"
 	myatomic "github.com/apmckinlay/gsuneido/util/generic/atomic"
+	"github.com/apmckinlay/gsuneido/util/generic/cache"
 	"github.com/apmckinlay/gsuneido/util/regex"
 	"github.com/apmckinlay/gsuneido/util/str"
 	"github.com/apmckinlay/gsuneido/util/tr"
@@ -56,9 +57,9 @@ type Thread struct {
 	blockReturnFrame *Frame
 
 	// RxCache is per thread so no locking is required
-	rxCache regex.Cache
+	rxCache *cache.Cache[string, regex.Pattern]
 	// TrCache is per thread so no locking is required
-	TrCache tr.Cache
+	trCache *cache.Cache[string, tr.Set]
 
 	// Name is the name of the thread (default is Thread-#)
 	Name string
@@ -106,27 +107,37 @@ type Thread struct {
 	ReturnThrow bool
 }
 
-var nThread atomic.Int32
+var threadNum atomic.Int32
 
 // NewThread creates a new thread.
 // It is primarily used for user initiated threads.
 // Internal threads can just use a zero Thread.
 func NewThread(parent *Thread) *Thread {
-	n := nThread.Add(1)
-	name := "Thread-" + strconv.Itoa(int(n))
-	th := &Thread{Num: n, Name: name}
+	th := setup(&Thread{})
 	if parent != nil {
 		if suneido := parent.Suneido.Load(); suneido != nil {
 			suneido.SetConcurrent()
 			th.Suneido.Store(suneido)
 		}
 	}
+	return th
+}
+
+func setup(th *Thread) *Thread {
+	th.Num = threadNum.Add(1)
+	th.Name = "Thread-" + strconv.Itoa(int(th.Num))
 	mts := ""
 	if MainThread != nil {
 		mts = MainThread.Session()
 	}
-	th.session.Store(str.Opt(mts, ":") + name)
+	th.session.Store(str.Opt(mts, ":") + th.Name)
 	return th
+}
+
+// Reset is equivalent to calling NewThread(nil)
+func (th *Thread) Reset() {
+	*th = Thread{} // zero it
+	setup(th)
 }
 
 func (th *Thread) Session() string {
@@ -166,17 +177,6 @@ func (th *Thread) Top() Value {
 // Swap exchanges the top two values on the stack
 func (th *Thread) Swap() {
 	th.stack[th.sp-1], th.stack[th.sp-2] = th.stack[th.sp-2], th.stack[th.sp-1]
-}
-
-// Reset sets a Thread back to its initial state
-func (th *Thread) Reset() {
-	th.fp = 0
-	th.sp = 0
-	th.Name = ""
-	th.blockReturnFrame = nil
-	th.InHandler = false
-	th.Suneido.Store(nil)
-	th.session.Store("")
 }
 
 // GetState and RestoreState are used by callbacks_windows.go
@@ -338,7 +338,17 @@ func (th *Thread) Regex(x Value) regex.Pattern {
 	if sr, ok := x.(SuRegex); ok {
 		return sr.Pat
 	}
+	if th.rxCache == nil {
+		th.rxCache = cache.New(regex.Compile)
+	}
 	return th.rxCache.Get(ToStr(x))
+}
+
+func (th *Thread) TrSet(x Value) tr.Set {
+	if th.trCache == nil {
+		th.trCache = cache.New(tr.New)
+	}
+	return th.trCache.Get(ToStr(x))
 }
 
 //-------------------------------------------------------------------

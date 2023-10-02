@@ -33,17 +33,16 @@ var mode = ""                       // set by: go build -ldflags "-X main.mode=g
 
 var help = `options:
 	-check
-	-c[lient] [ipaddress] (default 127.0.0.1)
+	-c[lient][=ipaddress] (default 127.0.0.1)
+	-compact
 	-d[ump] [table]
 	-h[elp] or -?
 	-l[oad] [table]
-	-n[o]r[elaunch]
-	-p[ort] # (default 3147)
+	-p[ort][=#] (default 3147)
 	-repair
-	-r[epl]
 	-s[erver]
-	-u[nattended]
-	-v[ersion]`
+	-v[ersion]
+	-w[eb][=#] (default -port + 1)`
 
 // dbmsLocal is set if running with a local/standalone database.
 var dbmsLocal *dbms.DbmsLocal
@@ -62,9 +61,6 @@ func main() {
 	}
 	if err := system.Service("gSuneido", redirect, exit.RunFuncs); err != nil {
 		Fatal(err)
-	}
-	if options.Action == "" && mode != "gui" {
-		options.Action = "repl"
 	}
 
 	switch options.Action {
@@ -114,7 +110,7 @@ func main() {
 		newSize /= 1024 * 1024
 		Alert("compacted", nTables, "tables", nViews, "views",
 			"in", time.Since(t).Round(time.Millisecond),
-			oldSize, "-", (oldSize-newSize), "=", newSize, "mb")
+			oldSize, "-", (oldSize - newSize), "=", newSize, "mb")
 		os.Exit(0)
 	case "check":
 		t := time.Now()
@@ -139,8 +135,11 @@ func main() {
 	case "help":
 		Alert(help)
 		os.Exit(0)
-	case "repl", "client":
-		// handled below
+	case "client":
+		if options.WebServer {
+			options.DbStatus.Store("")
+			startHttpStatus()
+		}
 	case "error":
 		Fatal(options.Error)
 	default:
@@ -179,14 +178,17 @@ func main() {
 		clientErrorLog()
 	} else {
 		openDbms()
+		if options.WebServer {
+			options.DbStatus.Store("")
+			startHttpStatus()
+		}
 	}
-	if options.Action == "repl" ||
-		(options.Action == "client" && options.Mode != "gui") {
-		run("Init.Repl()")
-		repl()
-	} else {
+	if mode == "gui" {
 		run("Init()")
 		builtin.Run()
+	} else {
+		run("Init.Repl()")
+		repl()
 	}
 }
 
@@ -248,8 +250,8 @@ func clientErrorLog() {
 // startServer does not return
 func startServer() {
 	log.Println("starting server")
-	startHttpStatus()
 	openDbms()
+	startHttpStatus()
 	Libload = libload // dependency injection
 	mainThread = &Thread{}
 	mainThread.Name = "main"
@@ -410,7 +412,7 @@ func eval(src string) {
 		fmt.Println("(" + s + ")")
 	}
 	fn := v.(*SuFunc)
-	// DisasmMixed(os.Stdout, fn, src)
+	// fmt.Println(DisasmMixed(fn, src))
 
 	mainThread.Reset()
 	result := mainThread.Call(fn)

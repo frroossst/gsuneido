@@ -62,6 +62,12 @@ type Query interface {
 	// This stage is not cost based, transforms are applied when possible.
 	//
 	// Transform methods MUST ensure they call Transform on their children.
+	// Transform is (mostly) bottom up, partly for path copying.
+	// Which means Transform methods should start by calling Transform
+	// on their children.
+	//
+	// Any changes should build new nodes, NOT modify nodes.
+	// This is partly to ensure that constructor validation is done.
 	Transform() Query
 
 	// SetTran is used for cursors
@@ -322,6 +328,9 @@ const impossible = Cost(math.MaxInt / 64) // allow for adding impossible's
 // Optimize determines the best (lowest estimated cost) query execution approach
 func Optimize(q Query, mode Mode, index []string, frac float64) (
 	fixcost, varcost Cost) {
+	if len(index) == 0 {
+		index = nil
+	}
 	assert.That(!math.IsNaN(frac) && !math.IsInf(frac, 0))
 	if fastSingle(q, index) {
 		index = nil
@@ -560,7 +569,8 @@ func (q2 *Query2) keypairs() [][]string {
 }
 
 type q2i interface {
-	q1i
+	stringOp() string
+	Source() Query
 	Source2() Query
 }
 

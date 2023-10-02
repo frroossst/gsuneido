@@ -27,7 +27,7 @@ import (
 )
 
 // This is the multiplexed server.
-// It only works with the gSuneido mulitplexed client.
+// It only works with the gSuneido multiplexed client.
 
 var workers *mux.Workers
 
@@ -310,6 +310,24 @@ func StopServer() {
 	}
 	serverConns = nil
 }
+
+var _ = AddInfo("server.nConnection", func() int {
+	serverConnsLock.Lock()
+	defer serverConnsLock.Unlock()
+	return len(serverConns)
+})
+
+var _ = AddInfo("server.nSession", func() int {
+	nses := 0
+	serverConnsLock.Lock()
+	defer serverConnsLock.Unlock()
+	for _, sc := range serverConns {
+		sc.sessionsLock.Lock()
+		nses += len(sc.sessions)
+		sc.sessionsLock.Unlock()
+	}
+	return nses
+})
 
 //-------------------------------------------------------------------
 

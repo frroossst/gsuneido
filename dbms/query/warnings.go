@@ -11,22 +11,10 @@ import (
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
-var seen = map[string]bool{}
-var nWarn = 0
-
 func Warnings(query string, q Query) {
 	w := warnings(q)
-	s := warnStr(query, w)
-	if s != "" {
-		if Suneido.Get(nil, SuStr("User")) == SuStr("default") {
-			panic(s)
-		} else {
-			nWarn++
-			if !seen[query] && nWarn < 10 {
-				seen[query] = true
-				log.Println("WARNING", s, query)
-			}
-		}
+	if s := warnStr(query, w); s != "" {
+		Warning(s, query)
 	}
 }
 
@@ -57,6 +45,9 @@ func warnings(q Query) int { // recursive
 	w := 0
 	switch q := q.(type) {
 	case *Project:
+		if _, ok := q.source.(*Project); ok {
+			log.Println("ERROR: transform did not merge project")
+		}
 		if !q.unique {
 			w |= projectNotUnique
 		}
@@ -71,6 +62,18 @@ func warnings(q Query) int { // recursive
 	case *LeftJoin:
 		if q.joinType == n_n {
 			w |= joinManyToMany
+		}
+	case *Where:
+		if _, ok := q.source.(*Where); ok {
+			log.Println("ERROR: transform did not merge where")
+		}
+	case *Extend:
+		if _, ok := q.source.(*Extend); ok {
+			log.Println("ERROR: transform did not merge extend")
+		}
+	case *Rename:
+		if _, ok := q.source.(*Rename); ok {
+			log.Println("ERROR: transform did not merge rename")
 		}
 	}
 	switch q := q.(type) {

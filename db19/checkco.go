@@ -98,10 +98,6 @@ type ckFinal struct {
 }
 
 func (ck *CheckCo) StartTran() *CkTran {
-	// if len(ck.c) == cap(ck.c) {
-	// 	log.Println("checker buffer full")
-	// 	return nil
-	// }
 	ret := make(chan *CkTran, 1)
 	ck.c <- &ckStart{ret: ret}
 	return <-ret

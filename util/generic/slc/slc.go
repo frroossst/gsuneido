@@ -4,11 +4,16 @@
 // Package slc contains additions to the standard slices package
 package slc
 
-import (
-	"slices"
+import "cmp"
 
-	. "golang.org/x/exp/constraints"
-)
+func LastIndex[E comparable](list []E, e E) int {
+	for i := len(list) - 1; i >= 0; i-- {
+		if list[i] == e {
+			return i
+		}
+	}
+	return -1
+}
 
 func IndexFn[E any](list []E, e E, eq func(E, E) bool) int {
 	for i, e2 := range list {
@@ -78,23 +83,6 @@ func Replace1[S ~[]E, E comparable](list S, from, to E) S {
 		}
 	}
 	return list2
-}
-
-// Replace returns a new list with occurrences of from
-// replaced by the corresponding value in to.
-// If no replacements are done, it returns the original list.
-func Replace[S ~[]E, E comparable](list, from, to S) S {
-	cloned := false
-	for i := range list {
-		if j := slices.Index(from, list[i]); j != -1 {
-			if !cloned {
-				list = slices.Clone(list)
-				cloned = true
-			}
-			list[i] = to[j]
-		}
-	}
-	return list
 }
 
 // Same returns true if x and y are the same slice
@@ -174,7 +162,7 @@ func MapFn[S ~[]E, E any](list S, fn func(E) E) S {
 }
 
 // Min returns the minimum value in the list
-func Min[E Ordered](list []E) E {
+func Min[E cmp.Ordered](list []E) E {
 	min := list[0]
 	for _, x := range list {
 		if x < min {
@@ -185,7 +173,7 @@ func Min[E Ordered](list []E) E {
 }
 
 // Max returns the maximum value in the list
-func Max[E Ordered](list []E) E {
+func Max[E cmp.Ordered](list []E) E {
 	max := list[0]
 	for _, x := range list {
 		if x > max {
