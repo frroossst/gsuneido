@@ -6,15 +6,14 @@
 package builtin
 
 import (
-	. "github.com/apmckinlay/gsuneido/runtime"
-	"github.com/apmckinlay/gsuneido/util/exit"
+	. "github.com/apmckinlay/gsuneido/core"
 )
 
-var _ = builtin(Exit, "(code = 0)")
+var _ = builtin(exit, "(code = 0)")
 
-func Exit(arg Value) Value {
+func exit(arg Value) Value {
 	if arg == True {
-		exit.Exit(0) // immediate exit
+		Exit(0) // immediate exit
 	}
 	postQuit(uintptr(IfInt(arg)))
 	return nil

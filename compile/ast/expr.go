@@ -11,8 +11,8 @@ import (
 	"slices"
 
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/options"
-	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -328,6 +328,7 @@ func evalOr(e Expr, c *Context, v Value) Value {
 // CanEvalRaw returns true if Eval doesn't need to unpack the values.
 // It sets Packed which is later used by Eval.
 func (a *In) CanEvalRaw(flds []string) bool {
+	a.Packed = nil
 	if !IsColumn(a.E, flds) {
 		return false
 	}

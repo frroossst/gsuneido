@@ -8,8 +8,8 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/tokens"
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/options"
-	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/dnum"
 	"github.com/apmckinlay/gsuneido/util/regex"
@@ -114,11 +114,11 @@ var _ = staticMethod(suneido_WarningsThrow, "(bool = true)")
 func suneido_WarningsThrow(x Value) Value {
 	switch x {
 	case True:
-		options.WarningsThrow = options.AllWarningsThrow
+		options.WarningsThrow.Store(options.AllWarningsThrow)
 	case False:
-		options.WarningsThrow = options.NoWarningsThrow
+		options.WarningsThrow.Store(options.NoWarningsThrow)
 	default:
-		options.WarningsThrow = regex.Compile(ToStr(x))
+		options.WarningsThrow.Store(regex.Compile(ToStr(x)))
 	}
 	return nil
 }

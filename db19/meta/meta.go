@@ -78,10 +78,7 @@ func (m *Meta) GetRwInfo(table string) *Info {
 		return nil
 	}
 	ti := *pti // copy
-	ti.origNrows = ti.Nrows
-	ti.origSize = ti.Size
 
-	// set up index overlays
 	ti.Indexes = slices.Clone(ti.Indexes)
 	for i := range ti.Indexes {
 		ti.Indexes[i] = ti.Indexes[i].Mutable()
@@ -320,7 +317,7 @@ func (m *Meta) AlterRename(table string, from, to []string) *Meta {
 	return mu.freeze()
 }
 
-// replaceUnique replaces occurences of from with to.
+// replaceUnique replaces occurrences of from with to.
 // Assumes list values are unique (no duplicates).
 // from values must exist.
 // Replacements must preserve uniqueness.
@@ -340,7 +337,7 @@ func replaceUnique(list, from, to []string) []string {
 	return list
 }
 
-// replace replaces occurences of from with to.
+// replace replaces occurrences of from with to.
 // Replacements are done in from/to order.
 func replace(list, from, to []string) []string {
 	cloned := false
@@ -746,16 +743,16 @@ func (m *Meta) LayeredOnto(latest *Meta) *Meta {
 	assert.That(latest.difInfo == nil)
 	info := latest.info.Mutable()
 	for _, ti := range m.difInfo {
+		tiOrig, _ := m.info.Get(ti.Table)
+
 		lti, ok := info.Get(ti.Table)
 		if !ok || lti.IsTomb() {
 			continue
 		}
-		ti.Nrows = lti.Nrows + (ti.Nrows - ti.origNrows)
+		ti.Nrows = lti.Nrows + (ti.Nrows - tiOrig.Nrows)
 		assert.That(ti.Nrows >= 0)
-		d := int64(ti.Size) - int64(ti.origSize)
+		d := int64(ti.Size) - int64(tiOrig.Size)
 		ti.Size = uint64(int64(lti.Size) + d)
-		ti.origNrows = 0
-		ti.origSize = 0
 		for i := range ti.Indexes {
 			ti.Indexes[i].UpdateWith(lti.Indexes[i])
 		}

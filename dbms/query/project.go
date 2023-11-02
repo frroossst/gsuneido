@@ -9,7 +9,7 @@ import (
 	"slices"
 
 	"github.com/apmckinlay/gsuneido/compile/ast"
-	. "github.com/apmckinlay/gsuneido/runtime"
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/hmap"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
@@ -306,11 +306,6 @@ func (p *Project) transformRename(r *Rename) Query {
 	p = newProject(r.source, newProj)
 	r = NewRename(p, newFrom, newTo)
 	return r.Transform()
-}
-
-func chained(from, to []string, i int) bool {
-	j := slices.Index(from[i:], to[i])
-	return j >= 0
 }
 
 // transformExtend tries to move projects before extends.

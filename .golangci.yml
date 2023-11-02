@@ -1,0 +1,14 @@
+linters:
+  enable:
+    - revive
+    - misspell
+  disable:
+    - errcheck
+
+linters-settings:
+  revive:
+    rules:
+      - name: dot-imports
+        disabled: true
+      - name: var-naming
+        disabled: true

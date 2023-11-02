@@ -11,10 +11,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/apmckinlay/gsuneido/runtime"
-	"github.com/apmckinlay/gsuneido/runtime/trace"
+	"github.com/apmckinlay/gsuneido/core"
+	"github.com/apmckinlay/gsuneido/core/trace"
 	"github.com/apmckinlay/gsuneido/util/assert"
-	myatomic "github.com/apmckinlay/gsuneido/util/generic/atomic"
+	"github.com/apmckinlay/gsuneido/util/generic/atomics"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 )
 
@@ -22,7 +22,7 @@ const HeaderSize = 4 + 4 + 1 /* size + id + final */
 
 type conn struct {
 	rw    io.ReadWriteCloser // the underlying connection
-	err   myatomic.String
+	err   atomics.String
 	wlock sync.Mutex       // used by write to keep header and data together
 	hdr   [HeaderSize]byte // used by write, guarded by wlock
 }
@@ -196,7 +196,7 @@ func (c *conn) reader(handler func(uint32, []byte)) {
 func (cc *ClientConn) client(id uint32, data []byte) {
 	// need to send id for client to pipeline messages
 	if data == nil {
-		runtime.Fatal("lost connection:", cc.err.Load())
+		core.Fatal("lost connection:", cc.err.Load())
 	}
 	cc.getrch(id) <- data
 }
