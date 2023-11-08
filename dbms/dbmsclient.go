@@ -4,273 +4,275 @@
 package dbms
 
 import (
-	"log"
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 
 	"slices"
 
+	. "github.com/apmckinlay/gsuneido/core"
+	"github.com/apmckinlay/gsuneido/core/trace"
 	"github.com/apmckinlay/gsuneido/dbms/commands"
-	"github.com/apmckinlay/gsuneido/dbms/csio"
-	. "github.com/apmckinlay/gsuneido/runtime"
-	"github.com/apmckinlay/gsuneido/runtime/trace"
+	"github.com/apmckinlay/gsuneido/dbms/mux"
 	"github.com/apmckinlay/gsuneido/util/ascii"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
-// token is to authorize the next connection
-var token string
-
-// tokenLock guards token
-var tokenLock sync.Mutex
-
-// dbmsClient is the client for the jSuneido server
+// dbmsClient is the mux client that matches dbmsserver.
+// See jsunClient for the version that matches jSuneido.
 type dbmsClient struct {
-	*csio.ReadWrite
-	conn net.Conn
+	cc *mux.ClientConn
 }
 
 func NewDbmsClient(conn net.Conn) *dbmsClient {
-	errfn := func(err string) {
-		Fatal("client:", err)
-	}
-	rw := csio.NewReadWrite(conn, errfn)
-	c := &dbmsClient{ReadWrite: rw, conn: conn}
-	tokenLock.Lock()
-	defer tokenLock.Unlock()
-	if token != "" {
-		c.auth(token)
-		token = c.Token()
-	}
-	return c
+	conn.Write(hello())
+	cc := mux.NewClientConn(conn)
+	return &dbmsClient{cc: cc}
+}
+
+type muxSession struct {
+	*mux.ClientSession
+}
+
+func (dc *dbmsClient) NewSession() *muxSession {
+	cs := dc.cc.NewClientSession()
+	return &muxSession{ClientSession: cs}
 }
 
 // Dbms interface
 
-var _ IDbms = (*dbmsClient)(nil)
+var _ IDbms = (*muxSession)(nil)
 
-func (dc *dbmsClient) Admin(admin string, _ *Sviews) {
-	dc.PutCmd(commands.Admin).PutStr(admin).Request()
+func (ms *muxSession) Admin(admin string, _ *Sviews) {
+	ms.PutCmd(commands.Admin).PutStr(admin)
+	ms.Request()
 }
 
-func (dc *dbmsClient) Auth(_ *Thread, s string) bool {
-	if !dc.auth(s) {
-		return false
-	}
-	tokenLock.Lock()
-	defer tokenLock.Unlock()
-	if token == "" {
-		token = dc.Token()
-	}
-	return true
+func (ms *muxSession) Auth(_ *Thread, s string) bool {
+	return ms.auth(s)
 }
 
-func (dc *dbmsClient) auth(s string) bool {
+func (ms *muxSession) auth(s string) bool {
 	if s == "" {
 		return false
 	}
-	dc.PutCmd(commands.Auth).PutStr(s).Request()
-	return dc.GetBool()
+	ms.PutCmd(commands.Auth).PutStr(s)
+	ms.Request()
+	return ms.GetBool()
 }
 
-func (dc *dbmsClient) Check() string {
-	dc.PutCmd(commands.Check).Request()
-	return dc.GetStr()
+func (ms *muxSession) Check() string {
+	ms.PutCmd(commands.Check)
+	ms.Request()
+	return ms.GetStr()
 }
 
-func (dc *dbmsClient) Close() {
-	// On Windows, Close() is not sufficient for a graceful close.
-	// If the client exits afterwards, the server gets WSAECONNRESET.
-	// Tried delays, CloseWrite, SetLinger but nothing helps.
-	// Currently, csio GetCmd specifically handles WSAECONNRESET.
-	err := dc.conn.Close()
-	if err != nil {
-		log.Println("ERROR client close:", err)
-	}
+func (ms *muxSession) Close() {
+	ms.PutCmd(commands.EndSession)
+	ms.EndMsg()
 }
 
-func (dc *dbmsClient) Connections() Value {
-	dc.PutCmd(commands.Connections).Request()
-	ob := dc.GetVal().(*SuObject)
+func (ms *muxSession) Connections() Value {
+	ms.PutCmd(commands.Connections)
+	ms.Request()
+	ob := ms.GetVal().(*SuObject)
 	ob.SetReadOnly()
 	return ob
 }
 
-func (dc *dbmsClient) Cursor(query string, _ *Sviews) ICursor {
-	dc.PutCmd(commands.Cursor).PutStr(query).Request()
-	cn := dc.GetInt()
-	return newClientCursor(dc, cn)
+func (ms *muxSession) Cursor(query string, _ *Sviews) ICursor {
+	ms.PutCmd(commands.Cursor).PutStr(query)
+	ms.Request()
+	cn := ms.GetInt()
+	return ms.newClientCursor(cn)
 }
 
-func (dc *dbmsClient) Cursors() int {
-	dc.PutCmd(commands.Cursors).Request()
-	return dc.GetInt()
+func (ms *muxSession) Cursors() int {
+	ms.PutCmd(commands.Cursors)
+	ms.Request()
+	return ms.GetInt()
 }
 
-func (dc *dbmsClient) DisableTrigger(string) {
+func (ms *muxSession) DisableTrigger(string) {
 	panic("DoWithoutTriggers can't be used by a client")
 }
-func (dc *dbmsClient) EnableTrigger(string) {
+func (ms *muxSession) EnableTrigger(string) {
 	assert.ShouldNotReachHere()
 }
 
-func (dc *dbmsClient) Dump(table string) string {
-	dc.PutCmd(commands.Dump).PutStr(table).Request()
-	return dc.GetStr()
+func (ms *muxSession) Dump(table string) string {
+	ms.PutCmd(commands.Dump).PutStr(table)
+	ms.Request()
+	return ms.GetStr()
 }
 
-func (dc *dbmsClient) Exec(_ *Thread, args Value) Value {
+func (ms *muxSession) Exec(_ *Thread, args Value) Value {
 	packed := PackValue(args) // do this first because it could panic
 	if trace.ClientServer.On() {
 		if len(packed) < 100 {
 			trace.ClientServer.Println("    ->", args)
 		}
 	}
-	dc.PutCmd(commands.Exec)
-	dc.PutStr_(packed).Request()
-	return dc.ValueResult()
+	ms.PutCmd(commands.Exec).PutStr_(packed)
+	ms.Request()
+	return ms.ValueResult()
 }
 
-func (dc *dbmsClient) Final() int {
-	dc.PutCmd(commands.Final).Request()
-	return dc.GetInt()
+func (ms *muxSession) Final() int {
+	ms.PutCmd(commands.Final)
+	ms.Request()
+	return ms.GetInt()
 }
 
-func (dc *dbmsClient) Get(_ *Thread, query string, dir Dir,
+func (ms *muxSession) Get(_ *Thread, query string, dir Dir,
 	_ *Sviews) (Row, *Header, string) {
-	return dc.get(0, query, dir)
+	return ms.get(0, query, dir)
 }
 
-func (dc *dbmsClient) get(tn int, query string, dir Dir) (Row, *Header, string) {
-	dc.PutCmd(commands.GetOne).PutByte(byte(dir)).PutInt(tn).PutStr(query).Request()
-	if !dc.GetBool() {
+func (ms *muxSession) get(tn int, query string, dir Dir) (Row, *Header, string) {
+	ms.PutCmd(commands.GetOne).PutByte(byte(dir)).PutInt(tn).PutStr(query)
+	ms.Request()
+	if !ms.GetBool() {
 		return nil, nil, ""
 	}
-	off := dc.GetInt()
-	hdr := dc.getHdr()
-	row := dc.getRow(off)
-	return row, hdr, "updateable"
+	off := ms.GetInt()
+	hdr := ms.getHdr()
+	tbl := ms.GetStr()
+	row := ms.getRow(off)
+	return row, hdr, tbl
 }
 
-func (dc *dbmsClient) Info() Value {
-	dc.PutCmd(commands.Info).Request()
-	return dc.GetVal()
+func (ms *muxSession) Info() Value {
+	ms.PutCmd(commands.Info)
+	ms.Request()
+	return ms.GetVal()
 }
 
-func (dc *dbmsClient) Kill(sessionid string) int {
-	dc.PutCmd(commands.Kill).PutStr(sessionid).Request()
-	return dc.GetInt()
+func (ms *muxSession) Kill(sessionid string) int {
+	ms.PutCmd(commands.Kill).PutStr(sessionid)
+	ms.Request()
+	return ms.GetInt()
 }
 
-func (dc *dbmsClient) Load(table string) int {
-	dc.PutCmd(commands.Load).PutStr(table).Request()
-	return dc.GetInt()
+func (ms *muxSession) Load(table string) int {
+	ms.PutCmd(commands.Load).PutStr(table)
+	ms.Request()
+	return ms.GetInt()
 }
 
-func (dc *dbmsClient) Log(s string) {
-	dc.PutCmd(commands.Log).PutStr(s).Request()
+func (ms *muxSession) Log(s string) {
+	ms.PutCmd(commands.Log).PutStr(s)
+	ms.Request()
 }
 
-func (dc *dbmsClient) LibGet(name string) []string {
-	dc.PutCmd(commands.LibGet).PutStr(name).Request()
-	n := dc.GetSize()
+func (ms *muxSession) LibGet(name string) []string {
+	ms.PutCmd(commands.LibGet).PutStr(name)
+	ms.Request()
+	n := ms.GetSize()
 	v := make([]string, 2*n)
 	sizes := make([]int, n)
 	for i := 0; i < 2*n; i += 2 {
-		v[i] = dc.GetStr() // library
-		sizes[i/2] = dc.GetSize()
+		v[i] = ms.GetStr() // library
+		sizes[i/2] = ms.GetSize()
 	}
 	for i := 1; i < 2*n; i += 2 {
-		v[i] = dc.GetN(sizes[i/2]) // text
+		v[i] = ms.GetN(sizes[i/2]) // text
 	}
 	return v
 }
 
-func (dc *dbmsClient) Libraries() []string {
-	dc.PutCmd(commands.Libraries).Request()
-	return dc.GetStrs()
+func (ms *muxSession) Libraries() []string {
+	ms.PutCmd(commands.Libraries)
+	ms.Request()
+	return ms.GetStrs()
 }
 
-func (dc *dbmsClient) Nonce(*Thread) string {
-	dc.PutCmd(commands.Nonce).Request()
-	return dc.GetStr()
+func (ms *muxSession) Nonce(*Thread) string {
+	ms.PutCmd(commands.Nonce)
+	ms.Request()
+	return ms.GetStr_()
 }
 
-func (dc *dbmsClient) Run(_ *Thread, code string) Value {
-	dc.PutCmd(commands.Run).PutStr(code).Request()
-	return dc.ValueResult()
+func (ms *muxSession) Run(_ *Thread, code string) Value {
+	ms.PutCmd(commands.Run).PutStr(code)
+	ms.Request()
+	return ms.ValueResult()
 }
 
-func (dc *dbmsClient) Schema(string) string {
+func (ms *muxSession) Schema(string) string {
 	panic("Schema only available standalone")
 }
 
-func (dc *dbmsClient) SessionId(th *Thread, id string) string {
+func (ms *muxSession) SessionId(th *Thread, id string) string {
 	if s := th.Session(); s != "" && id == "" {
 		return s // use cached value
 	}
-	dc.PutCmd(commands.SessionId).PutStr(id).Request()
-	s := dc.GetStr()
+	ms.PutCmd(commands.SessionId).PutStr(id)
+	ms.Request()
+	s := ms.GetStr()
 	th.SetSession(s)
 	return s
 }
 
-func (dc *dbmsClient) Size() uint64 {
-	dc.PutCmd(commands.Size).Request()
-	return uint64(dc.GetInt64())
+func (ms *muxSession) Size() uint64 {
+	ms.PutCmd(commands.Size)
+	ms.Request()
+	return uint64(ms.GetInt64())
 }
 
-func (dc *dbmsClient) Timestamp() SuDate {
-	dc.PutCmd(commands.Timestamp).Request()
-	return dc.GetVal().(SuDate)
+func (ms *muxSession) Timestamp() SuDate {
+	ms.PutCmd(commands.Timestamp)
+	ms.Request()
+	return ms.GetVal().(SuDate)
 }
 
-func (dc *dbmsClient) Token() string {
-	dc.PutCmd(commands.Token).Request()
-	return dc.GetStr()
+func (ms *muxSession) Token() string {
+	ms.PutCmd(commands.Token)
+	ms.Request()
+	return ms.GetStr()
 }
 
-func (dc *dbmsClient) Transaction(update bool) ITran {
-	dc.PutCmd(commands.Transaction).PutBool(update).Request()
-	tn := dc.GetInt()
-	return &TranClient{dc: dc, tn: tn}
+func (ms *muxSession) Transaction(update bool) ITran {
+	ms.PutCmd(commands.Transaction).PutBool(update)
+	ms.Request()
+	tn := ms.GetInt()
+	return &muxTran{muxSession: ms, tn: tn}
 }
 
-func (dc *dbmsClient) Transactions() *SuObject {
-	dc.PutCmd(commands.Transactions).Request()
+func (ms *muxSession) Transactions() *SuObject {
+	ms.PutCmd(commands.Transactions)
+	ms.Request()
 	ob := &SuObject{}
-	for n := dc.GetInt(); n > 0; n-- {
-		ob.Add(IntVal(dc.GetInt()))
+	for n := ms.GetInt(); n > 0; n-- {
+		ob.Add(IntVal(ms.GetInt()))
 	}
 	return ob
 }
 
-func (dc *dbmsClient) Unuse(lib string) bool {
+func (ms *muxSession) Unuse(lib string) bool {
 	panic("can't Unuse('" + lib + "')\n" +
 		"When client-server, only the server can Unuse")
 }
 
-func (dc *dbmsClient) Use(lib string) bool {
-	if slices.Contains(dc.Libraries(), lib) {
+func (ms *muxSession) Use(lib string) bool {
+	if slices.Contains(ms.Libraries(), lib) {
 		return false
 	}
 	panic("can't Use('" + lib + "')\n" +
 		"When client-server, only the server can Use")
 }
 
-func (dc *dbmsClient) Unwrap() IDbms {
-	return dc
+func (ms *muxSession) Unwrap() IDbms {
+	return ms
 }
 
-func (dc *dbmsClient) getHdr() *Header {
-	n := dc.GetInt()
+func (ms *muxSession) getHdr() *Header {
+	n := ms.GetInt()
 	fields := make([]string, 0, n)
 	columns := make([]string, 0, n)
 	for i := 0; i < n; i++ {
-		s := dc.GetStr()
+		s := ms.GetStr()
 		if ascii.IsUpper(s[0]) {
 			s = str.UnCapitalize(s)
 		} else if !strings.HasSuffix(s, "_lower!") {
@@ -283,193 +285,198 @@ func (dc *dbmsClient) getHdr() *Header {
 	return NewHeader([][]string{fields}, columns)
 }
 
-func (dc *dbmsClient) getRow(off int) Row {
-	return Row([]DbRec{{Record: dc.GetRec(), Off: uint64(off)}})
+func (ms *muxSession) getRow(off int) Row {
+	return Row([]DbRec{{Record: ms.GetRec(), Off: uint64(off)}})
 }
 
 // ------------------------------------------------------------------
 
-type TranClient struct {
-	dc       *dbmsClient
+type muxTran struct {
+	*muxSession
 	conflict string
 	tn       int
 	ended    bool
 }
 
-var _ ITran = (*TranClient)(nil)
+var _ ITran = (*muxTran)(nil)
 
-func (tc *TranClient) Abort() string {
+func (tc *muxTran) Abort() string {
 	tc.ended = true
-	tc.dc.PutCmd(commands.Abort).PutInt(tc.tn).Request()
+	tc.PutCmd(commands.Abort).PutInt(tc.tn)
+	tc.Request()
 	return ""
 }
 
-func (tc *TranClient) Asof(int64) int64 {
-	return 0 // jSuneido doesn't support Asof
+func (tc *muxTran) Asof(asof int64) int64 {
+	tc.PutCmd(commands.Asof).PutInt(tc.tn).PutInt64(asof)
+	tc.Request()
+	return tc.GetInt64()
 }
 
-func (tc *TranClient) Complete() string {
+func (tc *muxTran) Complete() string {
 	tc.ended = true
-	tc.dc.PutCmd(commands.Commit).PutInt(tc.tn).Request()
-	if tc.dc.GetBool() {
+	tc.PutCmd(commands.Commit).PutInt(tc.tn)
+	tc.Request()
+	if tc.GetBool() {
 		return ""
 	}
-	tc.conflict = tc.dc.GetStr()
+	tc.conflict = tc.GetStr()
 	return tc.conflict
 }
 
-func (tc *TranClient) Conflict() string {
+func (tc *muxTran) Conflict() string {
 	return tc.conflict
 }
 
-func (tc *TranClient) Ended() bool {
+func (tc *muxTran) Ended() bool {
 	return tc.ended
 }
 
-func (tc *TranClient) Delete(_ *Thread, _ string, off uint64) {
-	tc.dc.PutCmd(commands.Erase).PutInt(tc.tn).PutInt(int(off)).Request()
+func (tc *muxTran) Delete(_ *Thread, table string, off uint64) {
+	tc.PutCmd(commands.Erase).PutInt(tc.tn).PutStr(table).PutInt(int(off))
+	tc.Request()
 }
 
-func (tc *TranClient) Get(_ *Thread, query string, dir Dir,
+func (tc *muxTran) Get(_ *Thread, query string, dir Dir,
 	_ *Sviews) (Row, *Header, string) {
-	return tc.dc.get(tc.tn, query, dir)
+	return tc.get(tc.tn, query, dir)
 }
 
-func (tc *TranClient) Query(query string, _ *Sviews) IQuery {
-	tc.dc.PutCmd(commands.Query).PutInt(tc.tn).PutStr(query).Request()
-	qn := tc.dc.GetInt()
-	return newClientQuery(tc.dc, qn)
+func (tc *muxTran) Query(query string, _ *Sviews) IQuery {
+	tc.PutCmd(commands.Query).PutInt(tc.tn).PutStr(query)
+	tc.Request()
+	qn := tc.GetInt()
+	return tc.muxSession.newClientQuery(qn)
 }
 
-func (tc *TranClient) ReadCount() int {
-	tc.dc.PutCmd(commands.ReadCount).PutInt(tc.tn).Request()
-	return tc.dc.GetInt()
+func (tc *muxTran) ReadCount() int {
+	tc.PutCmd(commands.ReadCount).PutInt(tc.tn)
+	tc.Request()
+	return tc.GetInt()
 }
 
-func (tc *TranClient) Action(_ *Thread, action string, _ *Sviews) int {
-	tc.dc.PutCmd(commands.Action).PutInt(tc.tn).PutStr(action).Request()
-	return tc.dc.GetInt()
+func (tc *muxTran) Action(_ *Thread, action string, _ *Sviews) int {
+	tc.PutCmd(commands.Action).PutInt(tc.tn).PutStr(action)
+	tc.Request()
+	return tc.GetInt()
 }
 
-func (tc *TranClient) Update(_ *Thread, _ string, off uint64, rec Record) uint64 {
-	tc.dc.PutCmd(commands.Update).
-		PutInt(tc.tn).PutInt(int(off)).PutRec(rec).Request()
-	return uint64(tc.dc.GetInt())
+func (tc *muxTran) Update(_ *Thread, table string, off uint64, rec Record) uint64 {
+	tc.PutCmd(commands.Update).
+		PutInt(tc.tn).PutStr(table).PutInt(int(off)).PutRec(rec)
+	tc.Request()
+	return uint64(tc.GetInt())
 }
 
-func (tc *TranClient) WriteCount() int {
-	tc.dc.PutCmd(commands.WriteCount).PutInt(tc.tn).Request()
-	return tc.dc.GetInt()
+func (tc *muxTran) WriteCount() int {
+	tc.PutCmd(commands.WriteCount).PutInt(tc.tn)
+	tc.Request()
+	return tc.GetInt()
 }
 
-func (tc *TranClient) String() string {
+func (tc *muxTran) String() string {
 	return "Transaction" + strconv.Itoa(tc.tn)
 }
 
 // ------------------------------------------------------------------
 
-// clientQueryCursor is the common stuff for clientQuery and clientCursor
-type clientQueryCursor struct {
-	dc   *dbmsClient
+// muxQueryCursor is the common stuff for muxQuery and muxCursor
+type muxQueryCursor struct {
+	*muxSession
 	hdr  *Header
 	keys []string // cache
 	id   int
 	qc   qcType
 }
 
-type qcType byte
-
-const (
-	query  qcType = 'q'
-	cursor qcType = 'c'
-)
-
-func (qc *clientQueryCursor) Close() {
-	qc.dc.PutCmd(commands.Close).PutInt(qc.id).PutByte(byte(qc.qc)).Request()
+func (qc *muxQueryCursor) Close() {
+	qc.PutCmd(commands.Close).PutInt(qc.id).PutByte(byte(qc.qc))
+	qc.Request()
 }
 
-func (qc *clientQueryCursor) Header() *Header {
+func (qc *muxQueryCursor) Header() *Header {
 	if qc.hdr == nil { // cached
-		qc.dc.PutCmd(commands.Header).PutInt(qc.id).PutByte(byte(qc.qc)).Request()
-		qc.hdr = qc.dc.getHdr()
+		qc.PutCmd(commands.Header).PutInt(qc.id).PutByte(byte(qc.qc))
+		qc.Request()
+		qc.hdr = qc.getHdr()
 	}
 	return qc.hdr
 }
 
-func (qc *clientQueryCursor) Keys() []string {
+func (qc *muxQueryCursor) Keys() []string {
 	if qc.keys == nil { // cached
-		qc.dc.PutCmd(commands.Keys).PutInt(qc.id).PutByte(byte(qc.qc)).Request()
-		nk := qc.dc.GetInt()
-		qc.keys = make([]string, nk)
-		for i := range qc.keys {
-			cb := str.CommaBuilder{}
-			n := qc.dc.GetInt()
-			for ; n > 0; n-- {
-				cb.Add(qc.dc.GetStr())
-			}
-			qc.keys[i] = cb.String()
-		}
+		qc.PutCmd(commands.Keys).PutInt(qc.id).PutByte(byte(qc.qc))
+		qc.Request()
+		qc.keys = qc.GetStrs()
 	}
 	return qc.keys
 }
 
-func (qc *clientQueryCursor) Order() []string {
-	qc.dc.PutCmd(commands.Order).PutInt(qc.id).PutByte(byte(qc.qc)).Request()
-	return qc.dc.GetStrs()
+func (qc *muxQueryCursor) Order() []string {
+	qc.PutCmd(commands.Order).PutInt(qc.id).PutByte(byte(qc.qc))
+	qc.Request()
+	return qc.GetStrs()
 }
 
-func (qc *clientQueryCursor) Rewind() {
-	qc.dc.PutCmd(commands.Rewind).PutInt(qc.id).PutByte(byte(qc.qc)).Request()
+func (qc *muxQueryCursor) Rewind() {
+	qc.PutCmd(commands.Rewind).PutInt(qc.id).PutByte(byte(qc.qc))
+	qc.Request()
 }
 
-func (qc *clientQueryCursor) Strategy(_ bool) string {
-	qc.dc.PutCmd(commands.Strategy).PutInt(qc.id).PutByte(byte(qc.qc)).Request()
-	return qc.dc.GetStr()
+func (qc *muxQueryCursor) Strategy(formatted bool) string {
+	qc.PutCmd(commands.Strategy).PutInt(qc.id).PutByte(byte(qc.qc)).PutBool(formatted)
+	qc.Request()
+	return qc.GetStr()
 }
 
-// clientQuery implements IQuery ------------------------------------
-type clientQuery struct {
-	clientQueryCursor
+// muxQuery implements IQuery ------------------------------------
+type muxQuery struct {
+	muxQueryCursor
 }
 
-func newClientQuery(dc *dbmsClient, qn int) *clientQuery {
-	return &clientQuery{clientQueryCursor{dc: dc, id: qn, qc: query}}
+func (ms *muxSession) newClientQuery(qn int) *muxQuery {
+	return &muxQuery{muxQueryCursor{muxSession: ms, id: qn, qc: query}}
 }
 
-var _ IQuery = (*clientQuery)(nil)
+var _ IQuery = (*muxQuery)(nil)
 
-func (q *clientQuery) Get(_ *Thread, dir Dir) (Row, string) {
-	q.dc.PutCmd(commands.Get).PutByte(byte(dir)).PutInt(0).PutInt(q.id).Request()
-	if !q.dc.GetBool() {
+func (q *muxQuery) Get(_ *Thread, dir Dir) (Row, string) {
+	q.PutCmd(commands.Get).PutByte(byte(dir)).PutInt(0).PutInt(q.id)
+	q.Request()
+	if !q.GetBool() {
 		return nil, ""
 	}
-	off := q.dc.GetInt()
-	row := q.dc.getRow(off)
-	return row, "updateable"
+	off := q.GetInt()
+	table := q.GetStr()
+	row := q.getRow(off)
+	return row, table
 }
 
-func (q *clientQuery) Output(_ *Thread, rec Record) {
-	q.dc.PutCmd(commands.Output).PutInt(q.id).PutRec(rec).Request()
+func (q *muxQuery) Output(_ *Thread, rec Record) {
+	q.PutCmd(commands.Output).PutInt(q.id).PutRec(rec)
+	q.Request()
 }
 
-// clientCursor implements IQuery ------------------------------------
-type clientCursor struct {
-	clientQueryCursor
+// muxCursor implements IQuery ------------------------------------
+type muxCursor struct {
+	muxQueryCursor
 }
 
-func newClientCursor(dc *dbmsClient, cn int) *clientCursor {
-	return &clientCursor{clientQueryCursor{dc: dc, id: cn, qc: cursor}}
+func (ms *muxSession) newClientCursor(cn int) *muxCursor {
+	return &muxCursor{muxQueryCursor{muxSession: ms, id: cn, qc: cursor}}
 }
 
-var _ ICursor = (*clientCursor)(nil)
+var _ ICursor = (*muxCursor)(nil)
 
-func (q *clientCursor) Get(_ *Thread, tran ITran, dir Dir) (Row, string) {
-	t := tran.(*TranClient)
-	q.dc.PutCmd(commands.Get).PutByte(byte(dir)).PutInt(t.tn).PutInt(q.id).Request()
-	if !q.dc.GetBool() {
+func (q *muxCursor) Get(_ *Thread, tran ITran, dir Dir) (Row, string) {
+	t := tran.(*muxTran)
+	q.PutCmd(commands.Get).PutByte(byte(dir)).PutInt(t.tn).PutInt(q.id)
+	q.Request()
+	if !q.GetBool() {
 		return nil, ""
 	}
-	off := q.dc.GetInt()
-	row := q.dc.getRow(off)
-	return row, "updateable"
+	off := q.GetInt()
+	table := q.GetStr()
+	row := q.getRow(off)
+	return row, table
 }

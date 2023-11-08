@@ -47,7 +47,7 @@ func HasPrefix[E comparable](list, list2 []E) bool {
 }
 
 // Without returns a new slice
-// omitting any occurences of the given value,
+// omitting any occurrences of the given value,
 // maintaining the existing order.
 func Without[S ~[]E, E comparable](list S, str E) S {
 	dest := make(S, 0, len(list))
@@ -125,7 +125,8 @@ func Allow[S ~[]E, E any](s S, n int) S {
 	return Grow(s, n-len(s))
 }
 
-// With returns a copy of the list with the values appended
+// With returns a copy of the list with the values appended.
+// Unlike append, it allocates just the right size, no extra.
 func With[S ~[]E, E any](s1 S, s2 ...E) S {
 	result := make(S, len(s1)+len(s2))
 	copy(result, s1)
@@ -181,4 +182,8 @@ func Max[E cmp.Ordered](list []E) E {
 		}
 	}
 	return max
+}
+
+func StartsWith[E comparable](list []E, e E) bool {
+	return len(list) > 0 && list[0] == e
 }

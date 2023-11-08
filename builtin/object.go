@@ -6,8 +6,8 @@ package builtin
 import (
 	"strings"
 
-	. "github.com/apmckinlay/gsuneido/runtime"
-	"github.com/apmckinlay/gsuneido/runtime/types"
+	. "github.com/apmckinlay/gsuneido/core"
+	"github.com/apmckinlay/gsuneido/core/types"
 )
 
 var _ = builtin(ConcurrentQ, "(value)")
@@ -38,7 +38,13 @@ func ob_Add(th *Thread, as *ArgSpec, this Value, args []Value) Value {
 			putAt(th, ob, at, iter)
 		}
 	} else {
-		addAt(ob, ob.ListSize(), iter)
+		for {
+			k, v := iter()
+			if k != nil || v == nil {
+				break
+			}
+			ob.Add(v)
+		}
 	}
 	return this
 }

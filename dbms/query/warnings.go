@@ -7,26 +7,14 @@ import (
 	"log"
 	"strings"
 
-	. "github.com/apmckinlay/gsuneido/runtime"
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
-var seen = map[string]bool{}
-var nWarn = 0
-
 func Warnings(query string, q Query) {
-	w := warnings(q)
-	s := warnStr(query, w)
-	if s != "" {
-		if Suneido.Get(nil, SuStr("User")) == SuStr("default") {
-			panic(s)
-		} else {
-			nWarn++
-			if !seen[query] && nWarn < 10 {
-				seen[query] = true
-				log.Println("WARNING", s, query)
-			}
-		}
+	w := warnings(query, q)
+	if s := warnStr(query, w); s != "" {
+		Warning(s, query)
 	}
 }
 
@@ -53,12 +41,12 @@ func warnStr(query string, w int) string {
 	return cb.String()
 }
 
-func warnings(q Query) int { // recursive
+func warnings(query string, q Query) int { // recursive
 	w := 0
 	switch q := q.(type) {
 	case *Project:
 		if _, ok := q.source.(*Project); ok {
-			log.Println("ERROR: transform did not merge project")
+			log.Print("ERROR: transform did not merge project\n", query)
 		}
 		if !q.unique {
 			w |= projectNotUnique
@@ -77,23 +65,23 @@ func warnings(q Query) int { // recursive
 		}
 	case *Where:
 		if _, ok := q.source.(*Where); ok {
-			log.Println("ERROR: transform did not merge where")
+			log.Print("ERROR: transform did not merge where\n", query)
 		}
 	case *Extend:
 		if _, ok := q.source.(*Extend); ok {
-			log.Println("ERROR: transform did not merge extend")
+			log.Print("ERROR: transform did not merge extend\n", query)
 		}
 	case *Rename:
 		if _, ok := q.source.(*Rename); ok {
-			log.Println("ERROR: transform did not merge rename")
+			log.Print("ERROR: transform did not merge rename\n", query)
 		}
 	}
 	switch q := q.(type) {
 	case q2i:
-		w |= warnings(q.Source())
-		w |= warnings(q.Source2())
+		w |= warnings(query, q.Source())
+		w |= warnings(query, q.Source2())
 	case q1i:
-		w |= warnings(q.Source())
+		w |= warnings(query, q.Source())
 	}
 	return w
 }

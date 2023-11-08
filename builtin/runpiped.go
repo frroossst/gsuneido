@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	. "github.com/apmckinlay/gsuneido/runtime"
+	. "github.com/apmckinlay/gsuneido/core"
 )
 
 type suRunPiped struct {
@@ -23,6 +23,7 @@ type suRunPiped struct {
 }
 
 var nRunPiped atomic.Int32
+var _ = AddInfo("builtin.nRunPiped", &nRunPiped)
 
 var _ = builtin(RunPiped, "(command, block=false)")
 

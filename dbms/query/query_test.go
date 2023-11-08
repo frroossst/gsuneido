@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/apmckinlay/gsuneido/compile"
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19"
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/stor"
-	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 )
 
@@ -139,8 +139,7 @@ func TestForeignKeys(*testing.T) {
 	act("insert { a: 'a1', b: 'b2', d: 'd2', e: 'e2' } into lin8")
 	act("update hdr8 where a is 'a1' and b is '' set a = 'a0'")
 	assert.This(queryAll(db, "lin8")).Is("a=a0 d=d1 e=e1 | a=a1 b=b2 d=d2 e=e2")
-
-	db.Check()
+	db.MustCheck()
 }
 
 func queryAll(db *db19.Database, query string) string {
@@ -409,8 +408,7 @@ func BenchmarkNoOptMod(b *testing.B) {
 	orig := [][]string{{"a"}, {"b"}, {"c"}, {"d"}, {"e"}, {"f"}}
 	for i := 0; i < b.N; i++ {
 		result = make([][]string, len(orig))
-		//lint:ignore S1011 testing
-		for _, o := range orig {
+		for _, o := range orig { //nolint:gosimple
 			result = append(result, o)
 		}
 	}

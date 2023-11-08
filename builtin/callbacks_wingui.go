@@ -12,9 +12,9 @@ import (
 
 	"github.com/apmckinlay/gsuneido/builtin/goc"
 	"github.com/apmckinlay/gsuneido/builtin/heap"
+	. "github.com/apmckinlay/gsuneido/core"
+	"github.com/apmckinlay/gsuneido/core/types"
 	"github.com/apmckinlay/gsuneido/options"
-	. "github.com/apmckinlay/gsuneido/runtime"
-	"github.com/apmckinlay/gsuneido/runtime/types"
 )
 
 // use the very last 4 argument callback
@@ -267,6 +267,8 @@ func CallbacksCount() int {
 	return n
 }
 
+var _ = AddInfo("windows.nCallback", CallbacksCount)
+
 var _ = builtin(ClearCallback, "(fn)")
 
 func ClearCallback(fn Value) Value {
@@ -276,3 +278,5 @@ func ClearCallback(fn Value) Value {
 func WndProcCount() int {
 	return len(hwndToCb)
 }
+
+var _ = AddInfo("windows.nWndProc", WndProcCount)

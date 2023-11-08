@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/options"
-	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
@@ -88,6 +88,8 @@ var _ = staticMethod(thread_Count, "()")
 func thread_Count() Value {
 	return IntVal(threads.count())
 }
+
+var _ = AddInfo("builtin.nThread", threads.count)
 
 var _ = staticMethod(thread_List, "()")
 

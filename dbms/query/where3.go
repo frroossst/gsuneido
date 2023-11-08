@@ -4,15 +4,14 @@
 package query
 
 import (
-	"log"
 	"math"
 	"strconv"
 	"strings"
 
 	"slices"
 
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
-	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -121,7 +120,7 @@ func explodeIndexSpans(remaining [][]span, prefixes [][]span) [][]span {
 	} else { // len(f) > 1
 		newpre := make([][]span, 0, len(f)*len(prefixes))
 		if len(prefixes) < explodeWarn && len(newpre) >= explodeWarn {
-			log.Printf("WARNING query where explode large (> %d)", explodeWarn)
+			Warning("query where explode large >", explodeWarn)
 		}
 		for i := range prefixes {
 			// Clip so each append will make a new copy (COW)

@@ -9,11 +9,11 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/apmckinlay/gsuneido/core"
 	. "github.com/apmckinlay/gsuneido/db19"
 	"github.com/apmckinlay/gsuneido/db19/meta"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/options"
-	"github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/cksum"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
@@ -31,9 +31,9 @@ func Compact(dbfile string) (nTables, nViews int, oldSize, newSize uint64, err e
 		}
 	}()
 	src, err := OpenDb(dbfile, stor.Read, false)
-	oldSize = src.Store.Size()
 	ck(err)
 	defer src.Close()
+	oldSize = src.Store.Size()
 	dst, tmpfile := tmpdb()
 	defer func() { dst.Close(); os.Remove(tmpfile) }()
 
@@ -108,7 +108,7 @@ func copyViews(state *DbState, dst *Database) int {
 func compactTable(state *DbState, src *Database, ts *meta.Schema, dst *Database) {
 	defer func() {
 		if e := recover(); e != nil {
-			runtime.Fatal(ts.Table+":", e)
+			core.Fatal(ts.Table+":", e)
 		}
 	}()
 	hasdel := ts.HasDeleted()
@@ -130,7 +130,7 @@ func compactTable(state *DbState, src *Database, ts *meta.Schema, dst *Database)
 			cksum.Update(buf)
 		} else {
 			rec := src.Store.Data(off)
-			n = runtime.RecLen(rec)
+			n = core.RecLen(rec)
 			rec = rec[:n+cksum.Len]
 			cksum.MustCheck(rec)
 			off2, buf = dst.Store.Alloc(len(rec))

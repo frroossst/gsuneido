@@ -12,16 +12,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apmckinlay/gsuneido/core"
+	"github.com/apmckinlay/gsuneido/db19/index"
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
 	"github.com/apmckinlay/gsuneido/db19/stor"
-	rt "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 )
 
 func init() {
-	MakeSuTran = func(ut *UpdateTran) *rt.SuTran {
-		return rt.NewSuTran(nil, true)
+	MakeSuTran = func(ut *UpdateTran) *core.SuTran {
+		return core.NewSuTran(nil, true)
 	}
 }
 
@@ -50,7 +51,7 @@ func TestConcurrent(t *testing.T) {
 	db.ck.Stop()
 	db.ck = nil
 
-	ck(db.Check())
+	db.MustCheck()
 	var nout = nclients * ntrans
 	rt := db.NewReadTran()
 	ti := rt.meta.GetRoInfo("mytable")
@@ -79,12 +80,12 @@ func TestTran(t *testing.T) {
 				db, err = OpenDatabase("tmp.db")
 				ck(err)
 				db.CheckerSync()
-				ck(db.Check())
+				db.MustCheck()
 			}
 		}
 	}
 	db.persist(&execPersistSingle{})
-	ck(db.Check())
+	db.MustCheck()
 	rt := db.NewReadTran()
 	ti := rt.meta.GetRoInfo("mytable")
 	assert.T(t).Msg("nrows").This(ti.Nrows).Is(nout)
@@ -93,7 +94,7 @@ func TestTran(t *testing.T) {
 
 	db, err = OpenDatabaseRead("tmp.db")
 	ck(err)
-	ck(db.Check())
+	db.MustCheck()
 	rt = db.NewReadTran()
 	ti = rt.meta.GetRoInfo("mytable")
 	assert.T(t).Msg("nrows").This(ti.Nrows).Is(nout)
@@ -129,10 +130,10 @@ func output1(db *Database) *UpdateTran {
 	// NOTE: does not commit
 }
 
-func mkrec(args ...string) rt.Record {
-	var b rt.RecordBuilder
+func mkrec(args ...string) core.Record {
+	var b core.RecordBuilder
 	for _, a := range args {
-		b.Add(rt.SuStr(a))
+		b.Add(core.SuStr(a))
 	}
 	return b.Build()
 }
@@ -198,4 +199,41 @@ func TestOutputDupConflict(*testing.T) {
 	t1.Output(nil, "mytable", mkrec("1"))
 	assert.This(func() { t2.Output(nil, "mytable", mkrec("1")) }).
 		Panics("conflicted")
+}
+
+func TestGetIndexI(*testing.T) {
+	db, err := CreateDb(stor.HeapStor(8192))
+	ck(err)
+	StartConcur(db, 50*time.Millisecond)
+	createTbl(db)
+
+	ut := db.NewUpdateTran()
+	it := index.NewOverIter("mytable", 0)
+	it.Next(ut)                           // incorrectly got r/o info
+	ut.Output(nil, "mytable", mkrec("1")) // updates r/w info
+	it.Rewind()
+	it.Next(ut) // output wasn't visible through r/o info
+	assert.That(!it.Eof())
+	key, _ := it.Cur()
+	assert.This(core.Unpack(key)).Is(core.SuStr("1"))
+	ut.Commit()
+
+	db.MustCheck()
+}
+
+func TestGetIndexI2(t *testing.T) {
+	db, err := CreateDb(stor.HeapStor(8192))
+	ck(err)
+	StartConcur(db, 50*time.Millisecond)
+	createTbl(db)
+
+	ut := db.NewUpdateTran()
+	ut.GetIndexI("mytable", 0) // creates mut's
+	ut.Commit()                // moves mut's to layers but does not merge
+
+	ut = db.NewUpdateTran()
+	ut.Output(nil, "mytable", mkrec("1")) // merges wrong layer
+	ut.Commit()
+
+	db.MustCheck()
 }

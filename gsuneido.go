@@ -17,12 +17,13 @@ import (
 
 	"github.com/apmckinlay/gsuneido/builtin"
 	"github.com/apmckinlay/gsuneido/compile"
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19"
 	"github.com/apmckinlay/gsuneido/db19/tools"
 	"github.com/apmckinlay/gsuneido/dbms"
 	"github.com/apmckinlay/gsuneido/options"
-	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/exit"
+	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/regex"
 	"github.com/apmckinlay/gsuneido/util/system"
 	// sync "github.com/sasha-s/go-deadlock"
@@ -33,21 +34,20 @@ var mode = ""                       // set by: go build -ldflags "-X main.mode=g
 
 var help = `options:
 	-check
-	-c[lient] [ipaddress] (default 127.0.0.1)
+	-c[lient][=ipaddress] (default 127.0.0.1)
+	-compact
 	-d[ump] [table]
 	-h[elp] or -?
 	-l[oad] [table]
-	-n[o]r[elaunch]
-	-p[ort] # (default 3147)
+	-p[ort][=#] (default 3147)
 	-repair
-	-r[epl]
 	-s[erver]
-	-u[nattended]
-	-v[ersion]`
+	-v[ersion]
+	-w[eb][=#] (default -port + 1)`
 
 // dbmsLocal is set if running with a local/standalone database.
 var dbmsLocal *dbms.DbmsLocal
-var mainThread *Thread
+var mainThread Thread
 
 func main() {
 	options.BuiltDate = builtDate
@@ -56,15 +56,17 @@ func main() {
 	if options.Action == "client" {
 		options.Errlog = builtin.ErrlogDir() + "suneido" + options.Port + ".err"
 	}
+	Exit = exit.Exit
 	if mode == "gui" {
 		redirect()
-		// sync.Opts.LogBuf = os.Stderr
-	}
-	if err := system.Service("gSuneido", redirect, exit.RunFuncs); err != nil {
-		Fatal(err)
-	}
-	if options.Action == "" && mode != "gui" {
-		options.Action = "repl"
+	} else {
+		svc, err := system.Service("gSuneido", redirect, exit.RunFuncs)
+		if err != nil {
+			Fatal(err)
+		}
+		if svc {
+			Exit = system.StopService
+		}
 	}
 
 	switch options.Action {
@@ -74,8 +76,7 @@ func main() {
 		if mode == "gui" {
 			Fatal("Please use gsport for server mode")
 		}
-		startServer()
-		os.Exit(0)
+		runServer()
 	case "dump":
 		t := time.Now()
 		if options.Arg == "" {
@@ -114,7 +115,7 @@ func main() {
 		newSize /= 1024 * 1024
 		Alert("compacted", nTables, "tables", nViews, "views",
 			"in", time.Since(t).Round(time.Millisecond),
-			oldSize, "-", (oldSize-newSize), "=", newSize, "mb")
+			oldSize, "-", (oldSize - newSize), "=", newSize, "mb")
 		os.Exit(0)
 	case "check":
 		t := time.Now()
@@ -139,8 +140,11 @@ func main() {
 	case "help":
 		Alert(help)
 		os.Exit(0)
-	case "repl", "client":
-		// handled below
+	case "client":
+		if options.WebServer {
+			options.DbStatus.Store("")
+			startHttpStatus()
+		}
 	case "error":
 		Fatal(options.Error)
 	default:
@@ -148,50 +152,59 @@ func main() {
 		os.Exit(1)
 	}
 	Libload = libload // dependency injection
-	mainThread = &Thread{}
 	mainThread.Name = "main"
 	mainThread.UIThread = true
-	MainThread = mainThread
-	builtin.UIThread = mainThread
-	// exit.Add(func() { mainThread.Close() }) // causes race if run by thread
+	MainThread = &mainThread
+	builtin.UIThread = &mainThread
 	defer func() {
 		if e := recover(); e != nil {
 			log.Println("ERROR:", e, "(exiting)")
-			exit.Exit(1)
+			Exit(1)
 		}
-		exit.Exit(0)
+		Exit(0)
 	}()
 	// dependency injection of GetDbms
 	if options.Action == "client" {
 		conn, jserver := dbms.ConnectClient(options.Arg, options.Port)
 		if jserver {
-			mainThread.SetDbms(dbms.NewDbmsClient(conn))
+			mainThread.SetDbms(dbms.NewJsunClient(conn))
 			GetDbms = func() IDbms {
 				conn, _ := dbms.ConnectClient(options.Arg, options.Port)
-				return dbms.NewDbmsClient(conn)
+				return dbms.NewJsunClient(conn)
 			}
 		} else {
-			client := dbms.NewMuxClient(conn)
+			client := dbms.NewDbmsClient(conn)
 			GetDbms = func() IDbms {
 				return client.NewSession()
 			}
 		}
-		clientErrorLog()
+		if mode == "gui" {
+			clientErrorLog()
+		}
 	} else {
 		openDbms()
+		if options.WebServer {
+			options.DbStatus.Store("")
+			startHttpStatus()
+		}
 	}
-	if options.Action == "repl" ||
-		(options.Action == "client" && options.Mode != "gui") {
-		run("Init.Repl()")
-		repl()
-	} else {
+	if mode == "gui" {
 		run("Init()")
 		builtin.Run()
+	} else {
+		run("Init.Repl()")
+		repl()
 	}
 }
 
 func redirect() {
-	if err := system.Redirect(options.Errlog); err != nil {
+	getId := func() string {
+		if MainThread == nil {
+			return ""
+		}
+		return MainThread.Session()
+	}
+	if err := system.Redirect(options.Errlog, getId); err != nil {
 		Fatal("Redirect failed:", err)
 	}
 }
@@ -199,11 +212,11 @@ func redirect() {
 func run(src string) {
 	defer func() {
 		if e := recover(); e != nil {
-			LogUncaught(mainThread, src, e)
+			LogUncaught(&mainThread, src, e)
 			Fatal("ERROR from", src, e)
 		}
 	}()
-	compile.EvalString(mainThread, src)
+	compile.EvalString(&mainThread, src)
 }
 
 func ck(err error) {
@@ -218,9 +231,6 @@ func ck(err error) {
 func clientErrorLog() {
 	dbms := mainThread.Dbms()
 
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmsgprefix)
-	log.SetPrefix(mainThread.SessionId("") + " ")
-
 	f, err := os.Open(options.Errlog)
 	if err != nil {
 		return
@@ -229,7 +239,7 @@ func clientErrorLog() {
 		f.Close()
 		os.Truncate(options.Errlog, 0) // can't remove since open as stderr
 		if e := recover(); e != nil {
-			dbms.Log("log previous errors: " + fmt.Sprint(e))
+			dbms.Log("send previous errors: " + fmt.Sprint(e))
 		}
 	}()
 	// send errors to server
@@ -237,26 +247,26 @@ func clientErrorLog() {
 	in.Buffer(nil, 1024)
 	nlines := 0
 	for in.Scan() {
-		dbms.Log("PREVIOUS: " + in.Text())
+		dbms.Log("PREV: " + in.Text())
 		if nlines++; nlines > 1000 {
-			dbms.Log("PREVIOUS: too many errors")
+			dbms.Log("PREV: too many errors")
 			break
 		}
 	}
 }
 
-// startServer does not return
-func startServer() {
+// runServer does not return
+func runServer() {
 	log.Println("starting server")
-	startHttpStatus()
 	openDbms()
+	startHttpStatus()
 	Libload = libload // dependency injection
-	mainThread = &Thread{}
 	mainThread.Name = "main"
 	run("Init()")
 	options.DbStatus.Store("")
 	exit.Add(stopServer)
 	dbms.Server(dbmsLocal)
+	log.Fatalln("server should not return")
 }
 
 func stopServer() {
@@ -297,7 +307,13 @@ func openDbms() {
 	dbmsLocal = dbms.NewDbmsLocal(db)
 	DbmsAuth = options.Action == "server" || mode != "gui" || !db.HaveUsers()
 	GetDbms = getDbms
-	exit.Add(db.CloseKeepMapped) // keep mapped to avoid errors during shutdown
+	exit.Add(func() {
+		if options.Action == "server" {
+			log.Println("database closing")
+			defer log.Println("database closed")
+		}
+		db.CloseKeepMapped()
+	}) // keep mapped to avoid errors during shutdown
 	// go checkState()
 }
 
@@ -401,11 +417,11 @@ func showOptions() {
 func eval(src string) {
 	defer func() {
 		if e := recover(); e != nil {
-			LogUncaught(mainThread, "repl", e)
+			LogUncaught(&mainThread, "repl", e)
 		}
 	}()
 	src = "function () {\n" + src + "\n}"
-	v, results := compile.Checked(mainThread, src)
+	v, results := compile.Checked(&mainThread, src)
 	for _, s := range results {
 		fmt.Println("(" + s + ")")
 	}
@@ -430,22 +446,35 @@ func libload(th *Thread, name string) (result Value, e any) {
 			result = nil
 		}
 	}()
-	defs := th.Dbms().LibGet(name)
-	if len(defs) == 0 {
-		// fmt.Println("LOAD", name, "MISSING")
-		return nil, nil
+	libs := LibsList.Load()
+	if libs == nil {
+		libs = th.Dbms().Libraries()
+		LibsList.Store(libs)
 	}
-	for i := 0; i < len(defs); i += 2 {
-		lib := defs[i]
-		src := defs[i+1]
-		if s, ok := LibraryOverrides.Get(lib, name); ok {
-			src = s
+	defs := th.Dbms().LibGet(name)
+	ovLib, ovText := LibraryOverrides.Get(name)
+	i := 0
+	for _, lib := range libs {
+		var src string
+		if slc.StartsWith(defs[i:], lib) {
+			src = defs[i+1]
+			i += 2
 		}
 		if mode == "gui" && strings.HasSuffix(lib, "webgui") {
 			continue
 		}
-		result = llcompile(lib, name, src, result)
-		// fmt.Println("LOAD", name, "SUCCEEDED")
+		if lib == ovLib {
+			src = ovText
+		}
+		if src != "" {
+			result = llcompile(lib, name, src, result)
+		}
+	}
+	if ovLib == "" && ovText != "" {
+		result = llcompile("", name, ovText, result)
+	}
+	if i < len(defs) {
+		Fatal("libraries changed without unload", "("+defs[i]+")")
 	}
 	return result, nil
 }

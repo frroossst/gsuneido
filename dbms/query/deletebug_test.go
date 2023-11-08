@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19"
 	"github.com/apmckinlay/gsuneido/db19/stor"
-	. "github.com/apmckinlay/gsuneido/runtime"
 	"github.com/apmckinlay/gsuneido/util/assert"
 )
 
@@ -73,6 +73,7 @@ func TestDeleteBug(*testing.T) {
 		act("insert { k: 1 } into tmp")
 		act("delete tmp")
 	}
+	db.MustCheck()
 }
 
 func TestDeleteSynch(*testing.T) {
@@ -94,4 +95,5 @@ func TestDeleteSynch(*testing.T) {
 		act("insert { k: 1 } into tmp")
 		act("delete tmp")
 	}
+	db.MustCheck()
 }

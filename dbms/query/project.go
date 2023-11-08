@@ -4,13 +4,12 @@
 package query
 
 import (
-	"log"
 	"strings"
 
 	"slices"
 
 	"github.com/apmckinlay/gsuneido/compile/ast"
-	. "github.com/apmckinlay/gsuneido/runtime"
+	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/hmap"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
@@ -242,7 +241,7 @@ func (p *Project) Transform() Query {
 			return newProject(q.source, p.columns).Transform()
 		}
 		if set.Subset(p.columns, q.by) {
-			return NewSummarize(q.source, q.strat, q.by, cols, ops, ons).Transform()
+			return NewSummarize(q.source, q.hint, q.by, cols, ops, ons).Transform()
 		}
 	case *Rename:
 		return p.transformRename(q)
@@ -307,11 +306,6 @@ func (p *Project) transformRename(r *Rename) Query {
 	p = newProject(r.source, newProj)
 	r = NewRename(p, newFrom, newTo)
 	return r.Transform()
-}
-
-func chained(from, to []string, i int) bool {
-	j := slices.Index(from[i:], to[i])
-	return j >= 0
 }
 
 // transformExtend tries to move projects before extends.
@@ -596,12 +590,12 @@ func (p *Project) addResult(th *Thread, row Row) (Row, bool) {
 	} else {
 		if !p.warned && p.results.Size() > mapLimit {
 			p.warned = true
-			log.Printf("WARNING project-map large (> %d)", mapLimit)
+			Warning("project-map large >", mapLimit)
 		}
 		if !p.derivedWarned && p.derived > derivedWarn {
 			p.derivedWarned = true
-			log.Printf("WARNING project-map derived large (> %d) average %d",
-				derivedWarn, p.derived/p.results.Size())
+			Warning("project-map derived large >",
+				derivedWarn, "average", p.derived/p.results.Size())
 		}
 		return row, false
 	}

@@ -9,8 +9,7 @@ import (
 	"runtime"
 
 	"github.com/apmckinlay/gsuneido/builtin/goc"
-	. "github.com/apmckinlay/gsuneido/runtime"
-	"github.com/apmckinlay/gsuneido/util/exit"
+	. "github.com/apmckinlay/gsuneido/core"
 	"golang.org/x/sys/windows"
 )
 
@@ -46,7 +45,7 @@ func Run() {
 }
 
 func shutdown(exitcode int) {
-	exit.Exit(exitcode)
+	Exit(exitcode)
 }
 
 func OnUIThread() bool {
