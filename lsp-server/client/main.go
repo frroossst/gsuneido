@@ -103,10 +103,16 @@ func reduceTree(node Node) Node {
         newNode.Children = append(newNode.Children, reduceTree(child))
     }
 
-    if newNode.Value == "Binary" || newNode.Value == "Unary" || newNode.Value == "Trinary" {
+    tempType := Operator
+    if newNode.Value == "Call" {
+        tempType = Function
+    }
+
+    if newNode.Value == "Binary" || newNode.Value == "Unary" || 
+        newNode.Value == "Trinary" || newNode.Value == "Call" {
         if len(newNode.Children) > 0 {
             newNode.Value = newNode.Children[len(newNode.Children)-1].Value
-            newNode.Type = Operator
+            newNode.Type = tempType
             newNode.Children = newNode.Children[:len(newNode.Children)-1]
         }
     }
@@ -118,6 +124,8 @@ func reduceTree(node Node) Node {
 func main() {
     // Make an HTTP POST request to the server
     inputStr := "function() { x = 1 }"
+    // inputStr = "function() { x = 'foo'\n if String?(foo) { return 'str' } }"
+    inputStr = "function() { x = Object(a: 1, b: 's') }"
     // inputStr = "function() { x++ }"
     // inputStr = "function() { foo = 123; if (foo) { return 'hello' } else { return true } }"
     input := RequestJSON{Input: inputStr}
