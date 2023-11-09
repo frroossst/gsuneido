@@ -36,7 +36,6 @@ type Node struct {
 func generateAST(input string) Node {
 	stack := []Node{}
 	word := ""
-    word = strings.TrimSpace(word)
 
 	for _, c := range input {
 		switch c {
@@ -65,24 +64,61 @@ func generateAST(input string) Node {
 			}
 		default:
 			word += string(c)
+            word = strings.TrimSpace(word)
 		}
 	}
 
 	return stack[0]
 }
 
-func printNode(node Node, indent string) {
-	fmt.Println(indent + "Node: " + node.Value)
-	fmt.Println(indent + "  Type: " + node.Type.String())
-	fmt.Println(indent + "  Children: ")
-	for _, child := range node.Children {
-		printNode(child, indent+"    ")
-	}
+/*
+func reduceTree(node Node) Node {
+    newNode := Node{
+        Value: node.Value,
+        Type:  node.Type,
+    }
+
+    for _, child := range node.Children {
+        newNode.Children = append(newNode.Children, reduceTree(child))
+    }
+
+    if newNode.Value == "Binary" || newNode.Value == "Unary" || newNode.Value == "Trinary" {
+        if len(newNode.Children) > 0 {
+            newNode.Value = newNode.Children[len(newNode.Children)-1].Value
+            newNode.Type = Operator
+        }
+    }
+
+    return newNode
 }
+*/
+
+func reduceTree(node Node) Node {
+    newNode := Node{
+        Value: node.Value,
+        Type:  node.Type,
+    }
+
+    for _, child := range node.Children {
+        newNode.Children = append(newNode.Children, reduceTree(child))
+    }
+
+    if newNode.Value == "Binary" || newNode.Value == "Unary" || newNode.Value == "Trinary" {
+        if len(newNode.Children) > 0 {
+            newNode.Value = newNode.Children[len(newNode.Children)-1].Value
+            newNode.Type = Operator
+            newNode.Children = newNode.Children[:len(newNode.Children)-1]
+        }
+    }
+
+    return newNode
+}
+
 
 func main() {
     // Make an HTTP POST request to the server
     inputStr := "function() { x = 1 }"
+    // inputStr = "function() { x++ }"
     // inputStr = "function() { foo = 123; if (foo) { return 'hello' } else { return true } }"
     input := RequestJSON{Input: inputStr}
     responseJSON, err := sendRequest(input, "http://localhost:8080/process")
@@ -94,8 +130,17 @@ func main() {
     response := responseJSON.Output
     fmt.Println("response: ", response)
     parsedAst := generateAST(response)
-    printNode(parsedAst, "")
-    // fmt.Println("parsed: ", printNode(Parse2(response), ""))
+    newRoot := reduceTree(parsedAst)
+    printNode(newRoot, "")
+}
+
+func printNode(node Node, indent string) {
+	fmt.Println(indent + "Node: " + node.Value)
+	fmt.Println(indent + "  Type: " + node.Type.String())
+	fmt.Println(indent + "  Children: ")
+	for _, child := range node.Children {
+		printNode(child, indent+"    ")
+	}
 }
 
 func sendRequest(input RequestJSON, url string) (ResponseJSON, error) {
