@@ -1,25 +1,34 @@
-type ast =
-  | Function of ast
-  | Binary of string * ast * ast
-  | Variable of string
-  | Integer of int
+type ast = 
+  | Function of ast list
+  | Eq of ast list
+  | Node of string * string * ast list
 
-type inferred_type =
-  | Unknown
-  | Integer
-  | Function of inferred_type * inferred_type
+exception TypeError of string
 
 let rec infer_type = function
-  | Function(body) -> Function(Unknown, infer_type body)
-  | Binary(op, left, right) ->
-    let left_type = infer_type left in
-    let right_type = infer_type right in
-    if left_type = right_type then
-      match op with
-      | "Eq" -> Integer
-      | _ -> failwith ("Unknown operator: " ^ op)
+  | Function(children) -> 
+    List.iter infer_type children;
+    "Function"
+  | Eq(children) -> 
+    let types = List.map infer_type children in
+    if List.length (List.filter ((=) "Number") types) > 0 then
+      if List.exists ((=) "String") types then
+        raise (TypeError "Type mismatch: Number and String in Eq")
+      else
+        "Number"
     else
-      failwith "Type error: operands must be of the same type"
-  | Variable(_) -> Unknown
-  | Integer(_) -> Integer
+      "Unknown"
+  | Node(value, "Unknown", children) -> 
+    List.iter infer_type children;
+    "Number"
+  | Node(_, typ, children) -> 
+    List.iter infer_type children;
+    typ
+
+let infer_ast ast =
+  try 
+    let _ = infer_type ast in
+    "Inferred successfully"
+  with TypeError msg -> 
+    "Error: " ^ msg
 

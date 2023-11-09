@@ -125,7 +125,7 @@ func main() {
     // Make an HTTP POST request to the server
     inputStr := "function() { x = 1 }"
     // inputStr = "function() { x = 'foo'\n if String?(foo) { return 'str' } }"
-    inputStr = "function() { x = Object(a: 1, b: 's') }"
+    // inputStr = "function() { x = Object(a: 1, b: 's') }"
     // inputStr = "function() { x++ }"
     // inputStr = "function() { foo = 123; if (foo) { return 'hello' } else { return true } }"
     input := RequestJSON{Input: inputStr}
@@ -139,7 +139,8 @@ func main() {
     fmt.Println("response: ", response)
     parsedAst := generateAST(response)
     newRoot := reduceTree(parsedAst)
-    printNode(newRoot, "")
+    fmt.Println("\n")
+    printNode(newRoot, "\t")
 }
 
 func printNode(node Node, indent string) {
