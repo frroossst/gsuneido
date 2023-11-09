@@ -3,6 +3,7 @@ package main
 import (
     "encoding/json"
     "fmt"
+    "time"
     "net/http"
 
 	"github.com/apmckinlay/gsuneido/compile"
@@ -33,9 +34,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
     // Perform some processing on the input string.
 	p := compile.AstParser(req.Input)
+    
+    currentTime := time.Now()
+    formattedTime := currentTime.Format(time.RFC3339)
+    fmt.Println("[", formattedTime, "]")
     fmt.Println("input: ", req.Input)
 	ast := p.Const()
     fmt.Println("output: ", ast)
+    fmt.Println("=========================================")
 	if p.Token != tokens.Eof {
         // TODO: return error
 		p.Error("did not parse all input")
