@@ -120,6 +120,14 @@ func reduceTree(node Node) Node {
     return newNode
 }
 
+// first pass to determine obvious syntactically
+// guaranteed types
+func directTypeInference(node Node, parent Node) Node {
+
+    return node
+
+}
+
 
 func main() {
     // Make an HTTP POST request to the server
