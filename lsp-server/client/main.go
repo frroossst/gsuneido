@@ -7,8 +7,9 @@ import (
     "strings"
     "net/http"
 
+	"github.com/apmckinlay/gsuneido/compile"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
-	"github.com/apmckinlay/gsuneido/compile/lexer"
+//	"github.com/apmckinlay/gsuneido/compile/lexer"
 )
 
 type TypeError int
@@ -185,16 +186,20 @@ func main() {
         skipPrintMap[token] = true
     }
 
-    lxr := lexer.NewLexer(inputStr)
-    for ;; {
-        item := lxr.Next()
-        if item.Token == tok.Eof {
-            break
-        }
-        if !skipPrintMap[item.Token] {
-            fmt.Println(item)
-        }
-    }
+	p := compile.AstParser(inputStr)
+    p.InitFuncInfo()
+    // expr := p.Expression()
+    // lxr := p.Lxr
+    // for ;; {
+    //     item := lxr.Next()
+    //     if item.Token == tok.Eof {
+    //         break
+    //     }
+    //     if !skipPrintMap[item.Token] {
+    //         fmt.Println(item)
+    //     }
+    // }
+
     //  var mainThread Thread
     //	mainThread.Name = "main"
     //	mainThread.UIThread = true
@@ -205,7 +210,7 @@ func main() {
     //	}
 	// p := compile.AstParser(inputStr)
     if true {
-        panic("[DEBUG]")
+        panic("lsp-server/client/main.go: 211 [DEBUG]")
     }
 
     input := RequestJSON{Input: inputStr}
