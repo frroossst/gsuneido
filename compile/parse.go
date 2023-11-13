@@ -28,6 +28,10 @@ func AstParser(src string) *Parser {
 	return newParser(NewLexer(src), &astAspects{})
 }
 
+func AstTraversable(src string) *Parser {
+	return newParser(NewLexer(src), &astAspects{})
+}
+
 func GogenParser(src string) *Parser {
 	return newParser(NewLexer(src), &gogenAspects{})
 }
