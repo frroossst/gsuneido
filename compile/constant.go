@@ -42,7 +42,7 @@ func Checked(th *Thread, src string) (Value, []string) {
 	return v, p.CheckResults()
 }
 
-func (p *Parser) traversableConst() (result TreeNode) {
+func (p *Parser) traversableConst() (result treeNode) {
 	defer func(org int32) {
 		if r, ok := result.(iSetPos); ok {
 			SetPos(r, org, p.EndPos)
@@ -62,12 +62,44 @@ func (p *Parser) Const() (result Value) {
 
 // same as constant except each strign represents a node
 // these nodes build a tree, that can be traversed
-type TreeNode struct {
-	name     string
-	value    Value
-	children []TreeNode	
-	typename string
+type treeNode interface {
+	treenode()
+
+	String() string
+
+	Children(func(TreeNode) TreeNode)
+
+	SetPos(org, end int32)
+
+	Get(*Thread, Value) Value
 }
+
+type TreeNode struct {
+	name  string
+	value Value
+}
+
+// Children implements treeNode.
+func (TreeNode) Children(func(TreeNode) TreeNode) {
+	panic("unimplemented")
+}
+
+// Get implements treeNode.
+func (TreeNode) Get(*Thread, Value) Value {
+	panic("unimplemented")
+}
+
+// SetPos implements treeNode.
+func (TreeNode) SetPos(org int32, end int32) {
+	panic("unimplemented")
+}
+
+// String implements treeNode.
+func (TreeNode) String() string {
+	panic("unimplemented")
+}
+
+func (t TreeNode) treenode() {}
 
 func (t TreeNode) AsStr() (string, bool) {
 	return t.value.AsStr()
@@ -149,7 +181,7 @@ func (p *Parser) constant2() (result TreeNode) {
 		}
 	}
 	panic(p.Error("invalid constant, unexpected " + p.Token.String()))
-	
+
 }
 
 func (p *Parser) constant() Value {
