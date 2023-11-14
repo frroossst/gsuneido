@@ -25,6 +25,9 @@ func DepthFirstSearch(fn *Function) {
 
 func dfs(node Node) {
 	fmt.Println("node:", node.String())
+	tnode := AsTypedNode(node)
+	tnode.SetType("knownCompTime")
+	fmt.Println("type:", tnode.GetType())
 	switch node := node.(type) {
 	case *If:
 		dfs(node.Cond)

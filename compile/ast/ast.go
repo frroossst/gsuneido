@@ -74,6 +74,30 @@ func (a *TwoPos) GetEnd() int {
 	return int(a.end)
 }
 
+// TypedNode is implemented by nodes that have a type
+type TypedNode interface {
+	Node
+	GetType() string
+	SetType(string)
+}
+
+type TypedNodeWrapper struct {
+	Node
+	Type_ string
+}
+
+func (a *TypedNodeWrapper) GetType() string {
+	return a.Type_
+}
+
+func (a *TypedNodeWrapper) SetType(t string) {
+	a.Type_ = t
+}
+
+func AsTypedNode(node Node) TypedNode {
+	return &TypedNodeWrapper{Node: node}
+}
+
 // Expr is implemented by expression nodes
 type Expr interface {
 	Node
