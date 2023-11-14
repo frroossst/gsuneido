@@ -7,6 +7,23 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 )
 
+type TypedNodeAST struct {
+	CurrentNode  ast.TypedNode
+	ChildrenNodes []ast.TypedNode
+}
+
+func (t TypedNodeAST) String() string {
+	return t.CurrentNode.String()
+}
+
+func (t *TypedNodeAST) AddChild(child ast.TypedNode) {
+	t.ChildrenNodes = append(t.ChildrenNodes, child)
+}
+
+func (t TypedNodeAST) GetChildren() []ast.TypedNode {
+	return t.ChildrenNodes
+}
+
 func main() {
 	src := `
 		function(x) {
