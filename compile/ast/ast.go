@@ -86,6 +86,10 @@ type TypedNodeWrapper struct {
 	Type_ string
 }
 
+func (a *TypedNodeWrapper) String() string {
+	return fmt.Sprintf("%s:%s", a.Node.String(), a.Type_)
+}
+
 func (a *TypedNodeWrapper) GetType() string {
 	return a.Type_
 }
@@ -95,7 +99,7 @@ func (a *TypedNodeWrapper) SetType(t string) {
 }
 
 func AsTypedNode(node Node) TypedNode {
-	return &TypedNodeWrapper{Node: node}
+	return &TypedNodeWrapper{Node: node, Type_: "undetermined"}
 }
 
 // Expr is implemented by expression nodes

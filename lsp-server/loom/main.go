@@ -7,21 +7,6 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 )
 
-	/*
-	p := compile.NewParser(src)
-	f := p.Function()
-	ast.Blocks(f)
-
-	fmt.Println(f.Type())
-	fmt.Println(f.String())
-
-	for _, stmt := range f.Body {
-		if stmt != nil {
-			fmt.Println(stmt.String())
-		}
-	}
-	*/
-
 func main() {
 	src := `
 		function(x) {
@@ -29,15 +14,55 @@ func main() {
 		}
 	`
 	fmt.Println("src:", src)
+	// remove whitespace
+
+	fmt.Println(compile.AstParser(src).Const())
 
 	p := compile.NewParser(src)
 	f := p.Function()
 
 	ast.PropFold(f)
 
-	fmt.Println("type:", f.Type())
+	// fmt.Println("type:", f.Type())
+	// fmt.Println("ast:", f.String())
 
-	fmt.Println("ast:", f.String())
+	// tnode := ast.AsTypedAST(f)
+	// tnode.SetType("function")
+	// fmt.Println(tnode.GetType())
+	// fmt.Println(tnode.String())
 
-	ast.DepthFirstSearch(f)
+	dfs(f, visitor)
+
+}
+
+// dfs is a depth-first search of the AST
+// it traverses the AST and applies the visitor function
+// to each node
+func dfs(node ast.Node, visitor func(ast.Node) ast.Node) {
+	// apply the visitor function to the current node
+	node = visitor(node)
+
+	node.Children(func(child ast.Node) ast.Node {
+		dfs(child, visitor)
+		return child
+	})
+}
+
+// define a recursive function to be used in dfs with the
+// function signature fn func(node Node) Node
+func visitor(node ast.Node) ast.Node {
+	tnode := typeWrapper(node)
+	fmt.Println("[visitor]", node.String(), "_type:", tnode.GetType())
+	return tnode
+}
+
+func typeWrapper(node ast.Node) ast.TypedNode {
+	tnode := ast.AsTypedNode(node)
+	return tnode
+}
+
+// serialize is a helper function to convert an AST node to a string
+// this string is passed onto OCaml for type checking
+func serialize(node ast.Node) string {
+	return node.String()
 }
