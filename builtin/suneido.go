@@ -4,7 +4,6 @@
 package builtin
 
 import (
-	"fmt"
 	"runtime/metrics"
 
 	"github.com/apmckinlay/gsuneido/compile"
@@ -39,7 +38,6 @@ func suneido_Parse(th *Thread, args []Value) Value {
 	src := ToStr(args[0])
 	p := compile.AstParser(src)
 	ast := p.Const()
-	fmt.Println("[DEBUG]", ast)
 	if p.Token != tokens.Eof {
 		p.Error("did not parse all input")
 	}

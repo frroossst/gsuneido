@@ -21,6 +21,7 @@ package ast
 
 import (
 	"fmt"
+	"runtime/debug"
 
 	"github.com/apmckinlay/gsuneido/compile/lexer"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
@@ -564,6 +565,10 @@ func childStmt(fn func(Node) Node, pstmt *Statement) {
 }
 
 func (a *Function) Children(fn func(Node) Node) {
+	// ! DEBUG
+	// TODO: remove later
+	debug.PrintStack()
+	fmt.Println("[ast.go/Children(fn)]", a.Body)
 	for i := range a.Body {
 		childStmt(fn, &a.Body[i])
 	}
