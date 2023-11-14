@@ -102,6 +102,10 @@ func AsTypedNode(node Node) TypedNode {
 	return &TypedNodeWrapper{Node: node, Type_: "undetermined"}
 }
 
+func WrapNode(node Node) TypedNodeWrapper {
+	return TypedNodeWrapper{Node: node, Type_: "undetermined"}
+}
+
 // Expr is implemented by expression nodes
 type Expr interface {
 	Node

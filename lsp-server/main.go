@@ -33,7 +33,7 @@ func main() {
 	fmt.Println("src:", src)
 	// remove whitespace
 
-	fmt.Println(compile.AstParser(src).Const())
+	fmt.Println("compiled:", compile.AstParser(src).Const())
 
 	p := compile.NewParser(src)
 	f := p.Function()
@@ -48,14 +48,15 @@ func main() {
 	// fmt.Println(tnode.GetType())
 	// fmt.Println(tnode.String())
 
-	dfs(f, visitor)
-
+	// dfs(f, visitor)
+	t := dfs(f, typeVisitor)
+	fmt.Println("typed:", t.String())
 }
 
 // dfs is a depth-first search of the AST
 // it traverses the AST and applies the visitor function
 // to each node
-func dfs(node ast.Node, visitor func(ast.Node) ast.Node) {
+func dfs(node ast.Node, visitor func(ast.Node) ast.TypedNode) ast.TypedNode {
 	// apply the visitor function to the current node
 	node = visitor(node)
 
@@ -63,16 +64,26 @@ func dfs(node ast.Node, visitor func(ast.Node) ast.Node) {
 		dfs(child, visitor)
 		return child
 	})
+
+	return ast.AsTypedNode(node)
 }
 
 // define a recursive function to be used in dfs with the
 // function signature fn func(node Node) Node
 func visitor(node ast.Node) ast.Node {
-	tnode := typeWrapper(node)
+	fmt.Println("[visitor]", node.String())
+	return node
+}
+
+func typeVisitor(node ast.Node) ast.TypedNode {
+	tnode :=ast.AsTypedNode(node)
 	fmt.Println("[visitor]", node.String(), "_type:", tnode.GetType())
 	return tnode
 }
 
+	// tnode := typeWrapper(node)
+	// fmt.Println("[visitor]", node.String(), "_type:", tnode.GetType())
+	// return tnode
 func typeWrapper(node ast.Node) ast.TypedNode {
 	tnode := ast.AsTypedNode(node)
 	return tnode
