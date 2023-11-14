@@ -19,6 +19,5 @@ func main() {
 	ast.Blocks(f)
 
 	fmt.Println(f.Type())
-
 	fmt.Println(f.String())
 }
