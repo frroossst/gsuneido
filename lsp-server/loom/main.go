@@ -34,4 +34,10 @@ func main() {
 	f := p.Function()
 
 	ast.PropFold(f)
+
+	fmt.Println("type:", f.Type())
+
+	fmt.Println("ast:", f.String())
+
+	ast.DepthFirstSearch(f)
 }
