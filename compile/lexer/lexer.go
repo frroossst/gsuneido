@@ -23,6 +23,15 @@ type Lexer struct {
 	nlwhite bool
 }
 
+// ! DEBUG
+func (lxr *Lexer) GetSI() int {
+	return lxr.si
+}
+
+func (lxr *Lexer) SetSI(si int) {
+	lxr.si = si
+}
+
 // NewLexer returns a new Lexer
 func NewLexer(src string) *Lexer {
 	return &Lexer{src: src, keyword: keyword}

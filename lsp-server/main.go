@@ -29,6 +29,8 @@ func (u *UID) Next() uint64 {
 var uid UID
 
 func main() {
+	uid = UID{}
+
 	src := `
 		function(x) {
 			return x + 1
@@ -42,9 +44,10 @@ func main() {
 	p := compile.NewParser(src)
 	f := p.Function()
 
+	fmt.Println(p.Lxr.GetSI())
+
 	ast.PropFold(f)
 
-	uid = UID{}
 
 	// fmt.Println("type:", f.Type())
 	// fmt.Println("ast:", f.String())
@@ -54,6 +57,8 @@ func main() {
 	// fmt.Println(tnode.GetType())
 	// fmt.Println(tnode.String())
 
+	fmt.Println("item: ", p.Item, "token: ", p.Token, p.Lxr.GetSI())
+
 	// dfs(f, visitor)
 	t := dfs(f, typeVisitor)
 	fmt.Println("typed:", t.String())
@@ -62,16 +67,16 @@ func main() {
 // dfs is a depth-first search of the AST
 // it traverses the AST and applies the visitor function
 // to each node
-func dfs(node ast.Node, visitor func(ast.Node) ast.TypedNode) ast.TypedNode {
+func dfs(node ast.Node, visitorFn func(ast.Node) ast.TypedNode) ast.TypedNode {
 	// apply the visitor function to the current node
-	node = visitor(node)
+	currNode := visitorFn(node)
 
-	node.Children(func(child ast.Node) ast.Node {
-		dfs(child, visitor)
+	currNode.Children(func(child ast.Node) ast.Node {
+		dfs(child, visitorFn)
 		return child
 	})
 
-	return ast.AsTypedNode(node)
+	return ast.AsTypedNode(currNode)
 }
 
 // define a recursive function to be used in dfs with the
