@@ -48,7 +48,6 @@ func main() {
 
 	ast.PropFold(f)
 
-
 	// fmt.Println("type:", f.Type())
 	// fmt.Println("ast:", f.String())
 
@@ -62,6 +61,49 @@ func main() {
 	// dfs(f, visitor)
 	t := dfs(f, typeVisitor)
 	fmt.Println("typed:", t.String())
+}
+
+// tree to represent a copy of the AST,
+// these nodes are analogous to the AST nodes
+// but they do not need to impl the Node interface
+// as they are not used in the compiler
+type TypedTree struct {
+	root		*TypedNode
+}
+
+func (t* TypedTree) SetRoot(r TypedNode) {
+	t.root = &r
+}
+
+func (t* TypedTree) GetRoot() TypedNode {
+	return *t.root
+}
+
+type TypedNode struct {
+	uid 		uint64
+	node_t 		string	
+	children 	[]*TypedNode
+}
+
+func TypedNodeConstructor() *TypedNode {
+	return &TypedNode{
+		uid: uid.Next(),
+		node_t: "undetermined",
+		children: []*TypedNode{},
+	}
+}
+
+func (n *TypedNode) AddChild(c *TypedNode) {
+	n.children = append(n.children, c)
+}
+
+func (n *TypedNode) GetChilden() []*TypedNode {
+	return n.children
+}
+
+// recursively descend using depth first search and continually build a copy with TypedNodes
+func copyAST(node ast.Node, visitorFn func(ast.Node) ast.Node, newCopy ast.TypedNode) ast.TypedNode {
+
 }
 
 // dfs is a depth-first search of the AST
