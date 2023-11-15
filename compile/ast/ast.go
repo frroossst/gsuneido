@@ -79,15 +79,25 @@ type TypedNode interface {
 	Node
 	GetType() string
 	SetType(string)
+	GetUID() uint64
+	SetUID(uint64)
 }
 
 type TypedNodeWrapper struct {
 	Node
 	Type_ string
+	UID_  uint64
 }
 
 func (a *TypedNodeWrapper) String() string {
-	return fmt.Sprintf("%s:%s", a.Node.String(), a.Type_)
+	// node.String() recusively prints like below
+	// Function(x Return(Nary(Add x 1)))
+	// attach .GetType() to each node
+	// and .GetUID() to each node
+	// print as below for the above
+	// Function(x <type> <uid> (Return <type> <uid> (Nary <type> <uid> (Add <type> <uid> x <type> <uid> 1 <type> <uid>))))
+	return a.Node.String() + " <type> " + a.Type_ + " <uid> " + fmt.Sprint(a.UID_)
+	
 }
 
 func (a *TypedNodeWrapper) GetType() string {
@@ -98,12 +108,20 @@ func (a *TypedNodeWrapper) SetType(t string) {
 	a.Type_ = t
 }
 
+func (a *TypedNodeWrapper) GetUID() uint64 {
+	return a.UID_
+}
+
+func (a *TypedNodeWrapper) SetUID(uid uint64) {
+	a.UID_ = uid
+}
+
 func AsTypedNode(node Node) TypedNode {
-	return &TypedNodeWrapper{Node: node, Type_: "undetermined"}
+	return &TypedNodeWrapper{Node: node, Type_: "undetermined", UID_: 0}
 }
 
 func WrapNode(node Node) TypedNodeWrapper {
-	return TypedNodeWrapper{Node: node, Type_: "undetermined"}
+	return TypedNodeWrapper{Node: node, Type_: "undetermined", UID_: 0}
 }
 
 // Expr is implemented by expression nodes

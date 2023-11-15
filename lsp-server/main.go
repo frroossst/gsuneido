@@ -3,26 +3,30 @@ package main
 import (
 	"fmt"
 
+	"sync"
+	"time"
+
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
 )
 
-type TypedNodeAST struct {
-	CurrentNode  ast.TypedNode
-	ChildrenNodes []ast.TypedNode
+type UID struct {
+	counter uint64
+	mu      sync.Mutex
 }
 
-func (t TypedNodeAST) String() string {
-	return t.CurrentNode.String()
+func (u *UID) Next() uint64 {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.counter++
+
+	id := uint64(time.Now().UnixMicro())
+
+	return id
 }
 
-func (t *TypedNodeAST) AddChild(child ast.TypedNode) {
-	t.ChildrenNodes = append(t.ChildrenNodes, child)
-}
-
-func (t TypedNodeAST) GetChildren() []ast.TypedNode {
-	return t.ChildrenNodes
-}
+// define globally acessibly UID
+var uid UID
 
 func main() {
 	src := `
@@ -39,6 +43,8 @@ func main() {
 	f := p.Function()
 
 	ast.PropFold(f)
+
+	uid = UID{}
 
 	// fmt.Println("type:", f.Type())
 	// fmt.Println("ast:", f.String())
@@ -71,26 +77,15 @@ func dfs(node ast.Node, visitor func(ast.Node) ast.TypedNode) ast.TypedNode {
 // define a recursive function to be used in dfs with the
 // function signature fn func(node Node) Node
 func visitor(node ast.Node) ast.Node {
-	fmt.Println("[visitor]", node.String())
 	return node
 }
 
 func typeVisitor(node ast.Node) ast.TypedNode {
-	tnode :=ast.AsTypedNode(node)
-	fmt.Println("[visitor]", node.String(), "_type:", tnode.GetType())
-	return tnode
-}
-
-	// tnode := typeWrapper(node)
-	// fmt.Println("[visitor]", node.String(), "_type:", tnode.GetType())
-	// return tnode
-func typeWrapper(node ast.Node) ast.TypedNode {
 	tnode := ast.AsTypedNode(node)
+	tnode.SetUID(uid.Next())
 	return tnode
 }
 
-// serialize is a helper function to convert an AST node to a string
-// this string is passed onto OCaml for type checking
-func serialize(node ast.Node) string {
-	return node.String()
+func serialise(root ast.TypedNode) string {
+	return ""
 }
