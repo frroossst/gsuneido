@@ -156,9 +156,7 @@ func (f *fold) children(node Node) {
 }
 
 func (f *fold) childExpr(pexpr *Expr) {
-	(*pexpr).SetType("unknown_custom")
 	// call Echo() method on pointer to interface
-	fmt.Println("expr_t:", (*pexpr).GetType())
 	childExpr(f.visit, pexpr)
 }
 

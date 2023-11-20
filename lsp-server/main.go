@@ -36,7 +36,10 @@ func main() {
 			// test folding
 			notLogic = not true
 			constF = 1 + 2 + 3 + 4 + 5
-			return x + 1
+			if not notLogic or notLogic {
+				return x * 2
+			}
+			return x + 1 + b
 		}
 	`
 	fmt.Println("src:", src)
@@ -50,67 +53,16 @@ func main() {
 
 	fmt.Println("folded:", f)
 
-	// t := dfs(f, typeVisitor)
+	fmt.Println("export = ", f.String())
+
+	// t := dfs(f, visitor)
 	// fmt.Println("typed ast:", t)
 }
-
-// tree to represent a copy of the AST,
-// these nodes are analogous to the AST nodes
-// but they do not need to impl the Node interface
-// as they are not used in the compiler
-type TypedTree struct {
-	root *TypedNode
-}
-
-func (t *TypedTree) SetRoot(r TypedNode) {
-	t.root = &r
-}
-
-func (t *TypedTree) GetRoot() TypedNode {
-	return *t.root
-}
-
-type TypedNode struct {
-	uid      uint64
-	node_t   string
-	data     string
-	meta     string
-	children []*TypedNode
-}
-
-func TypedNodeConstructor() *TypedNode {
-	return &TypedNode{
-		uid:      0,
-		node_t:   "undetermined",
-		children: []*TypedNode{},
-	}
-}
-
-func (n *TypedNode) GetUID() uint64 {
-	return n.uid
-}
-
-func (n *TypedNode) SetUID(u uint64) {
-	n.uid = u
-}
-
-func (n *TypedNode) GetType() string {
-	return n.node_t
-}
-
-func (n *TypedNode) AddChild(c *TypedNode) {
-	n.children = append(n.children, c)
-}
-
-func (n *TypedNode) GetChilden() []*TypedNode {
-	return n.children
-}
-
 
 // dfs is a depth-first search of the AST
 // it traverses the AST and applies the visitor function
 // to each node
-func dfs(node ast.Node, visitorFn func(ast.Node) ast.TypedNode) ast.TypedNode {
+func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
 	// apply the visitor function to the current node
 	currNode := visitorFn(node)
 
@@ -119,7 +71,7 @@ func dfs(node ast.Node, visitorFn func(ast.Node) ast.TypedNode) ast.TypedNode {
 		return child
 	})
 
-	return ast.AsTypedNode(currNode)
+	return currNode
 }
 
 // define a recursive function to be used in dfs with the
@@ -129,9 +81,7 @@ func visitor(node ast.Node) ast.Node {
 }
 
 func typeVisitor(node ast.Node) ast.TypedNode {
-	tnode := ast.AsTypedNode(node)
-	tnode.SetUID(uid.Next())
-	return tnode
+	return nil
 }
 
 func serialise(root ast.TypedNode) string {

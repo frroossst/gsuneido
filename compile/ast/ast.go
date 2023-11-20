@@ -36,7 +36,6 @@ type TypedNode interface {
 
 // Node is embedded by Expr and Statement
 type Node interface {
-	TypedNode
 	astNode()
 	String() string
 	// Children calls the given function for each child node
@@ -49,20 +48,11 @@ type Node interface {
 
 type astNodeT struct {
 	SuAstNode
-	node_t string
 }
 
 func (*astNodeT) astNode() {}
 
 func (*astNodeT) Children(func(Node) Node) {
-}
-
-func (ant *astNodeT) SetType(t string) {
-	ant.node_t = t
-}
-
-func (ant *astNodeT) GetType() string {
-	return ant.node_t
 }
 
 type noPos struct {
@@ -222,10 +212,19 @@ type Binary struct {
 	Rhs     Expr
 	Tok     tok.Token
 	evalRaw bool
+	Node_t 	string
 }
 
 func (a *Binary) String() string {
 	return "Binary(" + a.Tok.String() + " " + a.Lhs.String() + " " + a.Rhs.String() + ")"
+}
+
+func (a *Binary) SetType(node_t string) {
+	a.Node_t = node_t
+}
+
+func (a *Binary) GetType() string {
+	return a.Node_t
 }
 
 var tokEcho = map[tok.Token]string{
@@ -254,10 +253,13 @@ func (a *Binary) Echo() string {
 func childExpr(fn func(Node) Node, pexpr *Expr) {
 	if *pexpr != nil {
 		*pexpr = fn(*pexpr).(Expr)
+		fmt.Println("pexpr: ", *pexpr)
 	}
 }
 
 func (a *Binary) Children(fn func(Node) Node) {
+	fmt.Println("lhs = ", a.Lhs)
+	fmt.Println("rhs = ", a.Rhs)
 	childExpr(fn, &a.Lhs)
 	childExpr(fn, &a.Rhs)
 }
@@ -546,7 +548,7 @@ func (a *Function) String() string {
 }
 
 func (a *Function) str(which string) string {
-	s := which + "(" + params(a.Params)
+	s := which + "[" + params(a.Params) + "]" + "("
 	for _, stmt := range a.Body {
 		if stmt != nil {
 			s += "\n\t" + stmt.String()
