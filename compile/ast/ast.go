@@ -29,8 +29,14 @@ import (
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
+type TypedNode interface {
+	GetType() string
+	SetType(string)
+}
+
 // Node is embedded by Expr and Statement
 type Node interface {
+	TypedNode
 	astNode()
 	String() string
 	// Children calls the given function for each child node
@@ -43,11 +49,20 @@ type Node interface {
 
 type astNodeT struct {
 	SuAstNode
+	node_t string
 }
 
 func (*astNodeT) astNode() {}
 
 func (*astNodeT) Children(func(Node) Node) {
+}
+
+func (ant *astNodeT) SetType(t string) {
+	ant.node_t = t
+}
+
+func (ant *astNodeT) GetType() string {
+	return ant.node_t
 }
 
 type noPos struct {
@@ -72,56 +87,6 @@ func (a *TwoPos) GetPos() int {
 
 func (a *TwoPos) GetEnd() int {
 	return int(a.end)
-}
-
-// TypedNode is implemented by nodes that have a type
-type TypedNode interface {
-	Node
-	GetType() string
-	SetType(string)
-	GetUID() uint64
-	SetUID(uint64)
-}
-
-type TypedNodeWrapper struct {
-	Node
-	Type_ string
-	UID_  uint64
-}
-
-func (a *TypedNodeWrapper) String() string {
-	// node.String() recusively prints like below
-	// Function(x Return(Nary(Add x 1)))
-	// attach .GetType() to each node
-	// and .GetUID() to each node
-	// print as below for the above
-	// Function(x <type> <uid> (Return <type> <uid> (Nary <type> <uid> (Add <type> <uid> x <type> <uid> 1 <type> <uid>))))
-	return a.Node.String() + " <type> " + a.Type_ + " <uid> " + fmt.Sprint(a.UID_)
-	
-}
-
-func (a *TypedNodeWrapper) GetType() string {
-	return a.Type_
-}
-
-func (a *TypedNodeWrapper) SetType(t string) {
-	a.Type_ = t
-}
-
-func (a *TypedNodeWrapper) GetUID() uint64 {
-	return a.UID_
-}
-
-func (a *TypedNodeWrapper) SetUID(uid uint64) {
-	a.UID_ = uid
-}
-
-func AsTypedNode(node Node) TypedNode {
-	return &TypedNodeWrapper{Node: node, Type_: "undetermined", UID_: 0}
-}
-
-func WrapNode(node Node) TypedNodeWrapper {
-	return TypedNodeWrapper{Node: node, Type_: "undetermined", UID_: 0}
 }
 
 // Expr is implemented by expression nodes

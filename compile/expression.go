@@ -14,6 +14,7 @@ import (
 
 // Expression parses a Suneido expression and builds an AST
 func (p *Parser) Expression() ast.Expr {
+	//	fmt.Println("Expression")
 	return p.pcExpr(1)
 }
 

@@ -33,34 +33,25 @@ func main() {
 
 	src := `
 		function(x) {
+			// test folding
+			notLogic = not true
+			constF = 1 + 2 + 3 + 4 + 5
 			return x + 1
 		}
 	`
 	fmt.Println("src:", src)
-	// remove whitespace
-
 	fmt.Println("compiled:", compile.AstParser(src).Const())
 
 	p := compile.NewParser(src)
+	fmt.Println("going to parse")
 	f := p.Function()
-
-	fmt.Println(p.Lxr.GetSI())
 
 	ast.PropFold(f)
 
-	// fmt.Println("type:", f.Type())
-	// fmt.Println("ast:", f.String())
+	fmt.Println("folded:", f)
 
-	// tnode := ast.AsTypedAST(f)
-	// tnode.SetType("function")
-	// fmt.Println(tnode.GetType())
-	// fmt.Println(tnode.String())
-
-	fmt.Println("item: ", p.Item, "token: ", p.Token, p.Lxr.GetSI())
-
-	// dfs(f, visitor)
-	t := dfs(f, typeVisitor)
-	fmt.Println("typed:", t.String())
+	// t := dfs(f, typeVisitor)
+	// fmt.Println("typed ast:", t)
 }
 
 // tree to represent a copy of the AST,
@@ -68,29 +59,43 @@ func main() {
 // but they do not need to impl the Node interface
 // as they are not used in the compiler
 type TypedTree struct {
-	root		*TypedNode
+	root *TypedNode
 }
 
-func (t* TypedTree) SetRoot(r TypedNode) {
+func (t *TypedTree) SetRoot(r TypedNode) {
 	t.root = &r
 }
 
-func (t* TypedTree) GetRoot() TypedNode {
+func (t *TypedTree) GetRoot() TypedNode {
 	return *t.root
 }
 
 type TypedNode struct {
-	uid 		uint64
-	node_t 		string	
-	children 	[]*TypedNode
+	uid      uint64
+	node_t   string
+	data     string
+	meta     string
+	children []*TypedNode
 }
 
 func TypedNodeConstructor() *TypedNode {
 	return &TypedNode{
-		uid: uid.Next(),
-		node_t: "undetermined",
+		uid:      0,
+		node_t:   "undetermined",
 		children: []*TypedNode{},
 	}
+}
+
+func (n *TypedNode) GetUID() uint64 {
+	return n.uid
+}
+
+func (n *TypedNode) SetUID(u uint64) {
+	n.uid = u
+}
+
+func (n *TypedNode) GetType() string {
+	return n.node_t
 }
 
 func (n *TypedNode) AddChild(c *TypedNode) {
@@ -101,10 +106,6 @@ func (n *TypedNode) GetChilden() []*TypedNode {
 	return n.children
 }
 
-// recursively descend using depth first search and continually build a copy with TypedNodes
-func copyAST(node ast.Node, visitorFn func(ast.Node) ast.Node, newCopy ast.TypedNode) ast.TypedNode {
-
-}
 
 // dfs is a depth-first search of the AST
 // it traverses the AST and applies the visitor function

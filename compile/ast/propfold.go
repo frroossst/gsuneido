@@ -19,7 +19,6 @@ func PropFold(fn *Function) *Function {
 	return fn
 }
 
-
 // propfold - constant propagation and folding
 func propfold(fn *Function, final map[string]uint8) {
 	f := fold{final: final, srcpos: -1}
@@ -157,6 +156,9 @@ func (f *fold) children(node Node) {
 }
 
 func (f *fold) childExpr(pexpr *Expr) {
+	(*pexpr).SetType("unknown_custom")
+	// call Echo() method on pointer to interface
+	fmt.Println("expr_t:", (*pexpr).GetType())
 	childExpr(f.visit, pexpr)
 }
 
