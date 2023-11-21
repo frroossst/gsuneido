@@ -212,7 +212,7 @@ type Binary struct {
 	Rhs     Expr
 	Tok     tok.Token
 	evalRaw bool
-	Node_t 	string
+	Node_t  string
 }
 
 func (a *Binary) String() string {
@@ -253,13 +253,10 @@ func (a *Binary) Echo() string {
 func childExpr(fn func(Node) Node, pexpr *Expr) {
 	if *pexpr != nil {
 		*pexpr = fn(*pexpr).(Expr)
-		fmt.Println("pexpr: ", *pexpr)
 	}
 }
 
 func (a *Binary) Children(fn func(Node) Node) {
-	fmt.Println("lhs = ", a.Lhs)
-	fmt.Println("rhs = ", a.Rhs)
 	childExpr(fn, &a.Lhs)
 	childExpr(fn, &a.Rhs)
 }

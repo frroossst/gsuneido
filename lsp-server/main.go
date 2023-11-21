@@ -55,8 +55,8 @@ func main() {
 
 	fmt.Println("export = ", f.String())
 
-	// t := dfs(f, visitor)
-	// fmt.Println("typed ast:", t)
+	t := dfs(f, propFoldVisitor)
+	fmt.Println("typed ast:", t)
 }
 
 // dfs is a depth-first search of the AST
@@ -78,6 +78,27 @@ func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
 // function signature fn func(node Node) Node
 func visitor(node ast.Node) ast.Node {
 	return node
+}
+
+func propFoldVisitor(node ast.Node) ast.Node {
+	if stmt, ok := node.(ast.Statement); ok {
+		stmt.Position() // for error reporting
+	}
+	// fmt.Println("node:", node.String())
+	propFoldChildren(node) // RECURSE
+
+	return node
+}
+
+func propFoldChildren(node ast.Node) {
+	switch n := node.(type) {
+	case *ast.Binary:
+		fmt.Println("binary:", n.Tok)
+	default:
+		fmt.Println("default:", n)
+	}
+
+	node.Children(propFoldVisitor)
 }
 
 func typeVisitor(node ast.Node) ast.TypedNode {
