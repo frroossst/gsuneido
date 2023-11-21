@@ -58,6 +58,7 @@ func main() {
 }
 
 type SuType int
+
 const (
 	Number SuType = iota
 	String
@@ -81,7 +82,7 @@ func NewTypedNode(node ast.Node, tag string) TypedNode {
 	return TypedNode{node, tag, ""}
 }
 
-func (t* TypedNode) String() string {
+func (t *TypedNode) String() string {
 	return fmt.Sprintf("%s %s %s", t.tag, t.node_t, t.node.String())
 }
 
@@ -100,10 +101,10 @@ func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
 	// apply the visitor function to the current node
 	currNode := visitorFn(node)
 
-	currNode.Children(func(child ast.Node) ast.Node {
-		dfs(child, visitorFn)
-		return child
-	})
+	// currNode.Children(func(child ast.Node) ast.Node {
+	// 	dfs(child, visitorFn)
+	// 	return child
+	// })
 
 	return currNode
 }
