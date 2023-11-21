@@ -39,6 +39,9 @@ func main() {
 			if not notLogic or notLogic {
 				return x * 2
 			}
+			bar = -5
+			if true { bar = 1 } else { bar = 2 }
+			bar()
 			return x + 1 + b
 		}
 	`
@@ -46,14 +49,9 @@ func main() {
 	fmt.Println("compiled:", compile.AstParser(src).Const())
 
 	p := compile.NewParser(src)
-	fmt.Println("going to parse")
 	f := p.Function()
 
 	ast.PropFold(f)
-
-	fmt.Println("folded:", f)
-
-	fmt.Println("export = ", f.String())
 
 	t := dfs(f, propFoldVisitor)
 	fmt.Println("typed ast:", t)
@@ -74,11 +72,25 @@ func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
 	return currNode
 }
 
+type SuType int
+
+const (
+	Number SuType = iota
+	String
+	Function
+	Boolean
+	Unknown
+	Undetermined
+	// acts like the None type in python
+	Unit
+	Object
+)
+
 type TypedNode struct {
-	node 	ast.Node
+	node ast.Node
 	// "expr" or "stmt"
-	tag  	string
-	node_t 	string
+	tag    string
+	node_t string
 }
 
 func NewTypedNode(node ast.Node, tag string) TypedNode {
@@ -96,7 +108,6 @@ func (t *TypedNode) GetType() string {
 func (t *TypedNode) SetType(node_t string) {
 	t.node_t = node_t
 }
-
 
 func propFoldVisitor(node ast.Node) ast.Node {
 	if stmt, ok := node.(ast.Statement); ok {
@@ -128,12 +139,4 @@ func propFoldChildren(node ast.Node) {
 	}
 
 	node.Children(propFoldVisitor)
-}
-
-func typeVisitor(node ast.Node) ast.TypedNode {
-	return nil
-}
-
-func serialise(root ast.TypedNode) string {
-	return ""
 }
