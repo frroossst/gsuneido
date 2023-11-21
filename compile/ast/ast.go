@@ -545,7 +545,7 @@ func (a *Function) String() string {
 }
 
 func (a *Function) str(which string) string {
-	s := which + "[" + params(a.Params) + "]" + "("
+	s := which + "(" + params(a.Params)
 	for _, stmt := range a.Body {
 		if stmt != nil {
 			s += "\n\t" + stmt.String()
