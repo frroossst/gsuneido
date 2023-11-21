@@ -50,6 +50,22 @@ func main() {
 			return x + 1 + b
 			}
 	`
+
+	// catching the simplest type error: `type number is not callable`
+	/*
+		1. Mark x as unknown (as it won't be known in the first pass)
+		2. Mark num as unknown + Number (123)
+		3. Evaluate x to be Number (as only then could it be added to 123)
+		4. Evaluate num to be Number
+		5. Throw error as Number is not callable
+	*/
+	src = `
+		function(x)
+			{
+			num = x + 123
+			num()
+			}`
+
 	fmt.Println("src:", src)
 	fmt.Println("compiled:", compile.AstParser(src).Const())
 
@@ -65,7 +81,7 @@ func main() {
 	typeAST_norep(f)
 	fmt.Println("=== type maps ===")
 	for k, v := range typeInfoMap {
-		fmt.Println("key:", (*k).String(), "value:", v)
+		fmt.Println("pointer: ", k, "key:", (*k).String(), "value:", v)
 	}
 
 }
@@ -152,17 +168,18 @@ func (t *TypeStoreDB) Set(node ast.Node, node_t string) {
 
 func typeAST_norep(node ast.Node) {
 	// Create a set to keep track of visited nodes
-	visited := make(map[ast.Node]bool)
+	// visited := make(map[ast.Node]bool)
+	visited := make(map[string]bool)
 
 	var dfsInner func(node ast.Node)
 	dfsInner = func(node ast.Node) {
-		if visited[node] {
+		if visited[node.String()] {
 			// Skip this node if it has already been visited
 			return
 		}
 
 		// Mark this node as visited
-		visited[node] = true
+		visited[node.String()] = true
 
 		// Apply the visitor function to the current node
 		typeVisitor(node)
