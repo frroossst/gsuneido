@@ -122,21 +122,15 @@ func propFoldChildren(node ast.Node) {
 	switch n := node.(type) {
 	case *ast.Binary:
 		fmt.Println("binary:", n.Tok)
-		fmt.Println("lhs:", n.Lhs.String())
-		fmt.Println("rhs:", n.Rhs.String())
 		return
 	case *ast.Nary:
 		fmt.Println("nary:", n.Tok)
-		fmt.Println("exprs:", n.Exprs)
-		t := NewTypedNode(n, "expr")
-		fmt.Println("typed node:", t)
 		return
 	case *ast.Return:
-		fmt.Println("return:", n.ValueBase.Type())
 		return
 	default:
 		fmt.Println("default:", n)
 	}
 
-	node.Children(propFoldVisitor)
+	node.Children(propFoldVisitor) // RECURSE
 }
