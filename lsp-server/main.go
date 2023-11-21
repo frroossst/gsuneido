@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 
 	"sync"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
-	. "github.com/apmckinlay/gsuneido/core"
 )
 
 type UID struct {
@@ -63,11 +61,13 @@ func main() {
 	t := dfs(f, propFoldVisitor)
 	fmt.Println("typed ast:", t)
 
-	// copying AST
-	c := copyAST(f)
-	fmt.Println("copied ast:", c)
-	// get runtime reflect type of c
-	fmt.Println("type:", c.String())
+	// typing AST
+	typeAST_norep(f)
+	fmt.Println("=== type maps ===")
+	for k, v := range typeInfoMap {
+		fmt.Println("key:", (*k).String(), "value:", v)
+	}
+
 }
 
 type SuType int
@@ -85,6 +85,7 @@ const (
 )
 
 // =============================================================================
+
 type TypedNode struct {
 	node ast.Node
 	// "expr" or "stmt"
@@ -108,46 +109,109 @@ func (t *TypedNode) GetNode() ast.Node {
 	return t.node
 }
 
-func (t *TypedNode) Children(f func(ast.Node) ast.Node) {
-	t.node.Children(f)
+// =============================================================================
+
+type TypeStoreDB struct {
+	db map[ast.Node]string
 }
 
-func (t *TypedNode) Get(*Thread, Value) Value {
-	panic("implement me")
+type TypeInfo struct {
+	Tag    string
+	Node_t string
 }
 
-func (t *TypedNode) SetPos(org, end int32) {
-	t.node.SetPos(org, end)
+func (t *TypeInfo) String() string {
+	return fmt.Sprintf("Tag= %s, Node_t= %s\n", t.Tag, t.Node_t)
 }
 
-func (t *TypedNode) astNode() { t.node.astNode() }
+// ! Global, remove later
+// Create a map to store the type information for each node
+var typeInfoMap = make(map[*ast.Node]*TypeInfo)
 
-func (t *TypedNode) String() string {
-	var buffer bytes.Buffer
+// Function to set the type information for a node
+func SetTypeInfo(node *ast.Node, tag string, node_t string) {
+	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t}
+}
 
-	var dfs func(node *TypedNode)
-	dfs = func(node *TypedNode) {
-		// Write the current node type, type info, and tag to the buffer
-		buffer.WriteString(fmt.Sprintf("(%s %s %T ", node.node_t, node.tag, node.node))
+// Function to get the type information for a node
+func GetTypeInfo(node *ast.Node) *TypeInfo {
+	return typeInfoMap[node]
+}
+
+func NewTypeStoreDB() *TypeStoreDB {
+	return &TypeStoreDB{make(map[ast.Node]string)}
+}
+
+func (t *TypeStoreDB) Get(node ast.Node) string {
+	return t.db[node]
+}
+
+func (t *TypeStoreDB) Set(node ast.Node, node_t string) {
+	t.db[node] = node_t
+}
+
+func typeAST_norep(node ast.Node) {
+	// Create a set to keep track of visited nodes
+	visited := make(map[ast.Node]bool)
+
+	var dfsInner func(node ast.Node)
+	dfsInner = func(node ast.Node) {
+		if visited[node] {
+			// Skip this node if it has already been visited
+			return
+		}
+
+		// Mark this node as visited
+		visited[node] = true
+
+		// Apply the visitor function to the current node
+		typeVisitor(node)
 
 		// Traverse the children
-		node.node.Children(func(child ast.Node) ast.Node {
-			if typedChild, ok := child.(*TypedNode); ok {
-				dfs(typedChild)
-			}
+		node.Children(func(child ast.Node) ast.Node {
+			dfsInner(child)
 			return child
 		})
-
-		buffer.WriteString(")")
 	}
 
 	// Start the DFS traversal
-	dfs(t)
-
-	return buffer.String()
+	dfsInner(node)
 }
 
-// =============================================================================
+func typeAST(node ast.Node) {
+	typeVisitor(node)
+
+	node.Children(func(child ast.Node) ast.Node {
+		typeAST(child)
+		return child
+	})
+}
+
+func typeVisitor(node ast.Node) {
+	var tag, node_t string
+	switch node.(type) {
+	case *ast.Binary:
+		tag = "binary"
+		node_t = "expr"
+	case *ast.Nary:
+		tag = "nary"
+		node_t = "expr"
+	case *ast.Unary:
+		tag = "unary"
+		node_t = "expr"
+	case *ast.Call:
+		tag = "call"
+		node_t = "expr"
+	case *ast.Function:
+		tag = "function"
+		node_t = "stmt"
+	default:
+		tag = "unknown"
+		node_t = "unknown"
+	}
+
+	SetTypeInfo(&node, tag, node_t)
+}
 
 func copyAST(node ast.Node) *TypedNode {
 	currNode := copyVisitor(node)
