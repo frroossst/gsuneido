@@ -29,10 +29,6 @@ import (
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
-type TypedNode interface {
-	GetType() string
-	SetType(string)
-}
 
 // Node is embedded by Expr and Statement
 type Node interface {

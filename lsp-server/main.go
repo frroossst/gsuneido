@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
+	. "github.com/apmckinlay/gsuneido/core"
 )
 
 type UID struct {
@@ -30,9 +32,14 @@ var uid UID
 
 func main() {
 	uid = UID{}
+	/*
+
+
+	 */
 
 	src := `
-		function(x) {
+		function(x) 
+			{
 			// test folding
 			notLogic = not true
 			constF = 1 + 2 + 3 + 4 + 5
@@ -43,7 +50,7 @@ func main() {
 			if true { bar = 1 } else { bar = 2 }
 			bar()
 			return x + 1 + b
-		}
+			}
 	`
 	fmt.Println("src:", src)
 	fmt.Println("compiled:", compile.AstParser(src).Const())
@@ -55,6 +62,12 @@ func main() {
 
 	t := dfs(f, propFoldVisitor)
 	fmt.Println("typed ast:", t)
+
+	// copying AST
+	c := copyAST(f)
+	fmt.Println("copied ast:", c)
+	// get runtime reflect type of c
+	fmt.Println("type:", c.String())
 }
 
 type SuType int
@@ -71,6 +84,7 @@ const (
 	Object
 )
 
+// =============================================================================
 type TypedNode struct {
 	node ast.Node
 	// "expr" or "stmt"
@@ -78,12 +92,8 @@ type TypedNode struct {
 	node_t string
 }
 
-func NewTypedNode(node ast.Node, tag string) TypedNode {
-	return TypedNode{node, tag, ""}
-}
-
-func (t *TypedNode) String() string {
-	return fmt.Sprintf("%s %s %s", t.tag, t.node_t, t.node.String())
+func NewTypedNode(node ast.Node, tag string) *TypedNode {
+	return &TypedNode{node, tag, ""}
 }
 
 func (t *TypedNode) GetType() string {
@@ -92,6 +102,89 @@ func (t *TypedNode) GetType() string {
 
 func (t *TypedNode) SetType(node_t string) {
 	t.node_t = node_t
+}
+
+func (t *TypedNode) GetNode() ast.Node {
+	return t.node
+}
+
+func (t *TypedNode) Children(f func(ast.Node) ast.Node) {
+	t.node.Children(f)
+}
+
+func (t *TypedNode) Get(*Thread, Value) Value {
+	panic("implement me")
+}
+
+func (t *TypedNode) SetPos(org, end int32) {
+	t.node.SetPos(org, end)
+}
+
+func (t *TypedNode) astNode() { t.node.astNode() }
+
+func (t *TypedNode) String() string {
+	var buffer bytes.Buffer
+
+	var dfs func(node *TypedNode)
+	dfs = func(node *TypedNode) {
+		// Write the current node type, type info, and tag to the buffer
+		buffer.WriteString(fmt.Sprintf("(%s %s %T ", node.node_t, node.tag, node.node))
+
+		// Traverse the children
+		node.node.Children(func(child ast.Node) ast.Node {
+			if typedChild, ok := child.(*TypedNode); ok {
+				dfs(typedChild)
+			}
+			return child
+		})
+
+		buffer.WriteString(")")
+	}
+
+	// Start the DFS traversal
+	dfs(t)
+
+	return buffer.String()
+}
+
+// =============================================================================
+
+func copyAST(node ast.Node) *TypedNode {
+	currNode := copyVisitor(node)
+	return currNode
+}
+
+func copyVisitor(node ast.Node) *TypedNode {
+	var tag string
+	switch node.(type) {
+	case *ast.Binary:
+		tag = "binary"
+	case *ast.Nary:
+		tag = "nary"
+	case *ast.Unary:
+		tag = "unary"
+	case *ast.Call:
+		tag = "call"
+	case *ast.Function:
+		tag = "function"
+	default:
+		tag = "unknown"
+	}
+	if stmt, ok := node.(ast.Statement); ok {
+		stmt.Position()
+	}
+	copyChildren(node) // RECURSE
+
+	return NewTypedNode(node, tag)
+}
+
+func copyChildren(node ast.Node) {
+	node.Children(func(child ast.Node) ast.Node {
+		typedChild := NewTypedNode(child, "expr")
+		child = typedChild.GetNode()
+		copyVisitor(child)
+		return child
+	})
 }
 
 // dfs is a depth-first search of the AST
