@@ -42,7 +42,6 @@ func (f *fold) visit(node Node) Node {
 	if stmt, ok := node.(Statement); ok {
 		f.srcpos = stmt.Position() // for error reporting
 	}
-	// fmt.Println("node:", node.String())
 	f.children(node) // RECURSE
 	node = f.fold(node)
 	if node != nil {

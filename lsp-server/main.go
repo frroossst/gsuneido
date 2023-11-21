@@ -74,17 +74,34 @@ func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
 	return currNode
 }
 
-// define a recursive function to be used in dfs with the
-// function signature fn func(node Node) Node
-func visitor(node ast.Node) ast.Node {
-	return node
+type TypedNode struct {
+	node 	ast.Node
+	// "expr" or "stmt"
+	tag  	string
+	node_t 	string
 }
+
+func NewTypedNode(node ast.Node, tag string) TypedNode {
+	return TypedNode{node, tag, ""}
+}
+
+func (t TypedNode) String() string {
+	return fmt.Sprintf("%s %s", t.tag, t.node.String())
+}
+
+func (t *TypedNode) GetType() string {
+	return t.node_t
+}
+
+func (t *TypedNode) SetType(node_t string) {
+	t.node_t = node_t
+}
+
 
 func propFoldVisitor(node ast.Node) ast.Node {
 	if stmt, ok := node.(ast.Statement); ok {
 		stmt.Position() // for error reporting
 	}
-	// fmt.Println("node:", node.String())
 	propFoldChildren(node) // RECURSE
 
 	return node
@@ -94,6 +111,18 @@ func propFoldChildren(node ast.Node) {
 	switch n := node.(type) {
 	case *ast.Binary:
 		fmt.Println("binary:", n.Tok)
+		fmt.Println("lhs:", n.Lhs.String())
+		fmt.Println("rhs:", n.Rhs.String())
+		return
+	case *ast.Nary:
+		fmt.Println("nary:", n.Tok)
+		fmt.Println("exprs:", n.Exprs)
+		t := NewTypedNode(n, "expr")
+		fmt.Println("typed node:", t)
+		return
+	case *ast.Return:
+		fmt.Println("return:", n.ValueBase.Type())
+		return
 	default:
 		fmt.Println("default:", n)
 	}
