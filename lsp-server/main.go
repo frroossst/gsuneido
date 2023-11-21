@@ -57,23 +57,7 @@ func main() {
 	fmt.Println("typed ast:", t)
 }
 
-// dfs is a depth-first search of the AST
-// it traverses the AST and applies the visitor function
-// to each node
-func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
-	// apply the visitor function to the current node
-	currNode := visitorFn(node)
-
-	currNode.Children(func(child ast.Node) ast.Node {
-		dfs(child, visitorFn)
-		return child
-	})
-
-	return currNode
-}
-
 type SuType int
-
 const (
 	Number SuType = iota
 	String
@@ -97,8 +81,8 @@ func NewTypedNode(node ast.Node, tag string) TypedNode {
 	return TypedNode{node, tag, ""}
 }
 
-func (t TypedNode) String() string {
-	return fmt.Sprintf("%s %s", t.tag, t.node.String())
+func (t* TypedNode) String() string {
+	return fmt.Sprintf("%s %s %s", t.tag, t.node_t, t.node.String())
 }
 
 func (t *TypedNode) GetType() string {
@@ -107,6 +91,21 @@ func (t *TypedNode) GetType() string {
 
 func (t *TypedNode) SetType(node_t string) {
 	t.node_t = node_t
+}
+
+// dfs is a depth-first search of the AST
+// it traverses the AST and applies the visitor function
+// to each node
+func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
+	// apply the visitor function to the current node
+	currNode := visitorFn(node)
+
+	currNode.Children(func(child ast.Node) ast.Node {
+		dfs(child, visitorFn)
+		return child
+	})
+
+	return currNode
 }
 
 func propFoldVisitor(node ast.Node) ast.Node {
