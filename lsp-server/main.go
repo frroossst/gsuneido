@@ -1,9 +1,12 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"reflect"
+
+	"encoding/base64"
+	"encoding/json"
+	"strings"
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
@@ -42,7 +45,7 @@ func main() {
 	src = `
 		function(x)
 			{
-			num = x + 123
+			num = x + "123"
 			num()
 			}`
 
@@ -77,6 +80,8 @@ func main() {
 		fmt.Println("key:", string(b))
 	}
 
+	fmt.Println("jsonify: ", typeInfoSet.String())
+
 }
 
 type SuType int
@@ -109,10 +114,25 @@ func (t *TypeInfo) String() string {
 // var typeInfoMap = make(map[*ast.Node]*TypeInfo)
 var typeInfoSet = KeyValueSet[*TypeInfo]{}
 
-// var globalVisited = make(map[string]bool)
-var visitedSet = KeyValueSet[bool]{}
+type Boolean_t struct {
+	Value bool
+}
 
-type KeyValueSet[T any] struct {
+func (b *Boolean_t) String() string {
+	if b.Value {
+		return "true"
+	}
+	return "false"
+}
+
+// var globalVisited = make(map[string]bool)
+var visitedSet = KeyValueSet[*Boolean_t]{}
+
+type Stringer interface {
+	String() string
+}
+
+type KeyValueSet[T Stringer] struct {
 	Keys   []string
 	Values []T
 }
@@ -148,6 +168,35 @@ func (kvs *KeyValueSet[T]) Contains(key string) bool {
 	return false
 }
 
+func (kvs *KeyValueSet[T]) String() string {
+	// serialise key and value to JSON like string
+	var buffer strings.Builder
+	buffer.WriteString("{")
+	for i, k := range kvs.Keys {
+		// decode k from Base64
+		b, err := base64.StdEncoding.DecodeString(k)
+		if err != nil {
+			panic(err)
+		}
+		if i > 0 {
+			buffer.WriteString(", ")
+		}
+		// Escape special characters in JSON string
+		keyJSON, err := json.Marshal(string(b))
+		if err != nil {
+			panic(err)
+		}
+		valJSON, err := json.Marshal(kvs.Values[i].String())
+		if err != nil {
+			panic(err)
+		}
+
+		buffer.WriteString(fmt.Sprintf("%s: %s", keyJSON, valJSON))
+	}
+	buffer.WriteString("}")
+	return buffer.String()
+}
+
 /*
 func SetTypeInfo(node *ast.Node, tag string, node_t string, tok string) {
 	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t, Token: tok}
@@ -163,7 +212,7 @@ func GetTypeInfo(node *ast.Node) *TypeInfo {
 func markVisited(str string) {
 	// encode string to Base64
 	b64 := base64.StdEncoding.EncodeToString([]byte(str))
-	visitedSet.Set(b64, true)
+	visitedSet.Set(b64, &Boolean_t{Value: true})
 }
 
 func dfsInner(node ast.Node) {
@@ -175,9 +224,6 @@ func dfsInner(node ast.Node) {
 	str := node.String()
 	defer markVisited(str)
 	// markVisited(str)
-
-	// Mark this node as globalVisited
-	// globalVisited[node.String()] = true
 
 	// Apply the visitor function to the current node
 	typeVisitor(node)
@@ -197,6 +243,11 @@ func typeAST_norep(node ast.Node) {
 	dfsInner(node)
 }
 
+func dfsChildrenFn(child ast.Node) ast.Node {
+	dfsInner(child)
+	return child
+}
+
 func typeVisitor(node ast.Node) {
 	var tag, node_t string
 	tok := "unimpl!"
@@ -209,22 +260,21 @@ func typeVisitor(node ast.Node) {
 		tag = "expr"
 		node_t = "unknown"
 	case *ast.Binary:
-		fmt.Println("hit binary")
 		tag = "expr"
 		node_t = "unknown"
+		n.Lhs.Children(dfsChildrenFn)
+		n.Rhs.Children(dfsChildrenFn)
 	case *ast.Nary:
 		tag = "expr"
 		node_t = "unknown"
+		n.Children(dfsChildrenFn)
 	case *ast.Compound:
 		tag = "expr"
 		node_t = "unknown"
 	case *ast.ExprStmt:
 		tag = "stmt"
 		node_t = "unknown"
-		node.Children(func(child ast.Node) ast.Node {
-			dfsInner(child)
-			return child
-		})
+		n.Children(dfsChildrenFn)
 	case *ast.Return:
 		tag = "stmt"
 		node_t = "unknown"
@@ -237,8 +287,11 @@ func typeVisitor(node ast.Node) {
 	case *ast.Function:
 		tag = "expr"
 		node_t = "unknown"
+	case *ast.Constant:
+		tag = "expr"
+		node_t = "unknown"
 	default:
-		fmt.Println("n=", n)
+		fmt.Println("[TODO: default] ", n, reflect.TypeOf(n))
 		tag = "unknown"
 		node_t = "unknown"
 	}

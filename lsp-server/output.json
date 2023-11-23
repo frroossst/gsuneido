@@ -1,0 +1,9 @@
+{
+    "Function(x\n\tBinary(Eq num Nary(Add x \"123\"))\n\tCall(num))": "Tag= expr, Node_t= unknown, Token=unimpl!\n",
+    "x": "Tag= expr, Node_t= unknown, Token=unimpl!\n",
+    "\"123\"": "Tag= expr, Node_t= unknown, Token=unimpl!\n",
+    "Binary(Eq num Nary(Add x \"123\"))": "Tag= stmt, Node_t= unknown, Token=unimpl!\n",
+    "num": "Tag= expr, Node_t= unknown, Token=unimpl!\n",
+    "Nary(Add x \"123\")": "Tag= expr, Node_t= unknown, Token=unimpl!\n",
+    "Call(num)": "Tag= stmt, Node_t= unknown, Token=unimpl!\n"
+}
