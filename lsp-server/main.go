@@ -2,34 +2,13 @@ package main
 
 import (
 	"fmt"
-
-	"sync"
-	"time"
+	"reflect"
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
 )
 
-type UID struct {
-	counter uint64
-	mu      sync.Mutex
-}
-
-func (u *UID) Next() uint64 {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	u.counter++
-
-	id := uint64(time.Now().UnixMicro())
-
-	return id
-}
-
-// define globally acessibly UID
-var uid UID
-
 func main() {
-	uid = UID{}
 	/*
 
 
@@ -73,9 +52,6 @@ func main() {
 	f := p.Function()
 
 	ast.PropFold(f)
-
-	t := dfs(f, propFoldVisitor)
-	fmt.Println("typed ast:", t)
 
 	// typing AST
 	typeAST_norep(f)
@@ -134,19 +110,21 @@ type TypeStoreDB struct {
 type TypeInfo struct {
 	Tag    string
 	Node_t string
+	Token  string
 }
 
 func (t *TypeInfo) String() string {
-	return fmt.Sprintf("Tag= %s, Node_t= %s\n", t.Tag, t.Node_t)
+	return fmt.Sprintf("Tag= %s, Node_t= %s, Token=%s\n", t.Tag, t.Node_t, t.Token)
 }
 
 // ! Global, remove later
 // Create a map to store the type information for each node
 var typeInfoMap = make(map[*ast.Node]*TypeInfo)
+var globalVisited = make(map[string]bool)
 
 // Function to set the type information for a node
-func SetTypeInfo(node *ast.Node, tag string, node_t string) {
-	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t}
+func SetTypeInfo(node *ast.Node, tag string, node_t string, tok string) {
+	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t, Token: tok}
 }
 
 // Function to get the type information for a node
@@ -166,33 +144,31 @@ func (t *TypeStoreDB) Set(node ast.Node, node_t string) {
 	t.db[node] = node_t
 }
 
-func typeAST_norep(node ast.Node) {
-	// Create a set to keep track of visited nodes
-	// visited := make(map[ast.Node]bool)
-	visited := make(map[string]bool)
-
-	var dfsInner func(node ast.Node)
-	dfsInner = func(node ast.Node) {
-		if visited[node.String()] {
-			// Skip this node if it has already been visited
-			return
-		}
-
-		// Mark this node as visited
-		visited[node.String()] = true
-
-		// Apply the visitor function to the current node
-		typeVisitor(node)
-
-		// Traverse the children
-		node.Children(func(child ast.Node) ast.Node {
-			dfsInner(child)
-			return child
-		})
+func dfsInner(node ast.Node, globalVisited map[string]bool) {
+	if globalVisited[node.String()] {
+		// Skip this node if it has already been globalVisited
+		return
 	}
 
+	// Mark this node as globalVisited
+	globalVisited[node.String()] = true
+
+	// Apply the visitor function to the current node
+	typeVisitor(node)
+
+	// Traverse the children
+	node.Children(func(child ast.Node) ast.Node {
+		dfsInner(child, globalVisited)
+		return child
+	})
+}
+
+func typeAST_norep(node ast.Node) {
+	// Create a set to keep track of globalVisited nodes
+	// globalVisited := make(map[ast.Node]bool)
+
 	// Start the DFS traversal
-	dfsInner(node)
+	dfsInner(node, globalVisited)
 }
 
 func typeAST(node ast.Node) {
@@ -206,30 +182,55 @@ func typeAST(node ast.Node) {
 
 func typeVisitor(node ast.Node) {
 	var tag, node_t string
-	switch node.(type) {
-	case *ast.Binary:
-		tag = "binary"
-		node_t = "expr"
-	case *ast.Nary:
-		tag = "nary"
-		node_t = "expr"
+	tok := "unimpl!"
+
+	// why doesn't node.(type) match with ast.Binart?
+	// print typeof using reflect
+	fmt.Println("node type:", reflect.TypeOf(node))
+	switch n := node.(type) {
 	case *ast.Unary:
-		tag = "unary"
-		node_t = "expr"
+		tag = "expr"
+		node_t = "unknown"
+	case *ast.Binary:
+		tag = "expr"
+		node_t = "unknown"
+	case *ast.Nary:
+		tag = "expr"
+		node_t = "unknown"
+	case *ast.Compound:
+		tag = "expr"
+		node_t = "unknown"
+	case *ast.ExprStmt:
+		tag = "stmt"
+		node_t = "unknown"
+		globalVisited := make(map[string]bool)
+		node.Children(func(child ast.Node) ast.Node {
+			dfsInner(child, globalVisited)
+			return child
+		})
+	case *ast.Return:
+		tag = "stmt"
+		node_t = "unknown"
+	case *ast.Ident:
+		tag = "expr"
+		node_t = "unknown"
 	case *ast.Call:
-		tag = "call"
-		node_t = "expr"
+		tag = "expr"
+		node_t = "unknown"
 	case *ast.Function:
-		tag = "function"
-		node_t = "stmt"
+		tag = "expr"
+		node_t = "unknown"
 	default:
+		fmt.Println("n=", n)
 		tag = "unknown"
 		node_t = "unknown"
 	}
+	// return (tag), (node_t)
 
-	SetTypeInfo(&node, tag, node_t)
+	SetTypeInfo(&node, tag, node_t, tok)
 }
 
+/*
 func copyAST(node ast.Node) *TypedNode {
 	currNode := copyVisitor(node)
 	return currNode
@@ -267,44 +268,4 @@ func copyChildren(node ast.Node) {
 		return child
 	})
 }
-
-// dfs is a depth-first search of the AST
-// it traverses the AST and applies the visitor function
-// to each node
-func dfs(node ast.Node, visitorFn func(ast.Node) ast.Node) ast.Node {
-	// apply the visitor function to the current node
-	currNode := visitorFn(node)
-
-	// currNode.Children(func(child ast.Node) ast.Node {
-	// 	dfs(child, visitorFn)
-	// 	return child
-	// })
-
-	return currNode
-}
-
-func propFoldVisitor(node ast.Node) ast.Node {
-	if stmt, ok := node.(ast.Statement); ok {
-		stmt.Position() // for error reporting
-	}
-	propFoldChildren(node) // RECURSE
-
-	return node
-}
-
-func propFoldChildren(node ast.Node) {
-	switch n := node.(type) {
-	case *ast.Binary:
-		fmt.Println("binary:", n.Tok)
-		return
-	case *ast.Nary:
-		fmt.Println("nary:", n.Tok)
-		return
-	case *ast.Return:
-		return
-	default:
-		fmt.Println("default:", n)
-	}
-
-	node.Children(propFoldVisitor) // RECURSE
-}
+*/
