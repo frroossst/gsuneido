@@ -76,36 +76,7 @@ const (
 	Object
 )
 
-// =============================================================================
-
-type TypedNode struct {
-	node ast.Node
-	// "expr" or "stmt"
-	tag    string
-	node_t string
-}
-
-func NewTypedNode(node ast.Node, tag string) *TypedNode {
-	return &TypedNode{node, tag, ""}
-}
-
-func (t *TypedNode) GetType() string {
-	return t.node_t
-}
-
-func (t *TypedNode) SetType(node_t string) {
-	t.node_t = node_t
-}
-
-func (t *TypedNode) GetNode() ast.Node {
-	return t.node
-}
-
-// =============================================================================
-
-type TypeStoreDB struct {
-	db map[ast.Node]string
-}
+// ==================================================================
 
 type TypeInfo struct {
 	Tag    string
@@ -117,32 +88,19 @@ func (t *TypeInfo) String() string {
 	return fmt.Sprintf("Tag= %s, Node_t= %s, Token=%s\n", t.Tag, t.Node_t, t.Token)
 }
 
-// ! Global, remove later
-// Create a map to store the type information for each node
+// TODO: Instead of using a global map, use a map that is passed around
 var typeInfoMap = make(map[*ast.Node]*TypeInfo)
 var globalVisited = make(map[string]bool)
 
-// Function to set the type information for a node
 func SetTypeInfo(node *ast.Node, tag string, node_t string, tok string) {
 	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t, Token: tok}
 }
 
-// Function to get the type information for a node
 func GetTypeInfo(node *ast.Node) *TypeInfo {
 	return typeInfoMap[node]
 }
 
-func NewTypeStoreDB() *TypeStoreDB {
-	return &TypeStoreDB{make(map[ast.Node]string)}
-}
-
-func (t *TypeStoreDB) Get(node ast.Node) string {
-	return t.db[node]
-}
-
-func (t *TypeStoreDB) Set(node ast.Node, node_t string) {
-	t.db[node] = node_t
-}
+// ==================================================================
 
 func dfsInner(node ast.Node) {
 	if globalVisited[node.String()] {
@@ -169,15 +127,6 @@ func typeAST_norep(node ast.Node) {
 
 	// Start the DFS traversal
 	dfsInner(node)
-}
-
-func typeAST(node ast.Node) {
-	typeVisitor(node)
-
-	node.Children(func(child ast.Node) ast.Node {
-		typeAST(child)
-		return child
-	})
 }
 
 func typeVisitor(node ast.Node) {
