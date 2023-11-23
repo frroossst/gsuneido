@@ -144,7 +144,7 @@ func (t *TypeStoreDB) Set(node ast.Node, node_t string) {
 	t.db[node] = node_t
 }
 
-func dfsInner(node ast.Node, globalVisited map[string]bool) {
+func dfsInner(node ast.Node) {
 	if globalVisited[node.String()] {
 		// Skip this node if it has already been globalVisited
 		return
@@ -158,7 +158,7 @@ func dfsInner(node ast.Node, globalVisited map[string]bool) {
 
 	// Traverse the children
 	node.Children(func(child ast.Node) ast.Node {
-		dfsInner(child, globalVisited)
+		dfsInner(child)
 		return child
 	})
 }
@@ -168,7 +168,7 @@ func typeAST_norep(node ast.Node) {
 	// globalVisited := make(map[ast.Node]bool)
 
 	// Start the DFS traversal
-	dfsInner(node, globalVisited)
+	dfsInner(node)
 }
 
 func typeAST(node ast.Node) {
@@ -192,6 +192,7 @@ func typeVisitor(node ast.Node) {
 		tag = "expr"
 		node_t = "unknown"
 	case *ast.Binary:
+		fmt.Println("hit binary")
 		tag = "expr"
 		node_t = "unknown"
 	case *ast.Nary:
@@ -203,9 +204,8 @@ func typeVisitor(node ast.Node) {
 	case *ast.ExprStmt:
 		tag = "stmt"
 		node_t = "unknown"
-		globalVisited := make(map[string]bool)
 		node.Children(func(child ast.Node) ast.Node {
-			dfsInner(child, globalVisited)
+			dfsInner(child)
 			return child
 		})
 	case *ast.Return:
@@ -229,43 +229,3 @@ func typeVisitor(node ast.Node) {
 
 	SetTypeInfo(&node, tag, node_t, tok)
 }
-
-/*
-func copyAST(node ast.Node) *TypedNode {
-	currNode := copyVisitor(node)
-	return currNode
-}
-
-func copyVisitor(node ast.Node) *TypedNode {
-	var tag string
-	switch node.(type) {
-	case *ast.Binary:
-		tag = "binary"
-	case *ast.Nary:
-		tag = "nary"
-	case *ast.Unary:
-		tag = "unary"
-	case *ast.Call:
-		tag = "call"
-	case *ast.Function:
-		tag = "function"
-	default:
-		tag = "unknown"
-	}
-	if stmt, ok := node.(ast.Statement); ok {
-		stmt.Position()
-	}
-	copyChildren(node) // RECURSE
-
-	return NewTypedNode(node, tag)
-}
-
-func copyChildren(node ast.Node) {
-	node.Children(func(child ast.Node) ast.Node {
-		typedChild := NewTypedNode(child, "expr")
-		child = typedChild.GetNode()
-		copyVisitor(child)
-		return child
-	})
-}
-*/
