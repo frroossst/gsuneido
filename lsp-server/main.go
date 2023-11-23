@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"reflect"
 
@@ -60,6 +61,16 @@ func main() {
 		fmt.Println("pointer: ", k, "key:", (*k).String(), "value:", v)
 	}
 
+	fmt.Println("=== KV Set ===")
+	for _, k := range globalKVSet.Keys {
+		// decode string from Base64
+		b, err := base64.StdEncoding.DecodeString(k)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("key:", string(b))
+	}
+
 }
 
 type SuType int
@@ -90,7 +101,44 @@ func (t *TypeInfo) String() string {
 
 // TODO: Instead of using a global map, use a map that is passed around
 var typeInfoMap = make(map[*ast.Node]*TypeInfo)
-var globalVisited = make(map[string]bool)
+
+// var globalVisited = make(map[string]bool)
+var globalKVSet = KeyValueSet{}
+
+type KeyValueSet struct {
+	Keys   []string
+	Values []bool
+}
+
+func (kvs *KeyValueSet) Get(key string) bool {
+	// find index of key
+	for i, k := range kvs.Keys {
+		if k == key {
+			return kvs.Values[i]
+		}
+	}
+	return false
+}
+
+func (kvs *KeyValueSet) Set(key string) {
+	for i, k := range kvs.Keys {
+		if k == key {
+			kvs.Values[i] = true
+			return
+		}
+	}
+	kvs.Keys = append(kvs.Keys, key)
+	kvs.Values = append(kvs.Values, true)
+}
+
+func (kvs *KeyValueSet) Contains(key string) bool {
+	for _, k := range kvs.Keys {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
 
 func SetTypeInfo(node *ast.Node, tag string, node_t string, tok string) {
 	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t, Token: tok}
@@ -102,14 +150,24 @@ func GetTypeInfo(node *ast.Node) *TypeInfo {
 
 // ==================================================================
 
+func markVisited(str string) {
+	// encode string to Base64
+	b64 := base64.StdEncoding.EncodeToString([]byte(str))
+	globalKVSet.Set(b64)
+}
+
 func dfsInner(node ast.Node) {
-	if globalVisited[node.String()] {
-		// Skip this node if it has already been globalVisited
+	b64 := base64.StdEncoding.EncodeToString([]byte(node.String()))
+	if globalKVSet.Contains(b64) {
 		return
 	}
 
+	str := node.String()
+	defer markVisited(str)
+	// markVisited(str)
+
 	// Mark this node as globalVisited
-	globalVisited[node.String()] = true
+	// globalVisited[node.String()] = true
 
 	// Apply the visitor function to the current node
 	typeVisitor(node)
@@ -174,7 +232,6 @@ func typeVisitor(node ast.Node) {
 		tag = "unknown"
 		node_t = "unknown"
 	}
-	// return (tag), (node_t)
-
+	// dont't really like this side effect
 	SetTypeInfo(&node, tag, node_t, tok)
 }
