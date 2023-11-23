@@ -57,12 +57,18 @@ func main() {
 	// typing AST
 	typeAST_norep(f)
 	fmt.Println("=== type maps ===")
-	for k, v := range typeInfoMap {
-		fmt.Println("pointer: ", k, "key:", (*k).String(), "value:", v)
+	for _, k := range typeInfoSet.Keys {
+		b, err := base64.StdEncoding.DecodeString(k)
+		if err != nil {
+			panic(err)
+		}
+		if v, ok := typeInfoSet.Get(k); ok {
+			fmt.Println("key:", string(b), "value:", v)
+		}
 	}
 
 	fmt.Println("=== KV Set ===")
-	for _, k := range globalKVSet.Keys {
+	for _, k := range visitedSet.Keys {
 		// decode string from Base64
 		b, err := base64.StdEncoding.DecodeString(k)
 		if err != nil {
@@ -100,38 +106,40 @@ func (t *TypeInfo) String() string {
 }
 
 // TODO: Instead of using a global map, use a map that is passed around
-var typeInfoMap = make(map[*ast.Node]*TypeInfo)
+// var typeInfoMap = make(map[*ast.Node]*TypeInfo)
+var typeInfoSet = KeyValueSet[*TypeInfo]{}
 
 // var globalVisited = make(map[string]bool)
-var globalKVSet = KeyValueSet{}
+var visitedSet = KeyValueSet[bool]{}
 
-type KeyValueSet struct {
+type KeyValueSet[T any] struct {
 	Keys   []string
-	Values []bool
+	Values []T
 }
 
-func (kvs *KeyValueSet) Get(key string) bool {
+func (kvs *KeyValueSet[T]) Get(key string) (T, bool) {
 	// find index of key
 	for i, k := range kvs.Keys {
 		if k == key {
-			return kvs.Values[i]
+			return kvs.Values[i], true
 		}
 	}
-	return false
+	var zero T
+	return zero, false
 }
 
-func (kvs *KeyValueSet) Set(key string) {
+func (kvs *KeyValueSet[T]) Set(key string, value T) {
 	for i, k := range kvs.Keys {
 		if k == key {
-			kvs.Values[i] = true
+			kvs.Values[i] = value
 			return
 		}
 	}
 	kvs.Keys = append(kvs.Keys, key)
-	kvs.Values = append(kvs.Values, true)
+	kvs.Values = append(kvs.Values, value)
 }
 
-func (kvs *KeyValueSet) Contains(key string) bool {
+func (kvs *KeyValueSet[T]) Contains(key string) bool {
 	for _, k := range kvs.Keys {
 		if k == key {
 			return true
@@ -140,6 +148,7 @@ func (kvs *KeyValueSet) Contains(key string) bool {
 	return false
 }
 
+/*
 func SetTypeInfo(node *ast.Node, tag string, node_t string, tok string) {
 	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t, Token: tok}
 }
@@ -147,18 +156,19 @@ func SetTypeInfo(node *ast.Node, tag string, node_t string, tok string) {
 func GetTypeInfo(node *ast.Node) *TypeInfo {
 	return typeInfoMap[node]
 }
+*/
 
 // ==================================================================
 
 func markVisited(str string) {
 	// encode string to Base64
 	b64 := base64.StdEncoding.EncodeToString([]byte(str))
-	globalKVSet.Set(b64)
+	visitedSet.Set(b64, true)
 }
 
 func dfsInner(node ast.Node) {
 	b64 := base64.StdEncoding.EncodeToString([]byte(node.String()))
-	if globalKVSet.Contains(b64) {
+	if visitedSet.Contains(b64) {
 		return
 	}
 
@@ -233,5 +243,8 @@ func typeVisitor(node ast.Node) {
 		node_t = "unknown"
 	}
 	// dont't really like this side effect
-	SetTypeInfo(&node, tag, node_t, tok)
+	// SetTypeInfo(&node, tag, node_t, tok)
+	// convert the pointer &node to a string
+	b64 := base64.StdEncoding.EncodeToString([]byte(node.String()))
+	typeInfoSet.Set(b64, &TypeInfo{Tag: tag, Node_t: node_t, Token: tok})
 }
