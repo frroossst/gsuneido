@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 
 	"encoding/base64"
 	"encoding/json"
@@ -182,11 +183,13 @@ func (kvs *KeyValueSet[T]) String() string {
 			buffer.WriteString(", ")
 		}
 		// Escape special characters in JSON string
-		keyJSON, err := json.Marshal(string(b))
+		pattern := regexp.MustCompile(`[^\S ]`)
+
+		keyJSON, err := json.Marshal(pattern.ReplaceAllString(string(b), ""))
 		if err != nil {
 			panic(err)
 		}
-		valJSON, err := json.Marshal(kvs.Values[i].String())
+		valJSON, err := json.Marshal(pattern.ReplaceAllString(kvs.Values[i].String(), ""))
 		if err != nil {
 			panic(err)
 		}
