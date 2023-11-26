@@ -1,0 +1,8 @@
+{
+    "Function(x Binary(Eq num Nary(Add x 123))Call(num))": "Function",
+    "x": "Variable",
+    "123": "Number",
+    "Binary(Eq num Nary(Add x 123))": "Solveable",
+    "num": "Number",
+    "Nary(Add x 123)": "Solveable"
+}

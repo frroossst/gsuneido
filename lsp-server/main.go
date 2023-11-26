@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"regexp"
 
@@ -81,7 +82,30 @@ func main() {
 		fmt.Println("key:", string(b))
 	}
 
-	fmt.Println("jsonify: ", typeInfoSet.String())
+	// write to file (for debugging)
+	jsonData := typeInfoSet.String()
+
+	fmt.Println("jsonify: ", jsonData)
+
+	// delete file if it exists
+	if _, err := os.Stat("output.json"); err == nil {
+		err = os.Remove("output.json")
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// write to file
+	fobj, err := os.OpenFile("output.json", os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		panic(err)
+	}
+	defer fobj.Close()
+
+	_, err = fobj.WriteString(jsonData)
+	if err != nil {
+		panic(err)
+	}
 
 }
 
