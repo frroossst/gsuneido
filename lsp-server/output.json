@@ -1,11 +1,18 @@
 {
-    "Function(xBinary(Eq num 123)Binary(Eq num Nary(Add x \"123\"))Call(num))": "Function",
-    "Binary(Eq num 123)": "Unknown",
-    "num": "Variable",
-    "123": "Constant",
+    "Function(xfalse15Return(Nary(Mul x 2))Binary(Eq bar -5)Binary(Eq bar 1)Call(bar)Return(Nary(Add x 1 b)))": "Function",
+    "false": "Unknown",
+    "15": "Unknown",
+    "Return(Nary(Mul x 2))": "Unknown",
     "x": "Variable",
-    "\"123\"": "Constant",
-    "Binary(Eq num Nary(Add x \"123\"))": "Unknown",
-    "Nary(Add x \"123\")": "Solveable",
-    "Call(num)": "Unknown"
+    "2": "Number",
+    "Nary(Mul x 2)": "Solveable",
+    "Binary(Eq bar -5)": "Unknown",
+    "bar": "Variable",
+    "-5": "Number",
+    "Binary(Eq bar 1)": "Unknown",
+    "1": "Number",
+    "Call(bar)": "Unknown",
+    "Return(Nary(Add x 1 b))": "Unknown",
+    "b": "Variable",
+    "Nary(Add x 1 b)": "Solveable"
 }

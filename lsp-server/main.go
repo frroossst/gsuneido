@@ -38,18 +38,18 @@ func main() {
 
 	// catching the simplest type error: `type number is not callable`
 	/*
-		1. Mark x as unknown (as it won't be known in the first pass)
-		2. Mark num as unknown + Number (123)
-		3. Evaluate x to be Number (as only then could it be added to 123)
-		4. Evaluate num to be Number
-		5. Throw error as Number is not callable
+			1. Mark x as unknown (as it won't be known in the first pass)
+			2. Mark num as unknown + Number (123)
+			3. Evaluate x to be Number (as only then could it be added to 123)
+			4. Evaluate num to be Number
+			5. Throw error as Number is not callable
 	*/
-	src = `
-		function(x)
-			{
-			num = x + "123"
-			num()
-			}`
+		src = `
+			function(x)
+				{
+				num = x + "123"
+				num()
+				}`
 
 	fmt.Println("src:", src)
 	fmt.Println("compiled:", compile.AstParser(src).Const())
@@ -85,6 +85,7 @@ func main() {
 	// write to file (for debugging)
 	jsonData := typeInfoSet.String()
 
+	fmt.Println("=== JSON ===")
 	fmt.Println("jsonify: ", jsonData)
 
 	// delete file if it exists
@@ -287,10 +288,11 @@ func typeVisitor(node ast.Node) {
 	case *ast.Function:
 		type_tag = "Function"
 	case *ast.Constant:
-		type_tag = "Constant"
+		type_tag = n.Val.Type().String()
 	default:
 		fmt.Println("[TODO: default] ", n, reflect.TypeOf(n))
 	}
+
 	// dont't really like this side effect
 	b64 := base64.StdEncoding.EncodeToString([]byte(node.String()))
 	s_t := &String_t{Value: type_tag}
