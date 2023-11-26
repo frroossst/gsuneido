@@ -125,19 +125,15 @@ const (
 
 // ==================================================================
 
-type TypeInfo struct {
-	Tag    string
-	Node_t string
-	Token  string
+type String_t struct {
+	Value string
 }
 
-func (t *TypeInfo) String() string {
-	return fmt.Sprintf("Tag= %s, Node_t= %s, Token=%s\n", t.Tag, t.Node_t, t.Token)
+func (s *String_t) String() string {
+	return s.Value
 }
 
-// TODO: Instead of using a global map, use a map that is passed around
-// var typeInfoMap = make(map[*ast.Node]*TypeInfo)
-var typeInfoSet = KeyValueSet[*TypeInfo]{}
+var typeInfoSet = KeyValueSet[*String_t]{}
 
 type Boolean_t struct {
 	Value bool
@@ -150,7 +146,6 @@ func (b *Boolean_t) String() string {
 	return "false"
 }
 
-// var globalVisited = make(map[string]bool)
 var visitedSet = KeyValueSet[*Boolean_t]{}
 
 type Stringer interface {
@@ -224,16 +219,6 @@ func (kvs *KeyValueSet[T]) String() string {
 	return buffer.String()
 }
 
-/*
-func SetTypeInfo(node *ast.Node, tag string, node_t string, tok string) {
-	typeInfoMap[node] = &TypeInfo{Tag: tag, Node_t: node_t, Token: tok}
-}
-
-func GetTypeInfo(node *ast.Node) *TypeInfo {
-	return typeInfoMap[node]
-}
-*/
-
 // ==================================================================
 
 func markVisited(str string) {
@@ -276,55 +261,38 @@ func dfsChildrenFn(child ast.Node) ast.Node {
 }
 
 func typeVisitor(node ast.Node) {
-	var tag, node_t string
-	tok := "unimpl!"
+	type_tag := "Unknown"
 
-	// why doesn't node.(type) match with ast.Binart?
-	// print typeof using reflect
 	fmt.Println("node type:", reflect.TypeOf(node))
 	switch n := node.(type) {
 	case *ast.Unary:
-		tag = "expr"
-		node_t = "unknown"
+		type_tag = "Solveable"
 	case *ast.Binary:
-		tag = "expr"
-		node_t = "unknown"
+		type_tag = "Solveable"
 		n.Lhs.Children(dfsChildrenFn)
 		n.Rhs.Children(dfsChildrenFn)
 	case *ast.Nary:
-		tag = "expr"
-		node_t = "unknown"
+		type_tag = "Solveable"
 		n.Children(dfsChildrenFn)
 	case *ast.Compound:
-		tag = "expr"
-		node_t = "unknown"
+		// compound
 	case *ast.ExprStmt:
-		tag = "stmt"
-		node_t = "unknown"
 		n.Children(dfsChildrenFn)
 	case *ast.Return:
-		tag = "stmt"
-		node_t = "unknown"
+		// return
 	case *ast.Ident:
-		tag = "expr"
-		node_t = "unknown"
+		type_tag = "Variable"
 	case *ast.Call:
-		tag = "expr"
-		node_t = "unknown"
+		// call
 	case *ast.Function:
-		tag = "expr"
-		node_t = "unknown"
+		type_tag = "Function"
 	case *ast.Constant:
-		tag = "expr"
-		node_t = "unknown"
+		type_tag = "Constant"
 	default:
 		fmt.Println("[TODO: default] ", n, reflect.TypeOf(n))
-		tag = "unknown"
-		node_t = "unknown"
 	}
 	// dont't really like this side effect
-	// SetTypeInfo(&node, tag, node_t, tok)
-	// convert the pointer &node to a string
 	b64 := base64.StdEncoding.EncodeToString([]byte(node.String()))
-	typeInfoSet.Set(b64, &TypeInfo{Tag: tag, Node_t: node_t, Token: tok})
+	s_t := &String_t{Value: type_tag}
+	typeInfoSet.Set(b64, s_t)
 }

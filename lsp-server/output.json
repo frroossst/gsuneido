@@ -1,9 +1,11 @@
 {
-    "Function(xBinary(Eq num Nary(Add x \"123\"))Call(num))": "Tag= expr, Node_t= unknown, Token=unimpl!",
-    "x": "Tag= expr, Node_t= unknown, Token=unimpl!",
-    "\"123\"": "Tag= expr, Node_t= unknown, Token=unimpl!",
-    "Binary(Eq num Nary(Add x \"123\"))": "Tag= stmt, Node_t= unknown, Token=unimpl!",
-    "num": "Tag= expr, Node_t= unknown, Token=unimpl!",
-    "Nary(Add x \"123\")": "Tag= expr, Node_t= unknown, Token=unimpl!",
-    "Call(num)": "Tag= stmt, Node_t= unknown, Token=unimpl!"
+    "Function(xBinary(Eq num 123)Binary(Eq num Nary(Add x \"123\"))Call(num))": "Function",
+    "Binary(Eq num 123)": "Unknown",
+    "num": "Variable",
+    "123": "Constant",
+    "x": "Variable",
+    "\"123\"": "Constant",
+    "Binary(Eq num Nary(Add x \"123\"))": "Unknown",
+    "Nary(Add x \"123\")": "Solveable",
+    "Call(num)": "Unknown"
 }
