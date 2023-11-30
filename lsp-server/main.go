@@ -17,7 +17,6 @@ import (
 func main() {
 	/*
 
-
 	 */
 
 	src := `
@@ -38,13 +37,13 @@ func main() {
 
 	// catching the simplest type error: `type number is not callable`
 	/*
-			1. Mark x as unknown (as it won't be known in the first pass)
-			2. Mark num as unknown + Number (123)
-			3. Evaluate x to be Number (as only then could it be added to 123)
-			4. Evaluate num to be Number
-			5. Throw error as Number is not callable
+		1. Mark x as unknown (as it won't be known in the first pass)
+		2. Mark num as unknown + Number (123)
+		3. Evaluate x to be Number (as only then could it be added to 123)
+		4. Evaluate num to be Number
+		5. Throw error as Number is not callable
 	*/
-		src = `
+	src = `
 			function(x)
 				{
 				num = x + "123"

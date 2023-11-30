@@ -1,18 +1,5 @@
 {
-    "Function(xfalse15Return(Nary(Mul x 2))Binary(Eq bar -5)Binary(Eq bar 1)Call(bar)Return(Nary(Add x 1 b)))": "Function",
-    "false": "Unknown",
-    "15": "Unknown",
-    "Return(Nary(Mul x 2))": "Unknown",
-    "x": "Variable",
-    "2": "Number",
-    "Nary(Mul x 2)": "Solveable",
-    "Binary(Eq bar -5)": "Unknown",
-    "bar": "Variable",
-    "-5": "Number",
-    "Binary(Eq bar 1)": "Unknown",
-    "1": "Number",
-    "Call(bar)": "Unknown",
-    "Return(Nary(Add x 1 b))": "Unknown",
-    "b": "Variable",
-    "Nary(Add x 1 b)": "Solveable"
+    "Function(x123Call(123))": "Function",
+    "123": "Unknown",
+    "Call(123)": "Unknown"
 }
