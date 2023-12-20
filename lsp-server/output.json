@@ -1,9 +1,10 @@
 {
-    "Function(xBinary(Eq num Nary(Add x 123))Call(num))": "Function",
+    "Function(xBinary(Eq num Nary(Add x \"123\"))Unary(PostInc num)Call(num))": "Function",
     "x": "Variable",
-    "123": "Number",
-    "Binary(Eq num Nary(Add x 123))": "Unknown",
+    "\"123\"": "String",
+    "Binary(Eq num Nary(Add x \"123\"))": "Unknown",
     "num": "Variable",
-    "Nary(Add x 123)": "Solveable",
+    "Nary(Add x \"123\")": "Solveable",
+    "Unary(PostInc num)": "Unknown",
     "Call(num)": "Unknown"
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
+	//	"os"
 	"reflect"
 	"regexp"
 
@@ -12,6 +12,8 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
+	"github.com/apmckinlay/gsuneido/core"
+	// . "github.com/apmckinlay/gsuneido/core"
 )
 
 func main() {
@@ -47,65 +49,88 @@ func main() {
 			function(x)
 				{
 				num = x + "123"
+				num++
 				num()
-				}`
+				}
+			`
+
+	src = `
+		class {
+			x: 0
+			msg: "hello"
+			pvt_foo() { return this.x }
+			pvt_bar() { return this.msg }
+			SetX(x) { .x = x }
+			SetMsg(msg) { .msg = msg }
+			Get() { return Object(numx: .x, strmsg: .msg) }
+		}
+		`
 
 	fmt.Println("src:", src)
 	fmt.Println("compiled:", compile.AstParser(src).Const())
 
-	p := compile.NewParser(src)
-	f := p.Function()
+	fmt.Println("=== AST ===")
+	c := compile.AstParser(src).Const()
+	fmt.Println(c.Get(nil, core.SuStr("children")))
 
-	ast.PropFold(f)
+	/*
+		p := compile.NewParser(src)
+		fmt.Println(p.String())
+		f := p.Function()
 
-	// typing AST
-	typeAST_norep(f)
-	fmt.Println("=== type maps ===")
-	for _, k := range typeInfoSet.Keys {
-		b, err := base64.StdEncoding.DecodeString(k)
-		if err != nil {
-			panic(err)
-		}
-		if v, ok := typeInfoSet.Get(k); ok {
-			fmt.Println("key:", string(b), "value:", v)
-		}
-	}
+		ast.PropFold(f)
 
-	fmt.Println("=== KV Set ===")
-	for _, k := range visitedSet.Keys {
-		// decode string from Base64
-		b, err := base64.StdEncoding.DecodeString(k)
-		if err != nil {
-			panic(err)
+		// typing AST
+		typeAST_norep(f)
+		fmt.Println("=== type maps ===")
+		for _, k := range typeInfoSet.Keys {
+			b, err := base64.StdEncoding.DecodeString(k)
+			if err != nil {
+				panic(err)
+			}
+			if v, ok := typeInfoSet.Get(k); ok {
+				fmt.Println("key:", string(b), "value:", v)
+			}
 		}
-		fmt.Println("key:", string(b))
-	}
+	*/
+
+	// fmt.Println("=== KV Set ===")
+	// for _, k := range visitedSet.Keys {
+	// 	// decode string from Base64
+	// 	b, err := base64.StdEncoding.DecodeString(k)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	fmt.Println("key:", string(b))
+	// }
 
 	// write to file (for debugging)
-	jsonData := typeInfoSet.String()
+	/*
+		jsonData := typeInfoSet.String()
 
-	fmt.Println("=== JSON ===")
-	fmt.Println("jsonify: ", jsonData)
+		fmt.Println("=== JSON ===")
+		fmt.Println("jsonify: ", jsonData)
 
-	// delete file if it exists
-	if _, err := os.Stat("output.json"); err == nil {
-		err = os.Remove("output.json")
+		// delete file if it exists
+		if _, err := os.Stat("output.json"); err == nil {
+			err = os.Remove("output.json")
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		// write to file
+		fobj, err := os.OpenFile("output.json", os.O_RDWR|os.O_CREATE, 0755)
 		if err != nil {
 			panic(err)
 		}
-	}
+		defer fobj.Close()
 
-	// write to file
-	fobj, err := os.OpenFile("output.json", os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		panic(err)
-	}
-	defer fobj.Close()
-
-	_, err = fobj.WriteString(jsonData)
-	if err != nil {
-		panic(err)
-	}
+		_, err = fobj.WriteString(jsonData)
+		if err != nil {
+			panic(err)
+		}
+	*/
 
 }
 
@@ -229,6 +254,7 @@ func markVisited(str string) {
 
 func dfsInner(node ast.Node) {
 	b64 := base64.StdEncoding.EncodeToString([]byte(node.String()))
+	fmt.Println("dfsInner, node.String() ", node.String())
 	if visitedSet.Contains(b64) {
 		return
 	}

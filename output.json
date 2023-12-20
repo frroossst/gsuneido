@@ -1,1 +1,0 @@
-{"Function(xBinary(Eq num Nary(Add x \"123\"))Call(num))": "Function", "x": "Variable", "\"123\"": "Constant", "Binary(Eq num Nary(Add x \"123\"))": "Unknown", "num": "Variable", "Nary(Add x \"123\")": "Solveable", "Call(num)": "Unknown"}

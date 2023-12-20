@@ -4,6 +4,7 @@
 package builtin
 
 import (
+	"runtime/debug"
 	"runtime/metrics"
 
 	"github.com/apmckinlay/gsuneido/compile"
@@ -35,6 +36,7 @@ func suneido_Compile(th *Thread, args []Value) Value {
 var _ = staticMethod(suneido_Parse, "(source)")
 
 func suneido_Parse(th *Thread, args []Value) Value {
+	debug.PrintStack()	
 	src := ToStr(args[0])
 	p := compile.AstParser(src)
 	ast := p.Const()
