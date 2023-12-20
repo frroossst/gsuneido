@@ -1,5 +1,9 @@
 {
-    "Function(x123Call(123))": "Function",
-    "123": "Unknown",
-    "Call(123)": "Unknown"
+    "Function(xBinary(Eq num Nary(Add x 123))Call(num))": "Function",
+    "x": "Variable",
+    "123": "Number",
+    "Binary(Eq num Nary(Add x 123))": "Unknown",
+    "num": "Variable",
+    "Nary(Add x 123)": "Solveable",
+    "Call(num)": "Unknown"
 }
