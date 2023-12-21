@@ -12,7 +12,7 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
-	. "github.com/apmckinlay/gsuneido/core"
+	// . "github.com/apmckinlay/gsuneido/core"
 )
 
 func main() {
@@ -68,39 +68,44 @@ func main() {
 		`
 
 	fmt.Println("src:", src)
-	//	fmt.Println("compiled:", compile.AstParser(src).Const())
-
-	fmt.Println("=== AST ===")
+	fmt.Println("compiled:", compile.AstParser(src).Const())
+	src = ` 123 - 456 `
 	p := compile.AstParser(src)
-	ast := p.Const()
-	fmt.Println(ast)
-	fmt.Println(reflect.TypeOf(ast))
-	fmt.Println("=== Children ===")
-	children := ast.Get(nil, SuStr("children"))
-	firstChild := children.Get(nil, IntVal(10))
-	firstChild_t := firstChild.Get(nil, SuStr("type"))
-	fmt.Println(firstChild_t)
-	fmt.Println("==============")
+	fmt.Println(p.TypeConst())
+
+	/*
+		fmt.Println("=== AST ===")
+		p := compile.AstParser(src)
+		ast := p.Const()
+		fmt.Println(ast)
+		fmt.Println(reflect.TypeOf(ast))
+		fmt.Println("=== Children ===")
+		children := ast.Get(nil, SuStr("children"))
+		firstChild := children.Get(nil, IntVal(10))
+		firstChild_t := firstChild.Get(nil, SuStr("type"))
+		fmt.Println(firstChild_t)
+		fmt.Println("==============")
+	*/
 
 	/*
 		p := compile.NewParser(src)
 		fmt.Println(p.String())
-		f := p.Function()
+			f := p.Function()
 
-		ast.PropFold(f)
+			ast.PropFold(f)
 
-		// typing AST
-		typeAST_norep(f)
-		fmt.Println("=== type maps ===")
-		for _, k := range typeInfoSet.Keys {
-			b, err := base64.StdEncoding.DecodeString(k)
-			if err != nil {
-				panic(err)
+			// typing AST
+			typeAST_norep(f)
+			fmt.Println("=== type maps ===")
+			for _, k := range typeInfoSet.Keys {
+				b, err := base64.StdEncoding.DecodeString(k)
+				if err != nil {
+					panic(err)
+				}
+				if v, ok := typeInfoSet.Get(k); ok {
+					fmt.Println("key:", string(b), "value:", v)
+				}
 			}
-			if v, ok := typeInfoSet.Get(k); ok {
-				fmt.Println("key:", string(b), "value:", v)
-			}
-		}
 	*/
 
 	// fmt.Println("=== KV Set ===")

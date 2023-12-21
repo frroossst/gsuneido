@@ -29,11 +29,6 @@ import (
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
-type Node_t struct {
-	branch string
-	type_t string
-}
-
 // Node is embedded by Expr and Statement
 type Node interface {
 	astNode()
@@ -118,10 +113,6 @@ func (a *Ident) String() string {
 	return a.Name
 }
 
-func (a *Ident) Json() Node_t {
-	return Node_t{branch: a.Name, type_t: "Variable"}
-}
-
 func (a *Ident) Echo() string {
 	return a.Name
 }
@@ -160,6 +151,7 @@ type Constant struct {
 }
 
 func (a *Constant) String() string {
+	// ! debug.PrintStack()
 	return a.Val.String()
 }
 

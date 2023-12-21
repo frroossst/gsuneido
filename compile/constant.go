@@ -42,6 +42,43 @@ func Checked(th *Thread, src string) (Value, []string) {
 	return v, p.CheckResults()
 }
 
+type Node_t struct {
+	// the branch of the node (e.g. Binary, Unary, etc.)
+	tag string
+	// the text content from the parser
+	content string
+	// the type of the node (e.g. string, number, etc.)
+	type_t string
+}
+
+func (p *Parser) TypeConst() []Node_t {
+	type_arr := []Node_t{}
+	for p.Token != tok.Eof {
+		type_arr = append(type_arr, p.typeConst())
+	}
+	return type_arr
+}
+
+func (p *Parser) typeConst() Node_t {
+	switch p.Token {
+	case tok.String:
+		content := p.Text
+		p.string()
+		return Node_t{tag: "Constant", type_t: "String", content: content}
+	case tok.Sub:
+		content := p.Text
+		p.Next()
+		OpUnaryMinus(p.number())
+		return Node_t{tag: "Operator", type_t: "Operator", content: content}
+	case tok.Number:
+		content := p.Text
+		p.number()
+		return Node_t{tag: "Constant", type_t: "Number", content: content}
+	default:
+		panic(p.Error("invalid constant, unexpected " + p.Token.String()))
+	}
+}
+
 func (p *Parser) Const() (result Value) {
 	defer func(org int32) {
 		if r, ok := result.(iSetPos); ok {
