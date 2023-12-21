@@ -12,8 +12,7 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
-	"github.com/apmckinlay/gsuneido/core"
-	// . "github.com/apmckinlay/gsuneido/core"
+	. "github.com/apmckinlay/gsuneido/core"
 )
 
 func main() {
@@ -45,6 +44,7 @@ func main() {
 		4. Evaluate num to be Number
 		5. Throw error as Number is not callable
 	*/
+
 	src = `
 			function(x)
 				{
@@ -63,15 +63,24 @@ func main() {
 			SetX(x) { .x = x }
 			SetMsg(msg) { .msg = msg }
 			Get() { return Object(numx: .x, strmsg: .msg) }
+			AddBreak() { return x + "123" }
 		}
 		`
 
 	fmt.Println("src:", src)
-	fmt.Println("compiled:", compile.AstParser(src).Const())
+	//	fmt.Println("compiled:", compile.AstParser(src).Const())
 
 	fmt.Println("=== AST ===")
-	c := compile.AstParser(src).Const()
-	fmt.Println(c.Get(nil, core.SuStr("children")))
+	p := compile.AstParser(src)
+	ast := p.Const()
+	fmt.Println(ast)
+	fmt.Println(reflect.TypeOf(ast))
+	fmt.Println("=== Children ===")
+	children := ast.Get(nil, SuStr("children"))
+	firstChild := children.Get(nil, IntVal(10))
+	firstChild_t := firstChild.Get(nil, SuStr("type"))
+	fmt.Println(firstChild_t)
+	fmt.Println("==============")
 
 	/*
 		p := compile.NewParser(src)
