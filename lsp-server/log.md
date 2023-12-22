@@ -46,5 +46,21 @@ Proof of concept shows that basic type inference is possible on Suneido without 
 - [ ] start writing the white papaer  
 - [ ] impl basic lsp in either vscode or nvim
 
+# 22 December 2023
 
+## Architecture
 
+Every class has a key value store, this key value store stores the member identifier name has a key and the value is another
+key value store that stores the relevant type information of it's scoped members/variables.
+
+When the key value stores are built, they contain the primitive inferred types of the members/variables. 
+
+Type inference uses the key value stores to infer the types of the members/variables, no type checking is done at this stage.
+
+Type cheking is then later done to constriant solve the inferred types
+
+## TODO
+
+- [ ] Implement typeFunction() parsing
+- [ ] Implement typeClass() parsing
+- [ ] Implement type key-value store
