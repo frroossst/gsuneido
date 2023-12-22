@@ -135,25 +135,44 @@ func (p *Parser) typeFunction() Function_t {
 	for i := 0; i < len(ast.Body); i++ {
 		fmt.Println("body:", ast.Body[i])
 		// TODO: parse each body type into a node_t
-		body = append(body, getNodeType(ast.Body[i]))
+		body = append(body, getExprType(ast.Body[i])...)
 	}
 
 	return Function_t{Node_t: Node_t{tag: "Function", type_t: "Function", content: "nil"}, name: "", parameters: parameters, body: body}
 }
 
-func getNodeType(node ast.Node) Node_t {
+func getExprType(expr ast.Statement) []Node_t {
+	// coerce ast.Expr to ast.Node
+	node := expr.(ast.Node)
+	// node matches with *ast.ExprStmt in a switch-case
+	// convert node to type node.Expr
+	basic_expr := node.(*ast.ExprStmt).E
+	return getNodeType(basic_expr)
+}
+
+func getNodeType(node ast.Node) []Node_t {
 	switch n := node.(type) {
 	case *ast.Unary:
-		return Node_t{tag: "Unary", type_t: "Solveable", content: "nil"}
+		return getNodeType(n.E)
 	case *ast.Binary:
-		fmt.Println("binary:", n)
-		return Node_t{tag: "Binary", type_t: "Solveable", content: "nil"}
-	case *ast.ExprStmt:
-		expr := n.E
-		return getNodeType(expr)
+		lhs := getNodeType(n.Lhs)
+		rhs := getNodeType(n.Rhs)
+		return append(lhs, rhs...)
+	case *ast.Nary:
+		args := []Node_t{}
+		for i := 0; i < len(n.Exprs); i++ {
+			args = append(args, getNodeType(n.Exprs[i])...)
+		}
+		return args
+	case *ast.Ident:
+		return []Node_t{{tag: "Identifier", type_t: "Variable", content: n.Name}}
+	case *ast.Constant:
+		return []Node_t{{tag: "Constant", type_t: "Unknown", content: n.Val.String()}}
+	case *ast.Call:
+		return []Node_t{{tag: "Call", type_t: "Unknown", content: n.Fn.(*ast.Ident).Name}}
 	default:
 		fmt.Println(reflect.TypeOf(n))
-		panic("not implemented " + n.String())
+		panic("not implemented in getNodeType " + n.String())
 	}
 }
 
