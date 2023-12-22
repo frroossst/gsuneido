@@ -129,16 +129,14 @@ func (p *Parser) typeFunction() Function_t {
 	for i := 0; i < len(ast.Params); i++ {
 		parameters = append(parameters, ast.Params[i].Name.Name)
 	}
-	fmt.Println("parameters:", parameters)
 
 	body := []Node_t{}
 	for i := 0; i < len(ast.Body); i++ {
-		fmt.Println("body:", ast.Body[i])
-		// TODO: parse each body type into a node_t
 		body = append(body, getExprType(ast.Body[i])...)
 	}
 
-	return Function_t{Node_t: Node_t{tag: "Function", type_t: "Function", content: "nil"}, name: "", parameters: parameters, body: body}
+	// mark anonymous functions with empty name
+	return Function_t{Node_t: Node_t{tag: "Function", type_t: "Function", content: "YW5vbnltb3Vz"}, name: "", parameters: parameters, body: body}
 }
 
 func getExprType(expr ast.Statement) []Node_t {
@@ -167,7 +165,7 @@ func getNodeType(node ast.Node) []Node_t {
 	case *ast.Ident:
 		return []Node_t{{tag: "Identifier", type_t: "Variable", content: n.Name}}
 	case *ast.Constant:
-		return []Node_t{{tag: "Constant", type_t: "Unknown", content: n.Val.String()}}
+		return []Node_t{{tag: "Constant", type_t: "Unknown", content: n.Val.Type().String()}}
 	case *ast.Call:
 		return []Node_t{{tag: "Call", type_t: "Unknown", content: n.Fn.(*ast.Ident).Name}}
 	default:
