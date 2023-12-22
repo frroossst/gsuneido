@@ -54,22 +54,22 @@ func main() {
 				}
 			`
 
-	src = `
+	/*
 		class {
 			x: 0
 			msg: "hello"
-			pvt_foo() { return this.x }
-			pvt_bar() { return this.msg }
-			SetX(x) { .x = x }
-			SetMsg(msg) { .msg = msg }
-			Get() { return Object(numx: .x, strmsg: .msg) }
-			AddBreak() { return x + "123" }
 		}
-		`
+		pvt_foo() { return .x }
+		pvt_bar() { return .msg }
+		SetX(x) { .x = x }
+		SetMsg(msg) { .msg = msg }
+		Get() { return Object(numx: .x, strmsg: .msg) }
+		AddBreak() { return x + "123" }
+
+	*/
 
 	fmt.Println("src:", src)
 	fmt.Println("compiled:", compile.AstParser(src).Const())
-	src = ` 123 - 456 `
 	p := compile.AstParser(src)
 	fmt.Println(p.TypeConst())
 

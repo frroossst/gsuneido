@@ -54,29 +54,50 @@ type Node_t struct {
 func (p *Parser) TypeConst() []Node_t {
 	type_arr := []Node_t{}
 	for p.Token != tok.Eof {
-		type_arr = append(type_arr, p.typeConst())
+		// type_arr = append(type_arr, p.typeConst())
+		// p.typeConst() returns an array, merge the arrays
+		type_arr = append(type_arr, p.typeConst()...)
 	}
 	return type_arr
 }
 
-func (p *Parser) typeConst() Node_t {
+func (p *Parser) typeConst() []Node_t {
 	switch p.Token {
 	case tok.String:
 		content := p.Text
 		p.string()
-		return Node_t{tag: "Constant", type_t: "String", content: content}
-	case tok.Sub:
-		content := p.Text
-		p.Next()
-		OpUnaryMinus(p.number())
-		return Node_t{tag: "Operator", type_t: "Operator", content: content}
+		return []Node_t{{tag: "Constant", type_t: "String", content: content}}
 	case tok.Number:
 		content := p.Text
 		p.number()
-		return Node_t{tag: "Constant", type_t: "Number", content: content}
+		return []Node_t{{tag: "Constant", type_t: "Number", content: content}}
+	case tok.Identifier:
+		content := p.Text
+		p.MatchIdent()
+		return []Node_t{{tag: "Identifier", type_t: "Variable", content: content}}
+	case tok.Eq:
+		content := p.Text
+		p.Match(tok.Eq)
+		return []Node_t{{tag: "Operator", type_t: "Operator", content: content}}
+	case tok.Add:
+		content := p.Text
+		p.Match(tok.Add)
+		return []Node_t{{tag: "Operator", type_t: "Operator", content: content}}
+	case tok.Sub:
+		content := p.Text
+		p.Match(tok.Sub)
+		return []Node_t{{tag: "Operator", type_t: "Operator", content: content}}
+	case tok.Function:
+		return p.typeFunction()
+	case tok.Class:
+		return p.typeClass()
 	default:
 		panic(p.Error("invalid constant, unexpected " + p.Token.String()))
 	}
+}
+
+func (p *Parser) typeFunction() []Node_t {
+	return []Node_t{{tag: "Function", type_t: "Function", content: "nil"}}
 }
 
 func (p *Parser) Const() (result Value) {
@@ -300,6 +321,34 @@ func (p *Parser) putMem(ob container, m Value, v Value, pos int32) {
 	} else {
 		p.set(ob, m, v, pos, p.EndPos)
 	}
+}
+
+// returns key value pair of node types for the AST
+func (p *Parser) typeClass() []Node_t {
+	if p.Token == tok.Class {
+		p.Match(tok.Class)
+		if p.Token == tok.Colon {
+			p.Match(tok.Colon)
+		}
+	}
+	var base Gnum
+	baseName := "class"
+	if p.Token.IsIdent() {
+		baseName = p.Text
+		base = p.ckBase(baseName)
+		p.MatchIdent()
+	}
+	pos1 := p.EndPos
+	p.Match(tok.LCurly)
+	pos2 := p.EndPos
+	prevClassName := p.className
+	p.className = p.getClassName()
+	mems := p.mkClass(baseName)
+	p.memberList(mems, tok.RCurly, base)
+	p.setPos(mems, pos1, pos2)
+	p.className = prevClassName
+
+	return []Node_t{{tag: "Class", type_t: "Class", content: "nil"}}
 }
 
 // classNum is used to generate names for anonymous classes
