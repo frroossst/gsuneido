@@ -4,10 +4,13 @@
 package compile
 
 import (
+	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
 
+	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/ascii"
@@ -51,6 +54,34 @@ type Node_t struct {
 	type_t string
 }
 
+type Function_t struct {
+	Node_t
+	// the name of the function
+	name string
+	// the parameters of the function
+	parameters []string
+	// the body of the function
+	body []Node_t
+}
+
+func (p *Parser) TypeFunction() Function_t {
+	return p.typeFunction()
+}
+
+type Class_t struct {
+	Node_t
+	// the name of the class
+	name string
+	// the base class of the class
+	base string
+	// the members of the class
+	members []Node_t
+}
+
+func (p *Parser) TypeClass() Class_t {
+	return p.typeClass()
+}
+
 func (p *Parser) TypeConst() []Node_t {
 	type_arr := []Node_t{}
 	for p.Token != tok.Eof {
@@ -87,17 +118,43 @@ func (p *Parser) typeConst() []Node_t {
 		content := p.Text
 		p.Match(tok.Sub)
 		return []Node_t{{tag: "Operator", type_t: "Operator", content: content}}
-	case tok.Function:
-		return p.typeFunction()
-	case tok.Class:
-		return p.typeClass()
 	default:
 		panic(p.Error("invalid constant, unexpected " + p.Token.String()))
 	}
 }
 
-func (p *Parser) typeFunction() []Node_t {
-	return []Node_t{{tag: "Function", type_t: "Function", content: "nil"}}
+func (p *Parser) typeFunction() Function_t {
+	ast := p.Function()
+	parameters := []string{}
+	for i := 0; i < len(ast.Params); i++ {
+		parameters = append(parameters, ast.Params[i].Name.Name)
+	}
+	fmt.Println("parameters:", parameters)
+
+	body := []Node_t{}
+	for i := 0; i < len(ast.Body); i++ {
+		fmt.Println("body:", ast.Body[i])
+		// TODO: parse each body type into a node_t
+		body = append(body, getNodeType(ast.Body[i]))
+	}
+
+	return Function_t{Node_t: Node_t{tag: "Function", type_t: "Function", content: "nil"}, name: "", parameters: parameters, body: body}
+}
+
+func getNodeType(node ast.Node) Node_t {
+	switch n := node.(type) {
+	case *ast.Unary:
+		return Node_t{tag: "Unary", type_t: "Solveable", content: "nil"}
+	case *ast.Binary:
+		fmt.Println("binary:", n)
+		return Node_t{tag: "Binary", type_t: "Solveable", content: "nil"}
+	case *ast.ExprStmt:
+		expr := n.E
+		return getNodeType(expr)
+	default:
+		fmt.Println(reflect.TypeOf(n))
+		panic("not implemented " + n.String())
+	}
 }
 
 func (p *Parser) Const() (result Value) {
@@ -324,7 +381,7 @@ func (p *Parser) putMem(ob container, m Value, v Value, pos int32) {
 }
 
 // returns key value pair of node types for the AST
-func (p *Parser) typeClass() []Node_t {
+func (p *Parser) typeClass() Class_t {
 	if p.Token == tok.Class {
 		p.Match(tok.Class)
 		if p.Token == tok.Colon {
@@ -348,7 +405,7 @@ func (p *Parser) typeClass() []Node_t {
 	p.setPos(mems, pos1, pos2)
 	p.className = prevClassName
 
-	return []Node_t{{tag: "Class", type_t: "Class", content: "nil"}}
+	return Class_t{Node_t: Node_t{tag: "Class", type_t: "Class", content: "nil"}, name: p.name, base: baseName, members: p.typeConst()}
 }
 
 // classNum is used to generate names for anonymous classes

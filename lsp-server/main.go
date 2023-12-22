@@ -46,7 +46,7 @@ func main() {
 	*/
 
 	src = `
-			function(x)
+			function(x, y, z)
 				{
 				num = x + "123"
 				num++
@@ -71,7 +71,7 @@ func main() {
 	fmt.Println("src:", src)
 	fmt.Println("compiled:", compile.AstParser(src).Const())
 	p := compile.AstParser(src)
-	fmt.Println(p.TypeConst())
+	fmt.Println(p.TypeFunction())
 
 	/*
 		fmt.Println("=== AST ===")
