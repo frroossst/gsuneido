@@ -175,21 +175,21 @@ func getNodeType(node ast.Node) []Node_t {
 		checkLen(lhs)
 		checkLen(rhs)
 		ops := n.Tok
-		return []Node_t{{Tag: "Binary", Type_t: ops.String(), Value: "nil", Args: append(lhs, rhs...)}}
+		return []Node_t{{Tag: "Binary", Type_t: "Operator", Value: ops.String(), Args: append(lhs, rhs...)}}
 	case *ast.Nary:
 		args := []Node_t{}
 		ops := n.Tok
 		for i := 0; i < len(n.Exprs); i++ {
 			args = append(args, getNodeType(n.Exprs[i])...)
 		}
-		return []Node_t{{Tag: "Nary", Type_t: ops.String(), Value: "nil", Args: args}}
+		return []Node_t{{Tag: "Nary", Type_t: "Operator", Value: ops.String(), Args: args}}
 	case *ast.Ident:
 		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: n.Name}}
 	case *ast.Constant:
 		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String()}}
 	case *ast.Call:
-		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil", 
-		Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: n.Fn.(*ast.Ident).Name}}}}
+		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: n.Fn.(*ast.Ident).Name}}}}
 	default:
 		fmt.Println(reflect.TypeOf(n))
 		panic("not implemented in getNodeType " + n.String())

@@ -1,1 +1,48 @@
-{"Tag":"Function","Value":"YW5vbnltb3Vz","Type_t":"Function","Args":null,"Name":"","Parameters":["x","y","z"],"Body":[[{"Tag":"Binary","Value":"nil","Type_t":"Eq","Args":[{"Tag":"Identifier","Value":"num","Type_t":"Variable","Args":null},{"Tag":"Nary","Value":"nil","Type_t":"Add","Args":[{"Tag":"Identifier","Value":"x","Type_t":"Variable","Args":null},{"Tag":"Constant","Value":"\"123\"","Type_t":"String","Args":null}]}]}]]}
+{
+    "Tag": "Function",
+    "Value": "YW5vbnltb3Vz",
+    "Type_t": "Function",
+    "Args": null,
+    "Name": "",
+    "Parameters": [
+        "x",
+        "y",
+        "z"
+    ],
+    "Body": [
+        [
+            {
+                "Tag": "Binary",
+                "Value": "Eq",
+                "Type_t": "Operator",
+                "Args": [
+                    {
+                        "Tag": "Identifier",
+                        "Value": "num",
+                        "Type_t": "Variable",
+                        "Args": null
+                    },
+                    {
+                        "Tag": "Nary",
+                        "Value": "Add",
+                        "Type_t": "Operator",
+                        "Args": [
+                            {
+                                "Tag": "Identifier",
+                                "Value": "x",
+                                "Type_t": "Variable",
+                                "Args": null
+                            },
+                            {
+                                "Tag": "Constant",
+                                "Value": "\"123\"",
+                                "Type_t": "String",
+                                "Args": null
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    ]
+}
