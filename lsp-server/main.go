@@ -49,13 +49,19 @@ func main() {
 			function(x, y, z)
 				{
 				num = x + "123"
+				num++
+				if String?(x) and Number?(y) 
+					{
+					abc = x + y + z + num
+					} 
+				else 
+					{
+					num()
+					}
 				}
 			`
 
 	/*
-				num++
-				num()
-				abc = x + y + z + num
 		class {
 			x: 0
 			msg: "hello"
@@ -86,6 +92,14 @@ func main() {
 	jsonData, err := json.Marshal(bk)
 	if err != nil {
 		panic(err)
+	}
+
+	// delete file if it exists
+	if _, err := os.Stat("output.json"); err == nil {
+		err = os.Remove("output.json")
+		if err != nil {
+			panic(err)
+		}
 	}
 	// write json data to file
 	fobj, err := os.OpenFile("output.json", os.O_RDWR|os.O_CREATE, 0755)

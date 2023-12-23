@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/google/uuid"
+
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/core"
@@ -54,6 +56,8 @@ type Node_t struct {
 	Type_t string
 	// Args
 	Args []Node_t
+	// UUID for downstream processing
+	ID string
 }
 
 type Function_t struct {
@@ -99,27 +103,27 @@ func (p *Parser) typeConst() []Node_t {
 	case tok.String:
 		content := p.Text
 		p.string()
-		return []Node_t{{Tag: "Constant", Type_t: "String", Value: content}}
+		return []Node_t{{Tag: "Constant", Type_t: "String", Value: content, ID: uuid.New().String()}}
 	case tok.Number:
 		content := p.Text
 		p.number()
-		return []Node_t{{Tag: "Constant", Type_t: "Number", Value: content}}
+		return []Node_t{{Tag: "Constant", Type_t: "Number", Value: content, ID: uuid.New().String()}}
 	case tok.Identifier:
 		content := p.Text
 		p.MatchIdent()
-		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: content}}
+		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: content, ID: uuid.New().String()}}
 	case tok.Eq:
 		content := p.Text
 		p.Match(tok.Eq)
-		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: uuid.New().String()}}
 	case tok.Add:
 		content := p.Text
 		p.Match(tok.Add)
-		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: uuid.New().String()}}
 	case tok.Sub:
 		content := p.Text
 		p.Match(tok.Sub)
-		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: uuid.New().String()}}
 	default:
 		panic(p.Error("invalid constant, unexpected " + p.Token.String()))
 	}
@@ -146,19 +150,27 @@ func getExprType(expr ast.Statement) []Node_t {
 	node := expr.(ast.Node)
 	// node matches with *ast.ExprStmt in a switch-case
 	// convert node to type node.Expr
-	basic_expr := node.(*ast.ExprStmt).E
-	return getNodeType(basic_expr)
-}
 
-// function to catch if getNodeType returns more than 1
-func checkLen(node []Node_t) {
-	if len(node) < -1 {
-		// if len(node) > 1 {
-		fmt.Println("\n\n\n========== [checkLen] ==========")
-		for i := 0; i < len(node); i++ {
-			fmt.Println(node[i])
+	// it can either conver to *ast.ExprStmt or *ast.
+	// basic_expr := node.(*ast.ExprStmt).E
+
+	switch t := node.(type) {
+	case *ast.ExprStmt:
+		basic_expr := node.(*ast.ExprStmt).E
+		return getNodeType(basic_expr)
+	case *ast.If:
+		if_stmt := node.(*ast.If)
+		cond := getNodeType(if_stmt.Cond)
+		then := getNodeType(if_stmt.Then)
+		if if_stmt.Else != nil {
+			els := getNodeType(if_stmt.Else)
+			return []Node_t{{Tag: "If", Type_t: "If", Value: "nil", Args: append(append(cond, then...), els...), ID: uuid.New().String()}}
 		}
-		panic("getNodeType returned more than 1 node")
+		return []Node_t{{Tag: "If", Type_t: "If", Value: "nil", Args: append(cond, then...), ID: uuid.New().String()}}
+	default:
+		fmt.Println(reflect.TypeOf(node))
+		fmt.Println(t.String())
+		panic("not implemented in getExprType " + node.String())
 	}
 }
 
@@ -167,29 +179,32 @@ func getNodeType(node ast.Node) []Node_t {
 	case *ast.Unary:
 		una := getNodeType(n.E)
 		ops := n.Tok
-		checkLen(una)
-		return []Node_t{{Tag: "Unary", Type_t: ops.String(), Value: "nil", Args: una}}
+		return []Node_t{{Tag: "Unary", Type_t: ops.String(), Value: ops.String(), Args: una, ID: uuid.New().String()}}
 	case *ast.Binary:
 		lhs := getNodeType(n.Lhs)
 		rhs := getNodeType(n.Rhs)
-		checkLen(lhs)
-		checkLen(rhs)
 		ops := n.Tok
-		return []Node_t{{Tag: "Binary", Type_t: "Operator", Value: ops.String(), Args: append(lhs, rhs...)}}
+		return []Node_t{{Tag: "Binary", Type_t: "Operator", Value: ops.String(), Args: append(lhs, rhs...), ID: uuid.New().String()}}
 	case *ast.Nary:
 		args := []Node_t{}
 		ops := n.Tok
 		for i := 0; i < len(n.Exprs); i++ {
 			args = append(args, getNodeType(n.Exprs[i])...)
 		}
-		return []Node_t{{Tag: "Nary", Type_t: "Operator", Value: ops.String(), Args: args}}
+		return []Node_t{{Tag: "Nary", Type_t: "Operator", Value: ops.String(), Args: args, ID: uuid.New().String()}}
+	case *ast.Compound:
+		cmps := []Node_t{}
+		for i := 0; i < len(n.Body); i++ {
+			cmps = append(cmps, getExprType(n.Body[i])...)
+		}
+		return []Node_t{{Tag: "Compound", Type_t: "Compound", Value: "nil", Args: cmps, ID: uuid.New().String()}}
 	case *ast.Ident:
-		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: n.Name}}
+		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: n.Name, ID: uuid.New().String()}}
 	case *ast.Constant:
-		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String()}}
+		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String(), ID: uuid.New().String()}}
 	case *ast.Call:
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
-			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: n.Fn.(*ast.Ident).Name}}}}
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: n.Fn.(*ast.Ident).Name, ID: uuid.New().String()}}}}
 	default:
 		fmt.Println(reflect.TypeOf(n))
 		panic("not implemented in getNodeType " + n.String())

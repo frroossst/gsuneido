@@ -3,6 +3,7 @@
     "Value": "YW5vbnltb3Vz",
     "Type_t": "Function",
     "Args": null,
+    "ID": "",
     "Name": "",
     "Parameters": [
         "x",
@@ -20,7 +21,8 @@
                         "Tag": "Identifier",
                         "Value": "num",
                         "Type_t": "Variable",
-                        "Args": null
+                        "Args": null,
+                        "ID": "ad57047d-1b29-4330-9326-00e12e20f59e"
                     },
                     {
                         "Tag": "Nary",
@@ -31,17 +33,168 @@
                                 "Tag": "Identifier",
                                 "Value": "x",
                                 "Type_t": "Variable",
-                                "Args": null
+                                "Args": null,
+                                "ID": "991e0675-bfba-46de-b58f-7fb948d10d6f"
                             },
                             {
                                 "Tag": "Constant",
                                 "Value": "\"123\"",
                                 "Type_t": "String",
-                                "Args": null
+                                "Args": null,
+                                "ID": "f4f1bac2-552a-4f9c-8225-69144a19e917"
                             }
-                        ]
+                        ],
+                        "ID": "5aecb212-dc3b-45c4-b06a-89a16ad69bb8"
                     }
-                ]
+                ],
+                "ID": "64134551-5595-4255-ba20-f2bfe5328a1a"
+            }
+        ],
+        [
+            {
+                "Tag": "Unary",
+                "Value": "PostInc",
+                "Type_t": "PostInc",
+                "Args": [
+                    {
+                        "Tag": "Identifier",
+                        "Value": "num",
+                        "Type_t": "Variable",
+                        "Args": null,
+                        "ID": "49a8f3c5-2704-45e1-aa7b-31582358cfd0"
+                    }
+                ],
+                "ID": "3c07e60d-83ac-4a9b-92f0-baf24b77f2b5"
+            }
+        ],
+        [
+            {
+                "Tag": "If",
+                "Value": "nil",
+                "Type_t": "If",
+                "Args": [
+                    {
+                        "Tag": "Nary",
+                        "Value": "And",
+                        "Type_t": "Operator",
+                        "Args": [
+                            {
+                                "Tag": "Call",
+                                "Value": "nil",
+                                "Type_t": "Operator",
+                                "Args": [
+                                    {
+                                        "Tag": "Identifier",
+                                        "Value": "String?",
+                                        "Type_t": "Callable",
+                                        "Args": null,
+                                        "ID": "7f1f40e5-13f5-4258-b8a5-edac3416f722"
+                                    }
+                                ],
+                                "ID": ""
+                            },
+                            {
+                                "Tag": "Call",
+                                "Value": "nil",
+                                "Type_t": "Operator",
+                                "Args": [
+                                    {
+                                        "Tag": "Identifier",
+                                        "Value": "Number?",
+                                        "Type_t": "Callable",
+                                        "Args": null,
+                                        "ID": "eca75eb9-7fd8-4b3a-893b-f9deb5af1503"
+                                    }
+                                ],
+                                "ID": ""
+                            }
+                        ],
+                        "ID": "bcfaa214-d28e-48fb-aa1d-981d675ade35"
+                    },
+                    {
+                        "Tag": "Compound",
+                        "Value": "nil",
+                        "Type_t": "Compound",
+                        "Args": [
+                            {
+                                "Tag": "Binary",
+                                "Value": "Eq",
+                                "Type_t": "Operator",
+                                "Args": [
+                                    {
+                                        "Tag": "Identifier",
+                                        "Value": "abc",
+                                        "Type_t": "Variable",
+                                        "Args": null,
+                                        "ID": "ea231854-4276-4708-9e27-039a78fb75fc"
+                                    },
+                                    {
+                                        "Tag": "Nary",
+                                        "Value": "Add",
+                                        "Type_t": "Operator",
+                                        "Args": [
+                                            {
+                                                "Tag": "Identifier",
+                                                "Value": "x",
+                                                "Type_t": "Variable",
+                                                "Args": null,
+                                                "ID": "1830525c-046d-4fd9-a973-d8b5f0eba0d7"
+                                            },
+                                            {
+                                                "Tag": "Identifier",
+                                                "Value": "y",
+                                                "Type_t": "Variable",
+                                                "Args": null,
+                                                "ID": "bf18db5e-4f3d-419a-8f3a-ba3a2411505e"
+                                            },
+                                            {
+                                                "Tag": "Identifier",
+                                                "Value": "z",
+                                                "Type_t": "Variable",
+                                                "Args": null,
+                                                "ID": "05931408-ff1e-4b10-bf34-7fe8b752e8e1"
+                                            },
+                                            {
+                                                "Tag": "Identifier",
+                                                "Value": "num",
+                                                "Type_t": "Variable",
+                                                "Args": null,
+                                                "ID": "16a9da43-fe1d-4b5b-9d6e-e9b87c17f5af"
+                                            }
+                                        ],
+                                        "ID": "33a5345d-1c2b-4cb0-abe1-db2d8eb43b1a"
+                                    }
+                                ],
+                                "ID": "1cd48613-5364-4450-b46e-2b9385ab9392"
+                            }
+                        ],
+                        "ID": "ed0f94ba-d284-4af4-bf80-1db8e17d5413"
+                    },
+                    {
+                        "Tag": "Compound",
+                        "Value": "nil",
+                        "Type_t": "Compound",
+                        "Args": [
+                            {
+                                "Tag": "Call",
+                                "Value": "nil",
+                                "Type_t": "Operator",
+                                "Args": [
+                                    {
+                                        "Tag": "Identifier",
+                                        "Value": "num",
+                                        "Type_t": "Callable",
+                                        "Args": null,
+                                        "ID": "41c820a4-fbb6-4979-a65b-ca795d677b87"
+                                    }
+                                ],
+                                "ID": ""
+                            }
+                        ],
+                        "ID": "7c9c9428-83bb-4e01-86f1-59e512990e67"
+                    }
+                ],
+                "ID": "08f22208-eb50-44eb-8807-1f15ee2afa71"
             }
         ]
     ]
