@@ -52,16 +52,18 @@ type Node_t struct {
 	content string
 	// the type of the node (e.g. string, number, etc.)
 	type_t string
+	// args
+	args []Node_t
 }
 
 type Function_t struct {
 	Node_t
-	// the name of the function
-	name string
-	// the parameters of the function
-	parameters []string
-	// the body of the function
-	body []Node_t
+	// the Name of the function
+	Name string
+	// the Parameters of the function
+	Parameters []string
+	// the Body of the function
+	Body [][]Node_t
 }
 
 func (p *Parser) TypeFunction() Function_t {
@@ -130,13 +132,13 @@ func (p *Parser) typeFunction() Function_t {
 		parameters = append(parameters, ast.Params[i].Name.Name)
 	}
 
-	body := []Node_t{}
+	body := [][]Node_t{}
 	for i := 0; i < len(ast.Body); i++ {
-		body = append(body, getExprType(ast.Body[i])...)
+		body = append(body, getExprType(ast.Body[i]))
 	}
 
 	// mark anonymous functions with empty name
-	return Function_t{Node_t: Node_t{tag: "Function", type_t: "Function", content: "YW5vbnltb3Vz"}, name: "", parameters: parameters, body: body}
+	return Function_t{Node_t: Node_t{tag: "Function", type_t: "Function", content: "YW5vbnltb3Vz"}, Name: "", Parameters: parameters, Body: body}
 }
 
 func getExprType(expr ast.Statement) []Node_t {
@@ -148,24 +150,44 @@ func getExprType(expr ast.Statement) []Node_t {
 	return getNodeType(basic_expr)
 }
 
+// function to catch if getNodeType returns more than 1
+func checkLen(node []Node_t) {
+	if len(node) < -1 {
+		// if len(node) > 1 {
+		fmt.Println("\n\n\n========== [checkLen] ==========")
+		for i := 0; i < len(node); i++ {
+			fmt.Println(node[i])
+		}
+		panic("getNodeType returned more than 1 node")
+	}
+}
+
 func getNodeType(node ast.Node) []Node_t {
 	switch n := node.(type) {
 	case *ast.Unary:
-		return getNodeType(n.E)
+		una := getNodeType(n.E)
+		ops := n.Tok
+		checkLen(una)
+		return []Node_t{{tag: "Unary", type_t: ops.String(), content: "nil"}, una[0]}
 	case *ast.Binary:
 		lhs := getNodeType(n.Lhs)
 		rhs := getNodeType(n.Rhs)
-		return append(lhs, rhs...)
+		checkLen(lhs)
+		checkLen(rhs)
+		ops := n.Tok
+		// return []Node_t{{tag: "Binary", type_t: ops.String(), content: "nil"}, lhs[0], rhs[0]}
+		return []Node_t{{tag: "Binary", type_t: ops.String(), content: "nil", args: append(lhs, rhs...)}}
 	case *ast.Nary:
 		args := []Node_t{}
+		ops := n.Tok
 		for i := 0; i < len(n.Exprs); i++ {
 			args = append(args, getNodeType(n.Exprs[i])...)
 		}
-		return args
+		return []Node_t{{tag: "Nary", type_t: ops.String(), content: "nil", args: args}}
 	case *ast.Ident:
 		return []Node_t{{tag: "Identifier", type_t: "Variable", content: n.Name}}
 	case *ast.Constant:
-		return []Node_t{{tag: "Constant", type_t: "Unknown", content: n.Val.Type().String()}}
+		return []Node_t{{tag: "Constant", type_t: n.Val.Type().String(), content: n.Val.String()}}
 	case *ast.Call:
 		return []Node_t{{tag: "Call", type_t: "Unknown", content: n.Fn.(*ast.Ident).Name}}
 	default:

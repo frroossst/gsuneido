@@ -51,6 +51,7 @@ func main() {
 				num = x + "123"
 				num++
 				num()
+				abc = x + y + z + num
 				}
 			`
 
@@ -71,7 +72,11 @@ func main() {
 	fmt.Println("src:", src)
 	fmt.Println("compiled:", compile.AstParser(src).Const())
 	p := compile.AstParser(src)
-	fmt.Println(p.TypeFunction())
+	bk := p.TypeFunction()
+	for i := 0; i < len(bk.Body); i++ {
+		// check if the type is of Node_t Binary
+		fmt.Println(bk.Body[i])
+	}
 
 	/*
 		fmt.Println("=== AST ===")
