@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	//	"os"
+	"os"
 	"reflect"
 	"regexp"
 
@@ -70,12 +70,33 @@ func main() {
 	*/
 
 	fmt.Println("src:", src)
+	fmt.Println()
 	fmt.Println("compiled:", compile.AstParser(src).Const())
+	fmt.Println()
 	p := compile.AstParser(src)
 	bk := p.TypeFunction()
 	for i := 0; i < len(bk.Body); i++ {
 		// check if the type is of Node_t Binary
+		fmt.Println(bk.Body[i][0].Tag)
 		fmt.Println(bk.Body[i])
+		fmt.Println(bk.Body[i][0].Args)
+	}
+
+	// convert to json
+	jsonData, err := json.Marshal(bk)
+	if err != nil {
+		panic(err)
+	}
+	// write json data to file
+	fobj, err := os.OpenFile("output.json", os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		panic(err)
+	}
+	defer fobj.Close()
+
+	_, err = fobj.WriteString(string(jsonData))
+	if err != nil {
+		panic(err)
 	}
 
 	/*

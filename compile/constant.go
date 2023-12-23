@@ -47,13 +47,13 @@ func Checked(th *Thread, src string) (Value, []string) {
 
 type Node_t struct {
 	// the branch of the node (e.g. Binary, Unary, etc.)
-	tag string
-	// the text content from the parser
-	content string
+	Tag string
+	// the text Content from the parser
+	Content string
 	// the type of the node (e.g. string, number, etc.)
-	type_t string
-	// args
-	args []Node_t
+	Type_t string
+	// Args
+	Args []Node_t
 }
 
 type Function_t struct {
@@ -99,27 +99,27 @@ func (p *Parser) typeConst() []Node_t {
 	case tok.String:
 		content := p.Text
 		p.string()
-		return []Node_t{{tag: "Constant", type_t: "String", content: content}}
+		return []Node_t{{Tag: "Constant", Type_t: "String", Content: content}}
 	case tok.Number:
 		content := p.Text
 		p.number()
-		return []Node_t{{tag: "Constant", type_t: "Number", content: content}}
+		return []Node_t{{Tag: "Constant", Type_t: "Number", Content: content}}
 	case tok.Identifier:
 		content := p.Text
 		p.MatchIdent()
-		return []Node_t{{tag: "Identifier", type_t: "Variable", content: content}}
+		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Content: content}}
 	case tok.Eq:
 		content := p.Text
 		p.Match(tok.Eq)
-		return []Node_t{{tag: "Operator", type_t: "Operator", content: content}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Content: content}}
 	case tok.Add:
 		content := p.Text
 		p.Match(tok.Add)
-		return []Node_t{{tag: "Operator", type_t: "Operator", content: content}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Content: content}}
 	case tok.Sub:
 		content := p.Text
 		p.Match(tok.Sub)
-		return []Node_t{{tag: "Operator", type_t: "Operator", content: content}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Content: content}}
 	default:
 		panic(p.Error("invalid constant, unexpected " + p.Token.String()))
 	}
@@ -138,7 +138,7 @@ func (p *Parser) typeFunction() Function_t {
 	}
 
 	// mark anonymous functions with empty name
-	return Function_t{Node_t: Node_t{tag: "Function", type_t: "Function", content: "YW5vbnltb3Vz"}, Name: "", Parameters: parameters, Body: body}
+	return Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Content: "YW5vbnltb3Vz"}, Name: "", Parameters: parameters, Body: body}
 }
 
 func getExprType(expr ast.Statement) []Node_t {
@@ -168,28 +168,28 @@ func getNodeType(node ast.Node) []Node_t {
 		una := getNodeType(n.E)
 		ops := n.Tok
 		checkLen(una)
-		return []Node_t{{tag: "Unary", type_t: ops.String(), content: "nil"}, una[0]}
+		return []Node_t{{Tag: "Unary", Type_t: ops.String(), Content: "nil", Args: una}}
 	case *ast.Binary:
 		lhs := getNodeType(n.Lhs)
 		rhs := getNodeType(n.Rhs)
 		checkLen(lhs)
 		checkLen(rhs)
 		ops := n.Tok
-		// return []Node_t{{tag: "Binary", type_t: ops.String(), content: "nil"}, lhs[0], rhs[0]}
-		return []Node_t{{tag: "Binary", type_t: ops.String(), content: "nil", args: append(lhs, rhs...)}}
+		return []Node_t{{Tag: "Binary", Type_t: ops.String(), Content: "nil", Args: append(lhs, rhs...)}}
 	case *ast.Nary:
 		args := []Node_t{}
 		ops := n.Tok
 		for i := 0; i < len(n.Exprs); i++ {
 			args = append(args, getNodeType(n.Exprs[i])...)
 		}
-		return []Node_t{{tag: "Nary", type_t: ops.String(), content: "nil", args: args}}
+		return []Node_t{{Tag: "Nary", Type_t: ops.String(), Content: "nil", Args: args}}
 	case *ast.Ident:
-		return []Node_t{{tag: "Identifier", type_t: "Variable", content: n.Name}}
+		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Content: n.Name}}
 	case *ast.Constant:
-		return []Node_t{{tag: "Constant", type_t: n.Val.Type().String(), content: n.Val.String()}}
+		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Content: n.Val.String()}}
 	case *ast.Call:
-		return []Node_t{{tag: "Call", type_t: "Unknown", content: n.Fn.(*ast.Ident).Name}}
+		return []Node_t{{Tag: "Call", Type_t: "Operator", Content: "nil", 
+		Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Content: n.Fn.(*ast.Ident).Name}}}}
 	default:
 		fmt.Println(reflect.TypeOf(n))
 		panic("not implemented in getNodeType " + n.String())
@@ -444,7 +444,7 @@ func (p *Parser) typeClass() Class_t {
 	p.setPos(mems, pos1, pos2)
 	p.className = prevClassName
 
-	return Class_t{Node_t: Node_t{tag: "Class", type_t: "Class", content: "nil"}, name: p.name, base: baseName, members: p.typeConst()}
+	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Content: "nil"}, name: p.name, base: baseName, members: p.typeConst()}
 }
 
 // classNum is used to generate names for anonymous classes

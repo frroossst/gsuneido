@@ -1,10 +1,124 @@
 {
-    "Function(xBinary(Eq num Nary(Add x \"123\"))Unary(PostInc num)Call(num))": "Function",
-    "x": "Variable",
-    "\"123\"": "String",
-    "Binary(Eq num Nary(Add x \"123\"))": "Unknown",
-    "num": "Variable",
-    "Nary(Add x \"123\")": "Solveable",
-    "Unary(PostInc num)": "Unknown",
-    "Call(num)": "Unknown"
+    "Tag": "Function",
+    "Content": "YW5vbnltb3Vz",
+    "Type_t": "Function",
+    "Args": null,
+    "Name": "",
+    "Parameters": [
+        "x",
+        "y",
+        "z"
+    ],
+    "Body": [
+        [
+            {
+                "Tag": "Binary",
+                "Content": "nil",
+                "Type_t": "Eq",
+                "Args": [
+                    {
+                        "Tag": "Identifier",
+                        "Content": "num",
+                        "Type_t": "Variable",
+                        "Args": null
+                    },
+                    {
+                        "Tag": "Nary",
+                        "Content": "nil",
+                        "Type_t": "Add",
+                        "Args": [
+                            {
+                                "Tag": "Identifier",
+                                "Content": "x",
+                                "Type_t": "Variable",
+                                "Args": null
+                            },
+                            {
+                                "Tag": "Constant",
+                                "Content": "\"123\"",
+                                "Type_t": "String",
+                                "Args": null
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        [
+            {
+                "Tag": "Unary",
+                "Content": "nil",
+                "Type_t": "PostInc",
+                "Args": [
+                    {
+                        "Tag": "Identifier",
+                        "Content": "num",
+                        "Type_t": "Variable",
+                        "Args": null
+                    }
+                ]
+            }
+        ],
+        [
+            {
+                "Tag": "Call",
+                "Content": "nil",
+                "Type_t": "Operator",
+                "Args": [
+                    {
+                        "Tag": "Identifier",
+                        "Content": "num",
+                        "Type_t": "Callable",
+                        "Args": null
+                    }
+                ]
+            }
+        ],
+        [
+            {
+                "Tag": "Binary",
+                "Content": "nil",
+                "Type_t": "Eq",
+                "Args": [
+                    {
+                        "Tag": "Identifier",
+                        "Content": "abc",
+                        "Type_t": "Variable",
+                        "Args": null
+                    },
+                    {
+                        "Tag": "Nary",
+                        "Content": "nil",
+                        "Type_t": "Add",
+                        "Args": [
+                            {
+                                "Tag": "Identifier",
+                                "Content": "x",
+                                "Type_t": "Variable",
+                                "Args": null
+                            },
+                            {
+                                "Tag": "Identifier",
+                                "Content": "y",
+                                "Type_t": "Variable",
+                                "Args": null
+                            },
+                            {
+                                "Tag": "Identifier",
+                                "Content": "z",
+                                "Type_t": "Variable",
+                                "Args": null
+                            },
+                            {
+                                "Tag": "Identifier",
+                                "Content": "num",
+                                "Type_t": "Variable",
+                                "Args": null
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    ]
 }
