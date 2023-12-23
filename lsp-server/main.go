@@ -49,13 +49,13 @@ func main() {
 			function(x, y, z)
 				{
 				num = x + "123"
-				num++
-				num()
-				abc = x + y + z + num
 				}
 			`
 
 	/*
+				num++
+				num()
+				abc = x + y + z + num
 		class {
 			x: 0
 			msg: "hello"
