@@ -22,7 +22,7 @@
                         "Value": "num",
                         "Type_t": "Variable",
                         "Args": null,
-                        "ID": "ad57047d-1b29-4330-9326-00e12e20f59e"
+                        "ID": "f72e69ae-c2c9-4bd6-b67f-c55ec501922f"
                     },
                     {
                         "Tag": "Nary",
@@ -34,20 +34,20 @@
                                 "Value": "x",
                                 "Type_t": "Variable",
                                 "Args": null,
-                                "ID": "991e0675-bfba-46de-b58f-7fb948d10d6f"
+                                "ID": "182e9b19-a389-4817-babb-5409cc48542e"
                             },
                             {
                                 "Tag": "Constant",
                                 "Value": "\"123\"",
                                 "Type_t": "String",
                                 "Args": null,
-                                "ID": "f4f1bac2-552a-4f9c-8225-69144a19e917"
+                                "ID": "c44b3629-29c2-4abc-90a2-930554a23ece"
                             }
                         ],
-                        "ID": "5aecb212-dc3b-45c4-b06a-89a16ad69bb8"
+                        "ID": "fa03bddc-8d1e-4e47-8154-de448839be80"
                     }
                 ],
-                "ID": "64134551-5595-4255-ba20-f2bfe5328a1a"
+                "ID": "45df98ff-8408-43d7-81ea-97b7fbbe7d23"
             }
         ],
         [
@@ -61,10 +61,10 @@
                         "Value": "num",
                         "Type_t": "Variable",
                         "Args": null,
-                        "ID": "49a8f3c5-2704-45e1-aa7b-31582358cfd0"
+                        "ID": "49ae8bd8-84be-426f-98c5-86365ffed33f"
                     }
                 ],
-                "ID": "3c07e60d-83ac-4a9b-92f0-baf24b77f2b5"
+                "ID": "3056dfe8-19e6-4287-a414-0653b84079c2"
             }
         ],
         [
@@ -88,7 +88,7 @@
                                         "Value": "String?",
                                         "Type_t": "Callable",
                                         "Args": null,
-                                        "ID": "7f1f40e5-13f5-4258-b8a5-edac3416f722"
+                                        "ID": "3bbfabe4-c2f5-4a2a-b7c2-61b6db84a4ad"
                                     }
                                 ],
                                 "ID": ""
@@ -103,13 +103,13 @@
                                         "Value": "Number?",
                                         "Type_t": "Callable",
                                         "Args": null,
-                                        "ID": "eca75eb9-7fd8-4b3a-893b-f9deb5af1503"
+                                        "ID": "4c568d20-d6b6-4fd1-97c5-397056c85799"
                                     }
                                 ],
                                 "ID": ""
                             }
                         ],
-                        "ID": "bcfaa214-d28e-48fb-aa1d-981d675ade35"
+                        "ID": "049a9a4d-31d1-41c6-bad0-f6645a35beac"
                     },
                     {
                         "Tag": "Compound",
@@ -126,7 +126,7 @@
                                         "Value": "abc",
                                         "Type_t": "Variable",
                                         "Args": null,
-                                        "ID": "ea231854-4276-4708-9e27-039a78fb75fc"
+                                        "ID": "06990304-7e96-4df7-9e18-d7bbb9d0db83"
                                     },
                                     {
                                         "Tag": "Nary",
@@ -138,37 +138,37 @@
                                                 "Value": "x",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "1830525c-046d-4fd9-a973-d8b5f0eba0d7"
+                                                "ID": "e22f84ea-ffb2-43eb-9e60-831f4b62285b"
                                             },
                                             {
                                                 "Tag": "Identifier",
                                                 "Value": "y",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "bf18db5e-4f3d-419a-8f3a-ba3a2411505e"
+                                                "ID": "c4d641af-8323-43a1-995d-0ebf79b4439c"
                                             },
                                             {
                                                 "Tag": "Identifier",
                                                 "Value": "z",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "05931408-ff1e-4b10-bf34-7fe8b752e8e1"
+                                                "ID": "4d1b1372-3313-4a0b-937e-cd4665db0758"
                                             },
                                             {
                                                 "Tag": "Identifier",
                                                 "Value": "num",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "16a9da43-fe1d-4b5b-9d6e-e9b87c17f5af"
+                                                "ID": "16ef8745-8c67-40d0-893d-bbb4975c13e1"
                                             }
                                         ],
-                                        "ID": "33a5345d-1c2b-4cb0-abe1-db2d8eb43b1a"
+                                        "ID": "6f7212ab-d2a1-43cb-bd97-8db3a3578a09"
                                     }
                                 ],
-                                "ID": "1cd48613-5364-4450-b46e-2b9385ab9392"
+                                "ID": "3fe3af0c-90c4-4f92-9f64-adb2626da0fd"
                             }
                         ],
-                        "ID": "ed0f94ba-d284-4af4-bf80-1db8e17d5413"
+                        "ID": "f1d19c12-47b5-448d-a32b-973f40af059b"
                     },
                     {
                         "Tag": "Compound",
@@ -185,16 +185,33 @@
                                         "Value": "num",
                                         "Type_t": "Callable",
                                         "Args": null,
-                                        "ID": "41c820a4-fbb6-4979-a65b-ca795d677b87"
+                                        "ID": "df0b5350-f8e1-4154-a81b-e5a6b7df175c"
                                     }
                                 ],
                                 "ID": ""
                             }
                         ],
-                        "ID": "7c9c9428-83bb-4e01-86f1-59e512990e67"
+                        "ID": "48f24554-eb4f-4828-9ab0-90d7e336ecc2"
                     }
                 ],
-                "ID": "08f22208-eb50-44eb-8807-1f15ee2afa71"
+                "ID": "104d3354-a831-4810-b7d6-16b9ea6a92e4"
+            }
+        ],
+        [
+            {
+                "Tag": "Call",
+                "Value": "nil",
+                "Type_t": "Operator",
+                "Args": [
+                    {
+                        "Tag": "Identifier",
+                        "Value": "this.qux",
+                        "Type_t": "Callable",
+                        "Args": null,
+                        "ID": "9520f966-50e1-41cc-92a1-f9a50235c8f2"
+                    }
+                ],
+                "ID": ""
             }
         ]
     ]

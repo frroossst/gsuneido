@@ -203,8 +203,21 @@ func getNodeType(node ast.Node) []Node_t {
 	case *ast.Constant:
 		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String(), ID: uuid.New().String()}}
 	case *ast.Call:
+		var value string
+		switch v := n.Fn.(type) {
+		case *ast.Ident:
+			value = v.Name
+		case *ast.Mem:
+			// remove double quoted strings from the following
+			noqute := v.M.String()[1 : len(v.M.String())-1]
+			value = v.E.(*ast.Ident).Name + "." + noqute
+		default:
+			fmt.Println(reflect.TypeOf(v))
+			fmt.Println(v)
+			panic("not implemented in getNodeType " + v.String())
+		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
-			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: n.Fn.(*ast.Ident).Name, ID: uuid.New().String()}}}}
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: uuid.New().String()}}}}
 	default:
 		fmt.Println(reflect.TypeOf(n))
 		panic("not implemented in getNodeType " + n.String())
