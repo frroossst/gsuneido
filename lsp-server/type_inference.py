@@ -2,6 +2,7 @@
 # Takes in a json object and dumps type information to a file
 # Checks basic type safety
 
+from graph import Graph, Node
 from enum import Enum
 import json
 
@@ -69,77 +70,109 @@ def constraint_type_with_operator_value(value, type) -> bool:
 def get_valid_type_for_operator(value) -> SuTypes:
     valid_types = {
         "Add": SuTypes.Number,
+        "PostInc": SuTypes.Number,
     }
 
     return valid_types[value]
 
 
-def infer_generic(stmt, store) -> SuTypes:
+def infer_generic(stmt, store, graph) -> SuTypes:
     match stmt["Tag"]:
         case "Unary":
-            return infer_unary(stmt, store)
+            return infer_unary(stmt, store, graph)
         case "Binary":
-            return infer_binary(stmt, store)
+            return infer_binary(stmt, store, graph)
         case "Nary":
-            return infer_nary(stmt, store)
+            return infer_nary(stmt, store, graph)
         case "Identifier":
             return SuTypes.Any
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
-def infer_unary(stmt, store):
+def infer_unary(stmt, store, graph):
     args = stmt["Args"]
     value = stmt["Value"]
 
-    print(args, value)
+    node = Node(args[0]["Value"])
+    graph.add_node(node)
 
-def infer_binary(stmt, store):
+    valid_t = get_valid_type_for_operator(value)
+    vn = Node(valid_t.name)
+    graph.add_node(vn)
+    graph.add_edge(node.value, vn.value)
+
+
+def infer_binary(stmt, store, graph):
     args = stmt["Args"]
     lhs = args[0]
     rhs = args[1::][0]
 
     # inferred types of lhs and rhs should be the same
-    lhs_t = infer_generic(lhs, store)
+    lhs_t = infer_generic(lhs, store, graph)
     if lhs_t is not None and lhs["Type_t"] != "Operator":
         store.set_once(lhs["ID"], lhs_t)
-    rhs_t = infer_generic(rhs, store)
+    rhs_t = infer_generic(rhs, store, graph)
     if rhs_t is not None and rhs["Type_t"] != "Operator":
         store.set_once(rhs["ID"], rhs_t)
 
-    if not check_type_equivalence(lhs_t, rhs_t):
-        raise TypeError(f"Type mismatch for {lhs_t} and {rhs_t}")
+    # if not check_type_equivalence(lhs_t, rhs_t):
+    #     raise TypeError(f"Type mismatch for {lhs_t} and {rhs_t}")
+    lhs_n = Node(lhs["ID"])
+    rhs_n = Node(rhs["ID"])
+    graph.add_node(lhs_n)
+    graph.add_node(rhs_n)
+    graph.add_edge(lhs_n.value, rhs_n.value)
 
     # if lhs or rhs is of type Any, then the other type is inferred
-    if lhs_t == SuTypes.Any:
-        store.set(lhs["ID"], rhs_t)
-        return rhs_t
-    elif rhs_t == SuTypes.Any:
-        store.set(rhs["ID"], lhs_t)
-        return lhs_t
+    # if lhs_t == SuTypes.Any:
+    #     store.set(lhs["ID"], rhs_t)
+    #     return rhs_t
+    # elif rhs_t == SuTypes.Any:
+    #     store.set(rhs["ID"], lhs_t)
+    #     return lhs_t
     
 
-def infer_nary(stmt, store):
+def infer_nary(stmt, store, graph):
     value = stmt["Value"]
     args = stmt["Args"]
 
     # all args should have the same type conforming with value of the operator
+    # for i in args:
+    #     if not constraint_type_with_operator_value(value, i["Type_t"]):
+    #         raise TypeError(f"Type mismatch for {i['Type_t']} and {value}")
+
+    # valid_t = get_valid_type_for_operator(value)
+    # for i in args:
+    #     store.set_once(i["ID"], valid_t)
+
+    # return valid_t
+
+    prev = None
     for i in args:
-        if not constraint_type_with_operator_value(value, i["Type_t"]):
-            raise TypeError(f"Type mismatch for {i['Type_t']} and {value}")
+        n = Node(i["Value"])
+        graph.add_node(n)
+        if prev is not None:
+            graph.add_edge(prev.value, n.value)
+        prev = n
 
     valid_t = get_valid_type_for_operator(value)
-    for i in args:
-        store.set_once(i["ID"], valid_t)
-
-    return valid_t
+    vn = Node(valid_t.name)
+    graph.add_node(vn)
+    graph.add_edge(prev.value, vn.value)
+    
 
 
 def main():
+    graph = Graph()
     store = KVStore()
     body = load_data_body()
 
-    for stmt in body:
-        infer_generic(stmt[0], store)
+    try:
+        for stmt in body:
+            infer_generic(stmt[0], store, graph)
+    except Exception as e:
+        print(e)
+        print(graph)
 
     # pretty print the store
     print(json.dumps(store.db, indent=4, cls=EnumEncoder))

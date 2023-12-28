@@ -10,11 +10,15 @@ class Graph:
 
     nodes = None
 
+    def __repr__(self) -> str:
+        return f"Graph({self.nodes})"
+
     def __init__(self):
         self.nodes = []
 
     def add_node(self, node):
-        self.nodes.append(node)
+        if self.find_node(node.value) is None:
+            self.nodes.append(node)
 
     def find_node(self, name):
         for node in self.nodes:
@@ -71,6 +75,9 @@ class Node:
     value = None
     # neighbours, what it can see
     edges = None
+
+    def __repr__(self) -> str:
+        return f"Node({self.value}, {self.edges})"
 
     def __init__(self, name):
         self.value = name
