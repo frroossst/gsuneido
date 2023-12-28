@@ -148,11 +148,9 @@ func (p *Parser) typeFunction() Function_t {
 func getExprType(expr ast.Statement) []Node_t {
 	// coerce ast.Expr to ast.Node
 	node := expr.(ast.Node)
+
 	// node matches with *ast.ExprStmt in a switch-case
 	// convert node to type node.Expr
-
-	// it can either conver to *ast.ExprStmt or *ast.
-	// basic_expr := node.(*ast.ExprStmt).E
 
 	switch t := node.(type) {
 	case *ast.ExprStmt:

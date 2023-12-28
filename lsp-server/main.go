@@ -66,14 +66,13 @@ func main() {
 		class {
 			x: 0
 			msg: "hello"
-		}
 		pvt_foo() { return .x }
 		pvt_bar() { return .msg }
 		SetX(x) { .x = x }
 		SetMsg(msg) { .msg = msg }
 		Get() { return Object(numx: .x, strmsg: .msg) }
 		AddBreak() { return x + "123" }
-
+		}
 	*/
 
 	fmt.Println("src:", src)
