@@ -61,6 +61,9 @@ def constraint_type_with_operator_value(value, type) -> bool:
         "Add": ["Number"],
     }
 
+    if type == "Operator":
+        return True
+
     if type == "Variable":
         return True
 
@@ -71,6 +74,7 @@ def get_valid_type_for_operator(value) -> SuTypes:
     valid_types = {
         "Add": SuTypes.Number,
         "PostInc": SuTypes.Number,
+        "And": SuTypes.Boolean,
     }
 
     return valid_types[value]
@@ -86,6 +90,12 @@ def infer_generic(stmt, store, graph) -> SuTypes:
             return infer_nary(stmt, store, graph)
         case "Identifier":
             return SuTypes.Any
+        case "If":
+            return infer_if(stmt, store, graph)
+        case "Compound":
+            return infer_generic(stmt["Args"][0], store, graph)
+        case "Call":
+            return infer_generic(stmt["Args"][0], store, graph)
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
@@ -137,9 +147,9 @@ def infer_nary(stmt, store, graph):
     args = stmt["Args"]
 
     # all args should have the same type conforming with value of the operator
-    # for i in args:
-    #     if not constraint_type_with_operator_value(value, i["Type_t"]):
-    #         raise TypeError(f"Type mismatch for {i['Type_t']} and {value}")
+    for i in args:
+        if not constraint_type_with_operator_value(value, i["Type_t"]):
+            raise TypeError(f"Type mismatch for {i['Type_t']} and {value}")
 
     # valid_t = get_valid_type_for_operator(value)
     # for i in args:
@@ -159,7 +169,21 @@ def infer_nary(stmt, store, graph):
     vn = Node(valid_t.name)
     graph.add_node(vn)
     graph.add_edge(prev.value, vn.value)
-    
+
+def infer_if(stmt, store, graph):
+    cond = stmt["Args"][0]
+    cond_t = infer_generic(cond, store, graph)
+    then = stmt["Args"][1]
+    then_t = infer_generic(then, store, graph)
+
+    else_t = None
+    if len(stmt["Args"]) == 3:
+        else_t = infer_generic(stmt["Args"][2], store, graph)
+
+    print(f"cond_t: {cond_t}")
+    print(f"then_t: {then_t}")
+    if else_t is not None:
+        print(f"else_t: {else_t}")
 
 
 def main():
@@ -167,12 +191,19 @@ def main():
     store = KVStore()
     body = load_data_body()
 
-    try:
-        for stmt in body:
-            infer_generic(stmt[0], store, graph)
+    for stmt in body:
+        infer_generic(stmt[0], store, graph)
+
+    graph.visualise()
+    """
+    except TypeError as e:
+        print(e)
+        exit(1)
     except Exception as e:
         print(e)
         print(graph)
+        graph.visualise()
+"""
 
     # pretty print the store
     print(json.dumps(store.db, indent=4, cls=EnumEncoder))

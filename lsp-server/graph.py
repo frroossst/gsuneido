@@ -1,3 +1,6 @@
+from matplotlib import pyplot as plt
+import networkx as nx
+
 """
 A graph data structure with nodes and edges
 
@@ -11,7 +14,7 @@ class Graph:
     nodes = None
 
     def __repr__(self) -> str:
-        return f"Graph({self.nodes})"
+        return f"Graph(\n\t{self.nodes}\n)"
 
     def __init__(self):
         self.nodes = []
@@ -69,6 +72,21 @@ class Graph:
                         
         return False
 
+    
+    def visualise(self):
+        G = nx.Graph()
+
+        for node in self.nodes:
+            G.add_node(node.value)
+            for edge in node.get_connected_edges():
+                G.add_edge(node.value, edge.value)
+
+        pos = nx.spring_layout(G)
+        labels = {node.value: node.value for node in self.nodes}
+
+        nx.draw(G, pos, with_labels=True, labels=labels)
+        plt.show()
+
 
 class Node:
 
@@ -77,7 +95,7 @@ class Node:
     edges = None
 
     def __repr__(self) -> str:
-        return f"Node({self.value}, {self.edges})"
+        return f"Node(value = {self.value}, edges = {self.edges})"
 
     def __init__(self, name):
         self.value = name
@@ -88,6 +106,7 @@ class Node:
     
     def add_edge(self, edge):
         self.edges.append(edge)
+
 
 
 def test_test():
@@ -116,3 +135,4 @@ def test_test():
 
 if __name__ == "__main__":
     test_test()
+

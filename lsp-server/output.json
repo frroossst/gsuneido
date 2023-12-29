@@ -22,7 +22,7 @@
                         "Value": "num",
                         "Type_t": "Variable",
                         "Args": null,
-                        "ID": "36aa12eb-1a1b-4bb7-81dc-88c47c66a687"
+                        "ID": "33c5a56d-f521-4fb6-8bd5-1c69e29d169d"
                     },
                     {
                         "Tag": "Nary",
@@ -34,20 +34,20 @@
                                 "Value": "x",
                                 "Type_t": "Variable",
                                 "Args": null,
-                                "ID": "7743b342-2949-4801-8765-b43a03744b43"
+                                "ID": "32301336-5b22-4e42-9d60-14ebeffe9b0d"
                             },
                             {
                                 "Tag": "Constant",
-                                "Value": "\"123\"",
-                                "Type_t": "String",
+                                "Value": "123",
+                                "Type_t": "Number",
                                 "Args": null,
-                                "ID": "27f8dc6d-1f6b-4599-b197-a6fbca940474"
+                                "ID": "64caecb7-adf9-4855-a6e4-7684c1e9abd2"
                             }
                         ],
-                        "ID": "9e8153c9-f917-4f13-8113-9ff66ddc22d8"
+                        "ID": "483015da-641f-4645-9d39-e2697671fc8c"
                     }
                 ],
-                "ID": "ec6190de-3f08-4e59-8054-7484e01652e7"
+                "ID": "6c234d59-81ba-42af-8bce-91051d9902f3"
             }
         ],
         [
@@ -61,10 +61,10 @@
                         "Value": "num",
                         "Type_t": "Variable",
                         "Args": null,
-                        "ID": "e745a52b-0e49-48a9-8a0d-ed5eeaae6512"
+                        "ID": "106d61a4-c050-4e63-8064-a12eeee852ef"
                     }
                 ],
-                "ID": "8b271472-96cf-40ef-aec5-9e2bf3644984"
+                "ID": "51eccb35-2e85-43ec-bd05-e55ff69020b7"
             }
         ],
         [
@@ -88,7 +88,7 @@
                                         "Value": "String?",
                                         "Type_t": "Callable",
                                         "Args": null,
-                                        "ID": "8979ab1f-70a7-434b-9036-8ddaecd01a86"
+                                        "ID": "bb3c5221-87ba-4cbb-a98b-6e34db04236f"
                                     }
                                 ],
                                 "ID": ""
@@ -103,13 +103,13 @@
                                         "Value": "Number?",
                                         "Type_t": "Callable",
                                         "Args": null,
-                                        "ID": "cd9d9e8c-19fb-4029-896b-5709e08753eb"
+                                        "ID": "58432923-fc7c-48ba-aa40-74ccab32f15c"
                                     }
                                 ],
                                 "ID": ""
                             }
                         ],
-                        "ID": "4c73a219-07f3-4c8c-81a6-809e22738ddf"
+                        "ID": "31d73746-12e5-4a21-8975-230900c170f1"
                     },
                     {
                         "Tag": "Compound",
@@ -126,7 +126,7 @@
                                         "Value": "abc",
                                         "Type_t": "Variable",
                                         "Args": null,
-                                        "ID": "fd812a7c-bd20-4418-bd24-02d83a4c3b79"
+                                        "ID": "23451889-1f45-492c-9c69-b007b97fb8ba"
                                     },
                                     {
                                         "Tag": "Nary",
@@ -138,37 +138,37 @@
                                                 "Value": "x",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "fcaecc57-87ad-4ef5-9aa1-fd8470c468a7"
+                                                "ID": "15f20923-581d-40b8-90dd-c8424a23875b"
                                             },
                                             {
                                                 "Tag": "Identifier",
                                                 "Value": "y",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "233c6af8-3b9d-4e6b-b729-db53180581a1"
+                                                "ID": "8a501ebd-46ec-40ec-9723-b69d67f4a8db"
                                             },
                                             {
                                                 "Tag": "Identifier",
                                                 "Value": "z",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "c966deeb-f6a3-4e60-88ea-47c33e574ada"
+                                                "ID": "ffb17be4-a2fd-41c6-9ee6-392facaa7e0a"
                                             },
                                             {
                                                 "Tag": "Identifier",
                                                 "Value": "num",
                                                 "Type_t": "Variable",
                                                 "Args": null,
-                                                "ID": "a505c6f7-1cec-44c6-8792-8ac43a33a21c"
+                                                "ID": "9590db47-493c-428e-b86f-2caac7492593"
                                             }
                                         ],
-                                        "ID": "4459c767-5ba8-4b85-8dc2-987af0672e40"
+                                        "ID": "2f3f3c2b-472f-483e-a312-6b4b8e80a351"
                                     }
                                 ],
-                                "ID": "a54f750a-8084-493d-bcec-eeca4249143c"
+                                "ID": "cd0af71f-596c-42d8-bc0f-2b01de3878c6"
                             }
                         ],
-                        "ID": "b90668e9-5d68-4664-b538-d4127559ca44"
+                        "ID": "5c7550b6-4278-4924-b4d0-33063959bc2c"
                     },
                     {
                         "Tag": "Compound",
@@ -185,16 +185,16 @@
                                         "Value": "num",
                                         "Type_t": "Callable",
                                         "Args": null,
-                                        "ID": "61202961-b0e1-43e2-9653-51e16d9524cd"
+                                        "ID": "a52e86b1-b020-4e44-b6e1-348148cd833b"
                                     }
                                 ],
                                 "ID": ""
                             }
                         ],
-                        "ID": "a591b6ce-f967-4014-af26-8624aa4ffe10"
+                        "ID": "6701fbe3-9330-4e1d-b871-1623e6e8cb9c"
                     }
                 ],
-                "ID": "219f7f99-20e0-4e31-b04c-d04b3b2085f4"
+                "ID": "8fe981e2-643c-41c6-9dcd-ca4c596c4ac7"
             }
         ],
         [
@@ -208,7 +208,7 @@
                         "Value": "this.qux",
                         "Type_t": "Callable",
                         "Args": null,
-                        "ID": "fca0f9bd-7345-4b74-a3fb-c9051ed01655"
+                        "ID": "169dbd37-dccd-4b63-93b7-a72b191d2cf8"
                     }
                 ],
                 "ID": ""

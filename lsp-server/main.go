@@ -48,7 +48,7 @@ func main() {
 	src = `
 			function(x, y, z)
 				{
-				num = x + "123"
+				num = x + 123
 				num++
 				if String?(x) and Number?(y) 
 					{
