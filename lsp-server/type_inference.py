@@ -12,6 +12,7 @@ class SuTypes(Enum):
     Number = 2
     Boolean = 3
     Any = 4
+    NotApplicable = 5
 
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
@@ -92,14 +93,12 @@ def infer_generic(stmt, store, graph) -> SuTypes:
             return SuTypes.Any
         case "If":
             return infer_if(stmt, store, graph)
-        case "Compound":
-            return infer_generic(stmt["Args"][0], store, graph)
-        case "Call":
+        case "Call" | "Compound":
             return infer_generic(stmt["Args"][0], store, graph)
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
-def infer_unary(stmt, store, graph):
+def infer_unary(stmt, store, graph) -> SuTypes:
     args = stmt["Args"]
     value = stmt["Value"]
 
@@ -111,8 +110,10 @@ def infer_unary(stmt, store, graph):
     graph.add_node(vn)
     graph.add_edge(node.value, vn.value)
 
+    return valid_t
 
-def infer_binary(stmt, store, graph):
+
+def infer_binary(stmt, store, graph) -> SuTypes:
     args = stmt["Args"]
     lhs = args[0]
     rhs = args[1::][0]
@@ -133,16 +134,19 @@ def infer_binary(stmt, store, graph):
     graph.add_node(rhs_n)
     graph.add_edge(lhs_n.value, rhs_n.value)
 
+    store.set_once(lhs["ID"], lhs_t)
+    store.set_once(rhs["ID"], rhs_t)
+
     # if lhs or rhs is of type Any, then the other type is inferred
-    # if lhs_t == SuTypes.Any:
-    #     store.set(lhs["ID"], rhs_t)
-    #     return rhs_t
-    # elif rhs_t == SuTypes.Any:
-    #     store.set(rhs["ID"], lhs_t)
-    #     return lhs_t
+    if lhs_t == SuTypes.Any:
+        store.set(lhs["ID"], rhs_t)
+        return rhs_t
+    elif rhs_t == SuTypes.Any:
+        store.set(rhs["ID"], lhs_t)
+        return lhs_t
     
 
-def infer_nary(stmt, store, graph):
+def infer_nary(stmt, store, graph) -> SuTypes:
     value = stmt["Value"]
     args = stmt["Args"]
 
@@ -151,39 +155,39 @@ def infer_nary(stmt, store, graph):
         if not constraint_type_with_operator_value(value, i["Type_t"]):
             raise TypeError(f"Type mismatch for {i['Type_t']} and {value}")
 
-    # valid_t = get_valid_type_for_operator(value)
-    # for i in args:
-    #     store.set_once(i["ID"], valid_t)
-
-    # return valid_t
+    valid_t = get_valid_type_for_operator(value)
 
     prev = None
     for i in args:
+        if i["Tag"] == "Call":
+            i = i["Args"][0]
         n = Node(i["Value"])
+        store.set_once(i["ID"], valid_t)
         graph.add_node(n)
         if prev is not None:
             graph.add_edge(prev.value, n.value)
         prev = n
 
-    valid_t = get_valid_type_for_operator(value)
     vn = Node(valid_t.name)
     graph.add_node(vn)
     graph.add_edge(prev.value, vn.value)
 
+    return valid_t
+
 def infer_if(stmt, store, graph):
     cond = stmt["Args"][0]
     cond_t = infer_generic(cond, store, graph)
+    store.set(cond["ID"], cond_t)
+
     then = stmt["Args"][1]
     then_t = infer_generic(then, store, graph)
+    store.set(then["ID"], then_t)
 
-    else_t = None
     if len(stmt["Args"]) == 3:
         else_t = infer_generic(stmt["Args"][2], store, graph)
+        store.set(stmt["Args"][2]["ID"], else_t)
 
-    print(f"cond_t: {cond_t}")
-    print(f"then_t: {then_t}")
-    if else_t is not None:
-        print(f"else_t: {else_t}")
+    return SuTypes.NotApplicable
 
 
 def main():
@@ -195,15 +199,6 @@ def main():
         infer_generic(stmt[0], store, graph)
 
     graph.visualise()
-    """
-    except TypeError as e:
-        print(e)
-        exit(1)
-    except Exception as e:
-        print(e)
-        print(graph)
-        graph.visualise()
-"""
 
     # pretty print the store
     print(json.dumps(store.db, indent=4, cls=EnumEncoder))

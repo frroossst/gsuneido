@@ -63,7 +63,7 @@ func main() {
 			`
 
 	/*
-		class {
+	src = `class {
 			x: 0
 			msg: "hello"
 		pvt_foo() { return .x }
@@ -72,8 +72,8 @@ func main() {
 		SetMsg(msg) { .msg = msg }
 		Get() { return Object(numx: .x, strmsg: .msg) }
 		AddBreak() { return x + "123" }
-		}
-	*/
+		}`
+	 */
 
 	fmt.Println("src:", src)
 	fmt.Println()
@@ -81,6 +81,7 @@ func main() {
 	fmt.Println()
 	p := compile.AstParser(src)
 	bk := p.TypeFunction()
+	// bk := p.TypeClass()
 	for i := 0; i < len(bk.Body); i++ {
 		// check if the type is of Node_t Binary
 		fmt.Println(bk.Body[i][0].Tag)
