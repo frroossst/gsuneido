@@ -453,22 +453,43 @@ func (p *Parser) typeClass() Class_t {
 			p.Match(tok.Colon)
 		}
 	}
-	var base Gnum
 	baseName := "class"
 	if p.Token.IsIdent() {
 		baseName = p.Text
-		base = p.ckBase(baseName)
 		p.MatchIdent()
 	}
-	pos1 := p.EndPos
 	p.Match(tok.LCurly)
-	pos2 := p.EndPos
 	prevClassName := p.className
+
+	// class members are stored as key value pairs separated by `:`
+	// e.g. `a: 1, b: 2`
+	// the key is the name of the member
+	// the value is the type of the member
+
+	// construct kv store where key is string and value is Node_t
+	kv_store := map[string]Node_t{}
+
+	// parse class members
+	for p.Token != tok.RCurly {
+		// parse member name
+		member_name := p.Text
+		p.MatchIdent()
+		isFunc := p.MatchIf(tok.Colon)
+
+		if !isFunc {
+			fmt.Println(p.Text)
+		}
+
+		// parse member type
+		member_type := p.typeConst()
+
+		kv_store[member_name] = member_type[0]
+	}
+
 	p.className = p.getClassName()
-	mems := p.mkClass(baseName)
-	p.memberList(mems, tok.RCurly, base)
-	p.setPos(mems, pos1, pos2)
 	p.className = prevClassName
+
+	fmt.Println("=== AST ===")
 
 	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, name: p.name, base: baseName, members: p.typeConst()}
 }

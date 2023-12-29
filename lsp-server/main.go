@@ -62,10 +62,10 @@ func main() {
 				}
 			`
 
-	/*
 	src = `class {
 			x: 0
 			msg: "hello"
+		Hello(x, y) { return x + y }
 		pvt_foo() { return .x }
 		pvt_bar() { return .msg }
 		SetX(x) { .x = x }
@@ -73,6 +73,7 @@ func main() {
 		Get() { return Object(numx: .x, strmsg: .msg) }
 		AddBreak() { return x + "123" }
 		}`
+	/*
 	 */
 
 	fmt.Println("src:", src)
@@ -80,14 +81,20 @@ func main() {
 	fmt.Println("compiled:", compile.AstParser(src).Const())
 	fmt.Println()
 	p := compile.AstParser(src)
-	bk := p.TypeFunction()
-	// bk := p.TypeClass()
-	for i := 0; i < len(bk.Body); i++ {
-		// check if the type is of Node_t Binary
-		fmt.Println(bk.Body[i][0].Tag)
-		fmt.Println(bk.Body[i])
-		fmt.Println(bk.Body[i][0].Args)
-	}
+	// bk := p.TypeFunction()
+	// for i := 0; i < len(bk.Body); i++ {
+	// 	// check if the type is of Node_t Binary
+	// 	fmt.Println(bk.Body[i][0].Tag)
+	// 	fmt.Println(bk.Body[i])
+	// 	fmt.Println(bk.Body[i][0].Args)
+	// }
+
+	cl := p.TypeClass()
+	fmt.Println("=== Class ===")
+	fmt.Println(cl)
+
+	// ! remove later
+	bk := "{}"
 
 	// convert to json
 	jsonData, err := json.Marshal(bk)
