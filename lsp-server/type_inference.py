@@ -13,6 +13,10 @@ class SuTypes(Enum):
     Boolean = 3
     Any = 4
     NotApplicable = 5
+    Never = 6
+    Function = 7
+    Object = 8
+
 
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
