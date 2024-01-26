@@ -5,10 +5,14 @@ The edges of the graph represent the constraints that exists. For example, "x mu
 are separate from each other, the type inference engine can infer the type of each variable by traversing the graph and checking the constraints. A 
 type conflict occurs when the type inference engine finds a variable that has two different types. This is resolved by checking the constraints
 and determining which type is more specific. Each node contains it's inferred type, it's type constraints. During the inference stage the graphs are
-produced, and during the checking stage the type constraints are checked. Objects are structurally typed.
+produced, and during the checking stage the type constraints are checked. Objects are structurally typed. Unions are not exclusive ORs just regular ORs.
+Intersections for objects are not types themselves but an additive combination of fields.
 
 Only more specific newer constraints are stored. If a constraint, "x is of type Number" exists then it can only be replaced by a more specific constraint
 such as, "x is of type i8" and not the other way around. 
+
+Function names are mangled when a node is created. The typical scheme is className_visibility_functionName_parameterTypes_returnTypes
+All functions and variables tagged with `@` are private, the number of `@` determines the scope for variables.
 
 
 ```
@@ -18,6 +22,7 @@ enum SuTypes {
     Boolean, 
     String, 
     Number, 
+    Void,
 
     Function, 
     Object, 

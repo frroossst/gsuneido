@@ -9,6 +9,12 @@ import (
 	. "github.com/apmckinlay/gsuneido/core"
 )
 
+// ? NOTE: Just for testing and MVP, maybe there's a better workaround
+// Function parses a function (starting without the "function" keyword)
+func (p *Parser) WithoutKeywordFunction() *ast.Function {
+	return p.function(false)
+}
+
 // Function parses a function (starting with the "function" keyword)
 func (p *Parser) Function() *ast.Function {
 	p.Match(tok.Function)

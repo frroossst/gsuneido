@@ -130,7 +130,7 @@ func (p *Parser) typeConst() []Node_t {
 }
 
 func (p *Parser) typeFunction() Function_t {
-	ast := p.Function()
+	ast := p.WithoutKeywordFunction()
 	parameters := []string{}
 	for i := 0; i < len(ast.Params); i++ {
 		parameters = append(parameters, ast.Params[i].Name.Name)
@@ -465,6 +465,10 @@ func (p *Parser) typeClass() Class_t {
 	// e.g. `a: 1, b: 2`
 	// the key is the name of the member
 	// the value is the type of the member
+	// class methods are represented as functions
+	// they are not `:` separated
+	// Foo(x, y) { x + y }
+	// bar() { 1 }
 
 	// construct kv store where key is string and value is Node_t
 	kv_store := map[string]Node_t{}
@@ -473,11 +477,22 @@ func (p *Parser) typeClass() Class_t {
 	for p.Token != tok.RCurly {
 		// parse member name
 		member_name := p.Text
-		p.MatchIdent()
-		isFunc := p.MatchIf(tok.Colon)
 
-		if !isFunc {
-			fmt.Println(p.Text)
+		isFunc := true
+
+		// check by looking ahead if member is a function
+		if p.Lxr.AheadSkip(0).Token == tok.Colon {
+			isFunc = false
+			p.MatchIdent()
+			p.Match(tok.Colon)
+		}
+
+		if isFunc {
+			fmt.Println("prev: ", p.Text)
+			fmt.Println("item: ", p.Item)
+			func_name := p.MatchIdent()
+			_ = func_name // ! remove
+			p.typeFunction()
 		}
 
 		// parse member type

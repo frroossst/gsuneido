@@ -65,9 +65,9 @@ func main() {
 	src = `class {
 			x: 0
 			msg: "hello"
-		Hello(x, y) { return x + y }
 		pvt_foo() { return .x }
 		pvt_bar() { return .msg }
+		Hello(x, y) { return x + y }
 		SetX(x) { .x = x }
 		SetMsg(msg) { .msg = msg }
 		Get() { return Object(numx: .x, strmsg: .msg) }
