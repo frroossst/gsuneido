@@ -149,9 +149,10 @@ func getExprType(expr ast.Statement) []Node_t {
 	// coerce ast.Expr to ast.Node
 	node := expr.(ast.Node)
 
+	id := uuid.New().String()
+
 	// node matches with *ast.ExprStmt in a switch-case
 	// convert node to type node.Expr
-
 	switch t := node.(type) {
 	case *ast.ExprStmt:
 		basic_expr := node.(*ast.ExprStmt).E
@@ -162,9 +163,13 @@ func getExprType(expr ast.Statement) []Node_t {
 		then := getNodeType(if_stmt.Then)
 		if if_stmt.Else != nil {
 			els := getNodeType(if_stmt.Else)
-			return []Node_t{{Tag: "If", Type_t: "If", Value: "nil", Args: append(append(cond, then...), els...), ID: uuid.New().String()}}
+			return []Node_t{{Tag: "If", Type_t: "If", Value: "nil", Args: append(append(cond, then...), els...), ID: id}}
 		}
-		return []Node_t{{Tag: "If", Type_t: "If", Value: "nil", Args: append(cond, then...), ID: uuid.New().String()}}
+		return []Node_t{{Tag: "If", Type_t: "If", Value: "nil", Args: append(cond, then...), ID: id}}
+	case *ast.Return:
+		stmt := t.E
+		return_stmt := getNodeType(stmt)
+		return []Node_t{{Tag: "Return", Type_t: "Return", Value: "nil", Args: return_stmt, ID: id}}
 	default:
 		fmt.Println(reflect.TypeOf(node))
 		fmt.Println(t.String())
@@ -173,33 +178,36 @@ func getExprType(expr ast.Statement) []Node_t {
 }
 
 func getNodeType(node ast.Node) []Node_t {
+
+	id := uuid.New().String()
+
 	switch n := node.(type) {
 	case *ast.Unary:
 		una := getNodeType(n.E)
 		ops := n.Tok
-		return []Node_t{{Tag: "Unary", Type_t: ops.String(), Value: ops.String(), Args: una, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Unary", Type_t: ops.String(), Value: ops.String(), Args: una, ID: id}}
 	case *ast.Binary:
 		lhs := getNodeType(n.Lhs)
 		rhs := getNodeType(n.Rhs)
 		ops := n.Tok
-		return []Node_t{{Tag: "Binary", Type_t: "Operator", Value: ops.String(), Args: append(lhs, rhs...), ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Binary", Type_t: "Operator", Value: ops.String(), Args: append(lhs, rhs...), ID: id}}
 	case *ast.Nary:
 		args := []Node_t{}
 		ops := n.Tok
 		for i := 0; i < len(n.Exprs); i++ {
 			args = append(args, getNodeType(n.Exprs[i])...)
 		}
-		return []Node_t{{Tag: "Nary", Type_t: "Operator", Value: ops.String(), Args: args, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Nary", Type_t: "Operator", Value: ops.String(), Args: args, ID: id}}
 	case *ast.Compound:
 		cmps := []Node_t{}
 		for i := 0; i < len(n.Body); i++ {
 			cmps = append(cmps, getExprType(n.Body[i])...)
 		}
-		return []Node_t{{Tag: "Compound", Type_t: "Compound", Value: "nil", Args: cmps, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Compound", Type_t: "Compound", Value: "nil", Args: cmps, ID: id}}
 	case *ast.Ident:
-		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: n.Name, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: n.Name, ID: id}}
 	case *ast.Constant:
-		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String(), ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String(), ID: id}}
 	case *ast.Call:
 		var value string
 		switch v := n.Fn.(type) {
@@ -215,7 +223,7 @@ func getNodeType(node ast.Node) []Node_t {
 			panic("not implemented in getNodeType " + v.String())
 		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
-			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: uuid.New().String()}}}}
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: id}}}}
 	default:
 		fmt.Println(reflect.TypeOf(n))
 		panic("not implemented in getNodeType " + n.String())

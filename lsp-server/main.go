@@ -65,9 +65,23 @@ func main() {
 	src = `class {
 			x: 0
 			msg: "hello"
-		pvt_foo() { return .x }
-		pvt_bar() { return .msg }
 		Hello(x, y) { return x + y }
+		pvt_foo() { return .x }
+		originalTestFunc(x, y, z)
+			{
+			num = x + 123
+			num++
+			if String?(x) and Number?(y) 
+				{
+				abc = x + y + z + num
+				} 
+			else 
+				{
+				num()
+				}
+			.qux()
+			}
+		pvt_bar() { return .msg }
 		SetX(x) { .x = x }
 		SetMsg(msg) { .msg = msg }
 		Get() { return Object(numx: .x, strmsg: .msg) }
