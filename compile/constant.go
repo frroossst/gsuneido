@@ -496,17 +496,22 @@ func (p *Parser) typeClass() Class_t {
 		}
 
 		if isFunc {
-			fmt.Println("prev: ", p.Text)
-			fmt.Println("item: ", p.Item)
 			func_name := p.MatchIdent()
 			_ = func_name // ! remove
-			p.typeFunction()
+
+			func_type := p.typeFunction()
+
+			fmt.Println("prev: ", p.Text)
+			fmt.Println("item: ", p.Item)
+
+			kv_store[func_name] = func_type.Node_t
+
+		} else {
+			// parse member type
+			member_type := p.typeConst()
+			kv_store[member_name] = member_type[0]
 		}
 
-		// parse member type
-		member_type := p.typeConst()
-
-		kv_store[member_name] = member_type[0]
 	}
 
 	p.className = p.getClassName()
