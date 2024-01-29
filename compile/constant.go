@@ -12,6 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"os"
+
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/core"
@@ -45,6 +47,13 @@ func Checked(th *Thread, src string) (Value, []string) {
 		p.Error("did not parse all input")
 	}
 	return v, p.CheckResults()
+}
+
+// struct to store either a Node_t or a new Function_t node
+type AttributeOrMethod_t struct {
+	Tag string
+	Node_t
+	Function_t
 }
 
 type Node_t struct {
@@ -81,7 +90,8 @@ type Class_t struct {
 	// the base class of the class
 	base string
 	// the members of the class
-	members []Node_t
+	// []Node_t
+	members map[string]AttributeOrMethod_t
 }
 
 func (p *Parser) TypeClass() Class_t {
@@ -219,11 +229,14 @@ func getNodeType(node ast.Node) []Node_t {
 			value = v.E.(*ast.Ident).Name + "." + noqute
 		default:
 			fmt.Println(reflect.TypeOf(v))
-			fmt.Println(v)
+			fmt.Fprintln(os.Stdout, []any{v}...)
 			panic("not implemented in getNodeType " + v.String())
 		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
 			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: id}}}}
+	case *ast.Mem:
+		noqute := n.M.String()[1 : len(n.M.String())-1]
+		return []Node_t{{Tag: "Member", Type_t: "Member", Value: noqute, ID: id}}
 	default:
 		fmt.Println(reflect.TypeOf(n))
 		panic("not implemented in getNodeType " + n.String())
@@ -479,7 +492,7 @@ func (p *Parser) typeClass() Class_t {
 	// bar() { 1 }
 
 	// construct kv store where key is string and value is Node_t
-	kv_store := map[string]Node_t{}
+	kv_store := map[string]AttributeOrMethod_t{}
 
 	// parse class members
 	for p.Token != tok.RCurly {
@@ -501,15 +514,19 @@ func (p *Parser) typeClass() Class_t {
 
 			func_type := p.typeFunction()
 
-			fmt.Println("prev: ", p.Text)
-			fmt.Println("item: ", p.Item)
+			fmt.Println("function name: ", func_name)
+			fmt.Println("function parameters: ", func_type.Parameters)
+			fmt.Println("function body: ", func_type.Body)
 
-			kv_store[func_name] = func_type.Node_t
+			// kv_store[func_name] = func_type.Node_t
+
+			kv_store[func_name] = AttributeOrMethod_t{Tag: "Method", Node_t: func_type.Node_t, Function_t: func_type}
 
 		} else {
 			// parse member type
 			member_type := p.typeConst()
-			kv_store[member_name] = member_type[0]
+			// kv_store[member_name] = member_type[0]
+			kv_store[member_name] = AttributeOrMethod_t{Tag: "Attribute", Node_t: member_type[0]}
 		}
 
 	}
@@ -519,7 +536,7 @@ func (p *Parser) typeClass() Class_t {
 
 	fmt.Println("=== AST ===")
 
-	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, name: p.name, base: baseName, members: p.typeConst()}
+	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, name: p.name, base: baseName, members: kv_store}
 }
 
 // classNum is used to generate names for anonymous classes

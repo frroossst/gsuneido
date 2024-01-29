@@ -11,3 +11,5 @@ require (
 	golang.org/x/text v0.12.0
 	golang.org/x/time v0.3.0
 )
+
+require github.com/davecgh/go-spew v1.1.1

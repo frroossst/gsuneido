@@ -12,6 +12,7 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
+	"github.com/davecgh/go-spew/spew"
 	// . "github.com/apmckinlay/gsuneido/core"
 )
 
@@ -105,13 +106,15 @@ func main() {
 
 	cl := p.TypeClass()
 	fmt.Println("=== Class ===")
-	fmt.Println(cl)
+	//	fmt.Printf("%#v\n", cl)
+
+	fmt.Println(spew.Sdump(cl))
 
 	// ! remove later
-	bk := "{}"
+	// bk := "{}"
 
 	// convert to json
-	jsonData, err := json.Marshal(bk)
+	jsonData, err := json.Marshal(cl)
 	if err != nil {
 		panic(err)
 	}
