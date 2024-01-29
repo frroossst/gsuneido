@@ -12,7 +12,8 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile"
 	"github.com/apmckinlay/gsuneido/compile/ast"
-	"github.com/davecgh/go-spew/spew"
+	//	"github.com/davecgh/go-spew/spew"
+	//
 	// . "github.com/apmckinlay/gsuneido/core"
 )
 
@@ -106,12 +107,25 @@ func main() {
 
 	cl := p.TypeClass()
 	fmt.Println("=== Class ===")
-	//	fmt.Printf("%#v\n", cl)
-
-	fmt.Println(spew.Sdump(cl))
-
-	// ! remove later
-	// bk := "{}"
+	fmt.Println("class ", cl.Name, " from ", cl.Base)
+	fmt.Println("\tAttributes:")
+	for name, attr := range cl.Attributes {
+		a := attr[0]
+		fmt.Println("\t", name, ":")
+		fmt.Println("\t\t", a.Value)
+		fmt.Println("\t\t", a.Tag)
+		fmt.Println("\t\t", a.Type_t)
+		fmt.Println()
+	}
+	fmt.Println("\tMethods:")
+	for _, method := range cl.Methods {
+		m := method[0]
+		fmt.Println("\t", m.Name, "(", m.Parameters, ")")
+		for _, stmt := range m.Body {
+			fmt.Println("\t\t", stmt)
+		}
+		fmt.Println()
+	}
 
 	// convert to json
 	jsonData, err := json.Marshal(cl)

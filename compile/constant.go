@@ -49,13 +49,6 @@ func Checked(th *Thread, src string) (Value, []string) {
 	return v, p.CheckResults()
 }
 
-// struct to store either a Node_t or a new Function_t node
-type AttributeOrMethod_t struct {
-	Tag string
-	Node_t
-	Function_t
-}
-
 type Node_t struct {
 	// the branch of the node (e.g. Binary, Unary, etc.)
 	Tag string
@@ -85,13 +78,14 @@ func (p *Parser) TypeFunction() Function_t {
 
 type Class_t struct {
 	Node_t
-	// the name of the class
-	name string
-	// the base class of the class
-	base string
-	// the members of the class
-	// []Node_t
-	members map[string]AttributeOrMethod_t
+	// the Name of the class
+	Name string
+	// the Base class of the class
+	Base string
+	// the Methods of the class
+	Methods map[string][]Function_t
+	// the Attributes of the class
+	Attributes map[string][]Node_t
 }
 
 func (p *Parser) TypeClass() Class_t {
@@ -492,7 +486,8 @@ func (p *Parser) typeClass() Class_t {
 	// bar() { 1 }
 
 	// construct kv store where key is string and value is Node_t
-	kv_store := map[string]AttributeOrMethod_t{}
+	kv_store_methods := map[string][]Function_t{}
+	kv_store_attrbts := map[string][]Node_t{}
 
 	// parse class members
 	for p.Token != tok.RCurly {
@@ -510,23 +505,16 @@ func (p *Parser) typeClass() Class_t {
 
 		if isFunc {
 			func_name := p.MatchIdent()
-			_ = func_name // ! remove
-
 			func_type := p.typeFunction()
+			func_node := Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: ""}, Name: func_name, Parameters: func_type.Parameters, Body: func_type.Body}
 
-			fmt.Println("function name: ", func_name)
-			fmt.Println("function parameters: ", func_type.Parameters)
-			fmt.Println("function body: ", func_type.Body)
-
-			// kv_store[func_name] = func_type.Node_t
-
-			kv_store[func_name] = AttributeOrMethod_t{Tag: "Method", Node_t: func_type.Node_t, Function_t: func_type}
+			kv_store_methods[func_name] = []Function_t{func_node}
 
 		} else {
 			// parse member type
 			member_type := p.typeConst()
 			// kv_store[member_name] = member_type[0]
-			kv_store[member_name] = AttributeOrMethod_t{Tag: "Attribute", Node_t: member_type[0]}
+			kv_store_attrbts[member_name] = []Node_t{member_type[0]}
 		}
 
 	}
@@ -536,7 +524,7 @@ func (p *Parser) typeClass() Class_t {
 
 	fmt.Println("=== AST ===")
 
-	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, name: p.name, base: baseName, members: kv_store}
+	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, Methods: kv_store_methods, Attributes: kv_store_attrbts}
 }
 
 // classNum is used to generate names for anonymous classes
