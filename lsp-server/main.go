@@ -10,27 +10,7 @@ import (
 )
 
 func main() {
-	/*
 
-	 */
-
-	src := `
-		function(x) 
-			{
-			// test folding
-			notLogic = not true
-			constF = 1 + 2 + 3 + 4 + 5
-			if not notLogic or notLogic {
-				return x * 2
-			}
-			bar = -5
-			if true { bar = 1 } else { bar = 2 }
-			bar()
-			return x + 1 + b
-			}
-	`
-
-	// catching the simplest type error: `type number is not callable`
 	/*
 		1. Mark x as unknown (as it won't be known in the first pass)
 		2. Mark num as unknown + Number (123)
@@ -38,25 +18,7 @@ func main() {
 		4. Evaluate num to be Number
 		5. Throw error as Number is not callable
 	*/
-
-	src = `
-			function(x, y, z)
-				{
-				num = x + 123
-				num++
-				if String?(x) and Number?(y) 
-					{
-					abc = x + y + z + num
-					} 
-				else 
-					{
-					num()
-					}
-				.qux()
-				}
-			`
-
-	src = `class {
+	src := `class {
 			x: 0
 			msg: "hello"
 		Hello(x, y) { return x + y }
@@ -81,8 +43,6 @@ func main() {
 		Get() { return Object(numx: .x, strmsg: .msg) }
 		AddBreak() { return x + "123" }
 		}`
-	/*
-	 */
 
 	fmt.Println("src:", src)
 	fmt.Println()
@@ -90,8 +50,8 @@ func main() {
 	fmt.Println()
 
 	p := compile.AstParser(src)
-
 	cl := p.TypeClass()
+
 	fmt.Println("=== Class ===")
 	fmt.Println("class ", cl.Name, " from ", cl.Base)
 	fmt.Println("\tAttributes:")

@@ -532,8 +532,6 @@ func (p *Parser) typeClass() Class_t {
 	p.className = p.getClassName()
 	p.className = prevClassName
 
-	fmt.Println("=== AST ===")
-
 	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, Methods: kv_store_methods, Attributes: kv_store_attrbts}
 }
 
