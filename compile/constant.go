@@ -49,6 +49,14 @@ func Checked(th *Thread, src string) (Value, []string) {
 	return v, p.CheckResults()
 }
 
+func GetUUID() string {
+	if uuid.New().String() != "" {
+		return uuid.New().String()
+	} else {
+		panic("UUID generation failed")
+	}
+}
+
 type Node_t struct {
 	// the branch of the node (e.g. Binary, Unary, etc.)
 	Tag string
@@ -103,31 +111,33 @@ func (p *Parser) TypeConst() []Node_t {
 }
 
 func (p *Parser) typeConst() []Node_t {
+	id := GetUUID()
+
 	switch p.Token {
 	case tok.String:
 		content := p.Text
 		p.string()
-		return []Node_t{{Tag: "Constant", Type_t: "String", Value: content, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Constant", Type_t: "String", Value: content, ID: id}}
 	case tok.Number:
 		content := p.Text
 		p.number()
-		return []Node_t{{Tag: "Constant", Type_t: "Number", Value: content, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Constant", Type_t: "Number", Value: content, ID: id}}
 	case tok.Identifier:
 		content := p.Text
 		p.MatchIdent()
-		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: content, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: content, ID: id}}
 	case tok.Eq:
 		content := p.Text
 		p.Match(tok.Eq)
-		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: id}}
 	case tok.Add:
 		content := p.Text
 		p.Match(tok.Add)
-		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: id}}
 	case tok.Sub:
 		content := p.Text
 		p.Match(tok.Sub)
-		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: uuid.New().String()}}
+		return []Node_t{{Tag: "Operator", Type_t: "Operator", Value: content, ID: id}}
 	default:
 		panic(p.Error("invalid constant, unexpected " + p.Token.String()))
 	}
@@ -153,7 +163,7 @@ func getExprType(expr ast.Statement) []Node_t {
 	// coerce ast.Expr to ast.Node
 	node := expr.(ast.Node)
 
-	id := uuid.New().String()
+	id := GetUUID()
 
 	// node matches with *ast.ExprStmt in a switch-case
 	// convert node to type node.Expr
@@ -183,7 +193,7 @@ func getExprType(expr ast.Statement) []Node_t {
 
 func getNodeType(node ast.Node) []Node_t {
 
-	id := uuid.New().String()
+	id := GetUUID()
 
 	switch n := node.(type) {
 	case *ast.Unary:
