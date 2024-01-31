@@ -71,6 +71,7 @@ Completed complete parsing of a class, including attributes and methods.
 
 ## TODO
 
+- [ ] Implement developer defined types for function signatures
 - [ ] Implement type inference and graph construction
 - [ ] Implement type checking on graph constraints
 - [ ] Implement object structure parsing

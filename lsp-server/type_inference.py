@@ -51,11 +51,14 @@ class KVStore:
     def set(self, var, value):
         self.db[var] = value
 
+"""
+! It assumes a singular class
+! It does not handle scope level
+"""
 class Identifier:
-
-    def __init__(self, class_name, function_name, variable_name, scope_level):
-        return f"{class_name}::{function_name}::{'@' * scope_level}{variable_name}"
-
+    @classmethod
+    def __init__(self, function_name: str, variable_name: str, scope_level: int = 1) -> str:
+        return f"{function_name}::{'@' * scope_level}{variable_name}"
 
 def load_data_body() -> dict:
 
@@ -102,6 +105,8 @@ def infer_generic(stmt, store, graph) -> SuTypes:
         case "If":
             return infer_if(stmt, store, graph)
         case "Call" | "Compound":
+            return infer_generic(stmt["Args"][0], store, graph)
+        case "Return":
             return infer_generic(stmt["Args"][0], store, graph)
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
@@ -197,14 +202,23 @@ def infer_if(stmt, store, graph):
 
     return SuTypes.NotApplicable
 
+def parse_class(clss):
+    members = {}
+
+    for k, v in clss.items():
+        members[k] = v[0]
+
+    return members
 
 def main():
     graph = Graph()
     store = KVStore()
-    methods = load_data_body()
+    methods = parse_class(load_data_body())
 
-    for stmt in methods:
-        infer_generic(stmt[0], store, graph)
+    for k, v in methods.items():
+        print(f"{k}: {json.dumps(v, indent=4)}")
+        for i in v["Body"]:
+            infer_generic(i[0], store, graph)
 
     graph.visualise()
 

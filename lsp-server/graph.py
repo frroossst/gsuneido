@@ -19,15 +19,15 @@ class Graph:
     def __init__(self):
         self.nodes = []
 
-    def add_node(self, node):
-        if self.find_node(node.value) is None:
-            self.nodes.append(node)
-
     def find_node(self, name):
         for node in self.nodes:
             if node.value == name:
                 return node
         return None
+
+    def add_node(self, node):
+        if self.find_node(node.value) is None:
+            self.nodes.append(node)
 
     def add_edge(self, node1, node2):
         n1 = self.find_node(node1)
