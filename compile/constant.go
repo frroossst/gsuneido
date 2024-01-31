@@ -51,7 +51,7 @@ func Checked(th *Thread, src string) (Value, []string) {
 
 func GetUUID() string {
 	if uuid.New().String() != "" {
-		return uuid.New().String()
+		return strings.Replace(uuid.New().String(), "-", "", -1)
 	} else {
 		panic("UUID generation failed")
 	}
