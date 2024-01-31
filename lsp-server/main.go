@@ -21,6 +21,7 @@ func main() {
 	src := `class {
 			x: 0
 			msg: "hello"
+		Get() { return Object(99, 68, ans: Hello(1, 2), numx: .x, strmsg: .msg) }
 		Hello(x, y) { return x + y }
 		pvt_foo() { return .x }
 		originalTestFunc(x, y, z)
@@ -40,7 +41,6 @@ func main() {
 		pvt_bar() { return .msg }
 		SetX(x) { .x = x }
 		SetMsg(msg) { .msg = msg }
-		Get() { return Object(numx: .x, strmsg: .msg) }
 		AddBreak() { return x + "123" }
 		}`
 

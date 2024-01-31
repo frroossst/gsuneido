@@ -224,6 +224,7 @@ func getNodeType(node ast.Node) []Node_t {
 		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String(), ID: id}}
 	case *ast.Call:
 		var value string
+		// TODO: handle parsing Object() calls
 		switch v := n.Fn.(type) {
 		case *ast.Ident:
 			value = v.Name
@@ -236,6 +237,10 @@ func getNodeType(node ast.Node) []Node_t {
 			fmt.Fprintln(os.Stdout, []any{v}...)
 			panic("not implemented in getNodeType " + v.String())
 		}
+		if value == "Object" {
+			obj := parseObjectStructure(n.Args)
+			return []Node_t{{Tag: "Object", Type_t: "Object", Value: "nil", Args: obj, ID: id}}
+		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
 			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: id}}}}
 	case *ast.Mem:
@@ -245,6 +250,43 @@ func getNodeType(node ast.Node) []Node_t {
 		fmt.Println(reflect.TypeOf(n))
 		panic("not implemented in getNodeType " + n.String())
 	}
+}
+
+func parseObjectStructure(object_args []ast.Arg) []Node_t {
+
+	members := map[string]Node_t{}
+
+	for i := 0; i < len(object_args); i++ {
+
+		var key string
+		if object_args[i].Name == nil {
+			// only value object member
+			key = strconv.Itoa(i)
+		} else {
+			// key value object member
+			key = object_args[i].Name.String()
+			key = key[1 : len(key)-1]
+		}
+		val := getNodeType(object_args[i].E)
+
+		fmt.Println(key, ": ", val)
+
+		// check if key already exists
+		if _, ok := members[key]; ok {
+			panic("duplicate member name (" + key + ")")
+		}
+
+		members[key] = val[0]
+	}
+
+	// traverse map and convert to array of Node_t
+	members_arr := []Node_t{}
+
+	for k, v := range members {
+		members_arr = append(members_arr, Node_t{Tag: "Member", Type_t: "Member", Value: k, Args: []Node_t{v}, ID: GetUUID()})
+	}
+
+	return members_arr
 }
 
 func (p *Parser) Const() (result Value) {

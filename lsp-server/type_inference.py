@@ -17,6 +17,11 @@ class SuTypes(Enum):
     Function = 7
     Object = 8
 
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return obj.name
+        return json.JSONEncoder.default(self, obj)
 
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
@@ -26,12 +31,6 @@ def check_type_equivalence(lhs, rhs) -> bool:
     return lhs == rhs
 
     
-class EnumEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Enum):
-            return obj.name
-        return json.JSONEncoder.default(self, obj)
-
 class KVStore:
 
     db = {}
@@ -52,13 +51,18 @@ class KVStore:
     def set(self, var, value):
         self.db[var] = value
 
+class Identifier:
+
+    def __init__(self, class_name, function_name, variable_name, scope_level):
+        return f"{class_name}::{function_name}::{'@' * scope_level}{variable_name}"
+
 
 def load_data_body() -> dict:
 
     with open('output.json') as data_file:
         data = json.load(data_file)
 
-    return data['Body']
+    return data['Methods']
 
 
 def constraint_type_with_operator_value(value, type) -> bool:
@@ -197,9 +201,9 @@ def infer_if(stmt, store, graph):
 def main():
     graph = Graph()
     store = KVStore()
-    body = load_data_body()
+    methods = load_data_body()
 
-    for stmt in body:
+    for stmt in methods:
         infer_generic(stmt[0], store, graph)
 
     graph.visualise()
