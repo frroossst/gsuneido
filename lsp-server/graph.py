@@ -1,6 +1,8 @@
 from matplotlib import pyplot as plt
 import networkx as nx
 
+from sutypes import SuTypes
+
 """
 A graph data structure with nodes and edges
 
@@ -90,15 +92,20 @@ class Graph:
 
 class Node:
 
+    # this is the value of the type i.e. "hello", 12.43
     value = None
+
+    # this is the type of the value i.e. String, Number
+    type = None
+
     # neighbours, what it can see
     edges = None
 
     def __repr__(self) -> str:
-        return f"Node(value = {self.value}, edges = {self.edges})"
+        return f"Node(type = {self.type}, value = {self.value}, edges = {self.edges})"
 
-    def __init__(self, name):
-        self.value = name
+    def __init__(self, value, type = SuTypes.Unknown):
+        self.value = value
         self.edges = []
 
     def get_connected_edges(self):
