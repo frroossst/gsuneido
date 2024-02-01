@@ -23,11 +23,18 @@ class Graph:
         self.nodes = []
 
         # add primitive types
-        self.add_node(Node("String", SuTypes.String))
-        self.add_node(Node("Number", SuTypes.Number))
-        self.add_node(Node("Boolean", SuTypes.Boolean))
-        self.add_node(Node("Object", SuTypes.Object))
-        self.add_node(Node("Function", SuTypes.Function))
+        for i in self.get_primitive_type_nodes():
+            self.add_node(i)
+
+    @classmethod
+    def get_primitive_type_nodes(cls):
+        return [
+            Node("String", SuTypes.String),
+            Node("Number", SuTypes.Number),
+            Node("Boolean", SuTypes.Boolean),
+            Node("Object", SuTypes.Object),
+            Node("Function", SuTypes.Function)
+        ]
 
     def find_node(self, name):
         for node in self.nodes:
@@ -43,8 +50,8 @@ class Graph:
         n1 = self.find_node(node1)
         n2 = self.find_node(node2)
 
-        if n1 is not None and n2 is not None:
-            n1.add_edge(n2)
+        if n1 is not None and n1 is not None:
+            n1.add_edge(n1)
             n2.add_edge(n1)
         else:
             raise Exception("Node not found")
@@ -59,7 +66,9 @@ class Graph:
                     return True
         return False
 
-    # simple BFS to find a path from node1 to node2
+    """
+    simple BFS to find a path from node1 to node2
+    """
     def path_exists(self, node1, node2):
         n1 = self.find_node(node1)
         n2 = self.find_node(node2)

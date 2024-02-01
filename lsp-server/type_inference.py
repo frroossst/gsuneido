@@ -6,7 +6,7 @@ from graph import Graph, Node
 from sutypes import SuTypes, EnumEncoder
 import json
 
-from utils import todo, unimplemented
+from utils import todo
 
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
@@ -52,6 +52,13 @@ def load_data_body() -> dict:
 
     return data['Methods']
 
+def load_data_attributes() -> dict:
+
+    with open('output.json') as data_file:
+        data = json.load(data_file)
+
+    return data['Attributes']
+
 
 def constraint_type_with_operator_value(value, type) -> bool:
     valid_constraints = {
@@ -96,7 +103,7 @@ def infer_generic(stmt, store, graph) -> SuTypes:
         case "Object":
             todo()
         case "Member":
-            todo()
+            return infer_attribute(stmt, store, graph)
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
@@ -186,6 +193,23 @@ def infer_if(stmt, store, graph):
 
     return SuTypes.NotApplicable
 
+def infer_attribute(stmt, store, graph):
+    value = stmt["Value"]
+    attrb_t = attributes.get(value, None)
+
+    if attrb_t is None:
+        raise TypeError(f"Attribute {value} not found")
+    
+    valid_t = SuTypes.from_str(attrb_t["Type_t"])
+    store.set(stmt["ID"], valid_t)
+
+    n = Node(stmt["Value"], sutype=valid_t)
+    graph.add_node(n)
+    graph.find_node(valid_t.name).add_edge(n)
+
+    return valid_t
+
+
 def parse_class(clss):
     members = {}
 
@@ -197,17 +221,26 @@ def parse_class(clss):
 def main():
     graph = Graph()
     store = KVStore()
+    global attributes
+    attributes = parse_class(load_data_attributes())
     methods = parse_class(load_data_body())
 
-    for k, v in methods.items():
-        print(f"{k}: {json.dumps(v, indent=4)}")
-        for i in v["Body"]:
-            infer_generic(i[0], store, graph)
+    try:
+        for k, v in methods.items():
+            print(f"{k}: {json.dumps(v, indent=4)}")
+            for i in v["Body"]:
+                infer_generic(i[0], store, graph)
+    except Exception as e:
+        print(e)
+    finally:
+        graph.visualise()
+
     
     print("=" * 80)
     print(json.dumps(store.db, indent=4, cls=EnumEncoder))
     print("=" * 80)
     print(json.dumps(graph.to_json(), indent=4))
+
 
     with open("type_store.json", "w") as fobj:
         json.dump(store.db, fobj, cls=EnumEncoder, indent=4)
