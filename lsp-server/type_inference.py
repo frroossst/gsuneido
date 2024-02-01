@@ -152,16 +152,16 @@ def infer_nary(stmt, store, graph) -> SuTypes:
     for i in args:
         if i["Tag"] == "Call":
             i = i["Args"][0]
-        n = Node(i["Value"])
+        n = Node(i["Value"], SuTypes.from_str(i["Type_t"]))
         store.set_once(i["ID"], valid_t)
         graph.add_node(n)
         if prev is not None:
             graph.add_edge(prev.value, n.value)
         prev = n
 
-    vn = Node(valid_t.name)
-    graph.add_node(vn)
-    graph.add_edge(prev.value, vn.value)
+    valid_str = SuTypes.to_str(valid_t)
+    n = graph.find_node(valid_str)
+    n.add_edge(prev)
 
     return valid_t
 
@@ -205,9 +205,14 @@ def main():
     # pretty print the store
     print("=" * 80)
     print(json.dumps(store.db, indent=4, cls=EnumEncoder))
+    print("=" * 80)
+    print(json.dumps(graph.to_json(), indent=4))
 
     with open("type_store.json", "w") as fobj:
         json.dump(store.db, fobj, cls=EnumEncoder, indent=4)
+
+    with open("type_graph.json", "w") as fobj:
+        fobj.write(graph.to_json())
 
 
 if __name__ == "__main__":

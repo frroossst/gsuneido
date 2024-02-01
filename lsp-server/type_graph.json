@@ -1,0 +1,45 @@
+{
+  "nodes": [
+    {
+      "value": "String",
+      "sutype": "String",
+      "edges": []
+    },
+    {
+      "value": "Number",
+      "sutype": "Number",
+      "edges": [
+        "\"123\""
+      ]
+    },
+    {
+      "value": "Boolean",
+      "sutype": "Boolean",
+      "edges": []
+    },
+    {
+      "value": "Object",
+      "sutype": "Object",
+      "edges": []
+    },
+    {
+      "value": "Function",
+      "sutype": "Function",
+      "edges": []
+    },
+    {
+      "value": "x",
+      "sutype": "Unknown",
+      "edges": [
+        "\"123\""
+      ]
+    },
+    {
+      "value": "\"123\"",
+      "sutype": "String",
+      "edges": [
+        "x"
+      ]
+    }
+  ]
+}

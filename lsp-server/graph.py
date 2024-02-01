@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 import networkx as nx
+import json
 
 from sutypes import SuTypes
 
@@ -20,6 +21,13 @@ class Graph:
 
     def __init__(self):
         self.nodes = []
+
+        # add primitive types
+        self.add_node(Node("String", SuTypes.String))
+        self.add_node(Node("Number", SuTypes.Number))
+        self.add_node(Node("Boolean", SuTypes.Boolean))
+        self.add_node(Node("Object", SuTypes.Object))
+        self.add_node(Node("Function", SuTypes.Function))
 
     def find_node(self, name):
         for node in self.nodes:
@@ -89,6 +97,34 @@ class Graph:
         nx.draw(G, pos, with_labels=True, labels=labels)
         plt.show()
 
+    def to_json(self):
+        graph_data = {
+            'nodes': [
+                {'value': node.value, 'sutype': node.sutype.name, 'edges': [edge.value for edge in node.edges]}
+                for node in self.nodes
+            ]
+        }
+        return json.dumps(graph_data, indent=2)
+
+    @classmethod
+    def from_json(cls, json_data):
+        graph_instance = cls()
+        graph_data = json.loads(json_data)
+
+        for node_data in graph_data.get('nodes', []):
+            value = node_data.get('value')
+            sutype = SuTypes[node_data.get('sutype', 'Unknown')]
+            node = Node(value, sutype)
+            graph_instance.add_node(node)
+
+            edges = node_data.get('edges', [])
+            for edge_value in edges:
+                edge_node = graph_instance.find_node(edge_value)
+                if edge_node:
+                    graph_instance.add_edge(value, edge_value)
+
+        return graph_instance
+
 
 class Node:
 
@@ -96,21 +132,23 @@ class Node:
     value = None
 
     # this is the type of the value i.e. String, Number
-    type = None
+    sutype = None
 
     # neighbours, what it can see
     edges = None
 
     def __repr__(self) -> str:
-        return f"Node(type = {self.type}, value = {self.value}, edges = {self.edges})"
+        return f"Node(type = {self.sutype}, value = {self.value}, edges = {self.edges})"
 
-    def __init__(self, value, type = SuTypes.Unknown):
+    def __init__(self, value, sutype = SuTypes.Unknown):
         self.value = value
         self.edges = []
+        self.sutype = sutype
 
     def get_connected_edges(self):
         return self.edges
     
+    # type edge = Node
     def add_edge(self, edge):
         self.edges.append(edge)
 
