@@ -6,6 +6,8 @@ from graph import Graph, Node
 from sutypes import SuTypes, EnumEncoder
 import json
 
+from utils import todo, unimplemented
+
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
         return True
@@ -91,6 +93,10 @@ def infer_generic(stmt, store, graph) -> SuTypes:
             return infer_generic(stmt["Args"][0], store, graph)
         case "Return":
             return infer_generic(stmt["Args"][0], store, graph)
+        case "Object":
+            todo()
+        case "Member":
+            todo()
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
@@ -197,12 +203,7 @@ def main():
         print(f"{k}: {json.dumps(v, indent=4)}")
         for i in v["Body"]:
             infer_generic(i[0], store, graph)
-        # ! For debugging only
-        break
-
-    graph.visualise()
-
-    # pretty print the store
+    
     print("=" * 80)
     print(json.dumps(store.db, indent=4, cls=EnumEncoder))
     print("=" * 80)
