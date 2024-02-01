@@ -163,11 +163,6 @@ def infer_nary(stmt, store, graph) -> SuTypes:
     value = stmt["Value"]
     args = stmt["Args"]
 
-    # all args should have the same type conforming with value of the operator
-    for i in args:
-        if not constraint_type_with_operator_value(value, i["Type_t"]):
-            raise TypeError(f"Type mismatch for {i['Type_t']} and {value}")
-
     valid_t = get_valid_type_for_operator(value)
 
     prev = None
@@ -219,11 +214,17 @@ def main():
         print(f"{k}: {json.dumps(v, indent=4)}")
         for i in v["Body"]:
             infer_generic(i[0], store, graph)
+        # ! For debugging only
+        break
 
     graph.visualise()
 
     # pretty print the store
+    print("=" * 80)
     print(json.dumps(store.db, indent=4, cls=EnumEncoder))
+
+    with open("type_store.json", "w") as fobj:
+        json.dump(store.db, fobj, cls=EnumEncoder, indent=4)
 
 
 if __name__ == "__main__":
