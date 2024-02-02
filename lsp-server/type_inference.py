@@ -229,7 +229,11 @@ def main():
         for k, v in methods.items():
             print(f"{k}: {json.dumps(v, indent=4)}")
             for i in v["Body"]:
-                infer_generic(i[0], store, graph)
+                valid_t = infer_generic(i[0], store, graph)
+                store.set(i[0]["ID"], valid_t)
+                n = Node(i[0]["Value"], sutype=valid_t)
+                graph.add_node(n)
+                graph.add_edge(n.value, graph.find_node(valid_t.name).value)
     except Exception as e:
         print(e)
     finally:

@@ -4,7 +4,8 @@
       "value": "String",
       "sutype": "String",
       "edges": [
-        "msg"
+        "msg",
+        "Eq"
       ]
     },
     {
@@ -12,10 +13,15 @@
       "sutype": "Number",
       "edges": [
         "\"123\"",
+        "nil",
         "y",
+        "nil",
         "x",
+        "Eq",
         "123",
-        "num"
+        "Eq",
+        "num",
+        "PostInc"
       ]
     },
     {
@@ -50,6 +56,14 @@
       ]
     },
     {
+      "value": "nil",
+      "sutype": "Number",
+      "edges": [
+        "nil",
+        "nil"
+      ]
+    },
+    {
       "value": "y",
       "sutype": "Unknown",
       "edges": [
@@ -73,6 +87,15 @@
       "sutype": "Unknown",
       "edges": [
         "1fa9a77aa21f42fd9fff5da26a252f56"
+      ]
+    },
+    {
+      "value": "Eq",
+      "sutype": "String",
+      "edges": [
+        "Eq",
+        "Eq",
+        "Eq"
       ]
     },
     {
@@ -115,6 +138,13 @@
       "sutype": "Unknown",
       "edges": [
         "num"
+      ]
+    },
+    {
+      "value": "PostInc",
+      "sutype": "Number",
+      "edges": [
+        "PostInc"
       ]
     }
   ]

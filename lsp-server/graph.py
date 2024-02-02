@@ -47,6 +47,9 @@ class Graph:
             self.nodes.append(node)
 
     def add_edge(self, node1, node2):
+        """
+        parameters are string values not node instances
+        """
         n1 = self.find_node(node1)
         n2 = self.find_node(node2)
 
