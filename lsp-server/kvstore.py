@@ -34,6 +34,8 @@ class StoreValue:
         }
 
 
+
+
 class KVStore:
 
     db = {}
@@ -62,3 +64,16 @@ class KVStore:
                 pass
         else:
             raise ValueError(f"Variable already exists in the store\nexists: {self.get(var_id)},\ngot: {value}")
+
+    @classmethod
+    def from_json(cls, json_data: dict):
+        kv_instance = cls()
+
+        for k, v in json_data.items():
+            value = v.get("value")
+            actual = SuTypes.from_str(v.get("actual"))
+            inferred = SuTypes.from_str(v.get("inferred"))
+            store_value = StoreValue(value, actual, inferred)
+            kv_instance.set(k, store_value)
+
+        return kv_instance

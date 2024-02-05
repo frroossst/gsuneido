@@ -21,9 +21,17 @@ class SuTypes(Enum):
                 return SuTypes.String
             case "Number":
                 return SuTypes.Number
+            case "Unknown":
+                return SuTypes.Unknown
+            case "Boolean":
+                return SuTypes.Boolean
             case "Variable" | "Member":
                 return SuTypes.Unknown
-            case "Return" | "Operator" | "PostInc" | "Callable" | "Compound" | "If":
+            case "Any":
+                return SuTypes.Any
+            case "Object":
+                return SuTypes.Object
+            case "Return" | "Operator" | "PostInc" | "Callable" | "Compound" | "If" | "InBuiltOperator":
                 return SuTypes.InBuiltOperator
             case _:
                 raise ValueError(f"Unknown type {str} converting to SuTypes enum")

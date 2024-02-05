@@ -1,6 +1,7 @@
 import json
 
 from graph import Graph
+from kvstore import KVStore
 
 
 def load_kv_data():
@@ -17,17 +18,33 @@ def load_graph_data():
 
 def main():
 
-    content = load_kv_data()
+    store = KVStore().from_json(load_kv_data())
+    ascii_store = """
+     ____ _____ ___  ____  _____ 
+    / ___|_   _/ _ \|  _ \| ____|
+    \___ \ | || | | | |_) |  _|  
+     ___) || || |_| |  _ <| |___ 
+    |____/ |_| \___/|_| \_\_____|
 
-    print(json.dumps(content, indent=4))
+    """
+    print(ascii_store)
     print("=" * 80)
+    print(json.dumps(store.to_json(), indent=4))
+
 
     graph = Graph().from_json(load_graph_data())
+    ascii_graph = """
+      ____ ____      _    ____  _   _ 
+     / ___|  _ \    / \  |  _ \| | | |
+    | |  _| |_) |  / _ \ | |_) | |_| |
+    | |_| |  _ <  / ___ \|  __/|  _  |
+     \____|_| \_\/_/   \_\_|   |_| |_|
 
-    print(graph)
+    """
+    print(ascii_graph)
     print("=" * 80)
+    print(json.dumps(graph.to_json(), indent=4))
 
-    graph.add_edge("Number", "String")
 
     # check if a path exists between two primitive types
     primitive_types = Graph.get_primitive_type_nodes()
