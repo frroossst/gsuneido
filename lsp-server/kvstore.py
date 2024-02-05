@@ -1,4 +1,4 @@
-from sutypes import SuTypes
+from sutypes import SuTypes, check_type_equality
 
 
 class StoreValue:
@@ -52,7 +52,6 @@ class KVStore:
     def get(self, var) -> SuTypes | None:
         return self.db.get(var, None)
 
-    # set if it doesn't exist already
     def set(self, var_id, value) ->  bool:
         if not isinstance(value, StoreValue):
             raise TypeError("Value should be of type Value")
@@ -64,6 +63,19 @@ class KVStore:
                 pass
         else:
             raise ValueError(f"Variable already exists in the store\nexists: {self.get(var_id)},\ngot: {value}")
+
+    def set_on_type_equivalence(self, var_id, value):
+        if (val := self.get(var_id)) is None:
+            self.set(var_id, value)
+            return
+
+        if check_type_equality(val.inferred, value.inferred):
+            self.set(var_id, value)
+            return
+        
+        raise TypeError(f"For type node {self.value} cannot assign incompatible new type {value.value} to existing type {self.sutype}")
+
+
 
     @classmethod
     def from_json(cls, json_data: dict):

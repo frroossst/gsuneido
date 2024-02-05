@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 import networkx as nx
 import json
 
+from kvstore import StoreValue
 from sutypes import SuTypes
 
 """
@@ -41,6 +42,13 @@ class Graph:
             Node("InBuiltOperator", SuTypes.InBuiltOperator),
         ]
 
+    @staticmethod
+    def get_primitive_type_string():
+        return "StringNumberBooleanAnyNotApplicableNeverFunctionObjectInBuiltOperator"
+
+    def get_nodes(self):
+        return self.nodes
+
     def find_node(self, name):
         """
         for node in self.nodes:
@@ -72,7 +80,7 @@ class Graph:
         n2 = self.find_node(node2)
 
         if n1 is not None and n1 is not None:
-            n1.add_edge(n1)
+            n1.add_edge(n2)
             n2.add_edge(n1)
         else:
             raise Exception("Node not found")
@@ -87,10 +95,10 @@ class Graph:
                     return True
         return False
 
-    """
-    simple BFS to find a path from node1 to node2
-    """
     def path_exists(self, node1, node2):
+        """
+        simple BFS to find a path from node1 to node2
+        """
         n1 = self.find_node(node1)
         n2 = self.find_node(node2)
 
@@ -199,11 +207,38 @@ class Node:
     
     # type edge = Node
     def add_edge(self, edge):
+        """
+        @note do not use this method directly, use graph.add_edge instead
+        """
         for i in self.edges:
             if i.value == edge.value:
                 return # edge already exists
         if self.value != edge.value:
             self.edges.append(edge)
+
+    def propogate_type(self, store, new_type:SuTypes=None, visited=None):
+        """
+        simple DFS to find all connected edges and set their type to new_type if provided
+        if new_type is not provided the current node's type is propogated
+        """
+        if visited is None:
+            visited = set()
+
+        if self in visited:
+            return
+        
+        visited.add(self)
+
+        if new_type is not None:
+            self.sutype = new_type
+        else:
+            new_type = self.sutype
+
+        if self.value not in Graph.get_primitive_type_string():
+            store.set_on_type_equivalence(self.value, StoreValue(self.value, self.sutype, new_type))
+
+        for edge in self.edges:
+            edge.propogate_type(store, new_type, visited)
 
 
 

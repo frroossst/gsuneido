@@ -2,21 +2,8 @@ import json
 
 from graph import Graph
 from kvstore import KVStore
-from sutypes import SuTypes
+from sutypes import SuTypes, check_type_equality
 
-
-
-def check_type_equality(lhs, rhs) -> bool:
-    if lhs == SuTypes.Any or rhs == SuTypes.Any:
-        return True
-    # does not matter if one of the types is an inbuilt operator
-    if lhs == SuTypes.InBuiltOperator or rhs == SuTypes.InBuiltOperator:
-        return True
-    if lhs == SuTypes.Unknown or rhs == SuTypes.Unknown:
-        print("Unknown type not handled in type equivalence check")
-        # ! remove this line
-        return True
-    return lhs == rhs
 
 
 def load_kv_data():

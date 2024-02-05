@@ -60,3 +60,52 @@ class EnumEncoder(json.JSONEncoder):
         if isinstance(obj, Enum):
             return obj.name
         return json.JSONEncoder.default(self, obj)
+
+
+class UnionSuType():
+
+    # types is a set
+    types = None
+
+    def __init__(self, args: list):
+        self.types = set(args)
+
+    def __str__(self):
+        return f"UnionSuType({', '.join([str(x) for x in self.types])})"
+
+    def __repr__(self):
+        return f"UnionSuType({', '.join([str(x) for x in self.types])})"
+
+    def add_type(self, t: SuTypes):
+        self.types.add(t)
+
+    def remove_type(self, t: SuTypes):
+        self.type.remove(t)
+
+    def unify(self):
+        pass
+
+
+class IntersectSuType:
+
+    types = None
+
+    def __init__(self) -> None:
+        pass
+
+
+
+def check_type_equality(lhs, rhs) -> bool:
+    if lhs == SuTypes.Any or rhs == SuTypes.Any:
+        return True
+    # does not matter if one of the types is an inbuilt operator
+    if lhs == SuTypes.InBuiltOperator or rhs == SuTypes.InBuiltOperator:
+        return True
+    if lhs == SuTypes.Unknown or rhs == SuTypes.Unknown:
+        print("Unknown type not handled in type equivalence check")
+        # ! remove this line
+        return True
+    return lhs == rhs
+
+
+
