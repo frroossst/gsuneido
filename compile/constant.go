@@ -74,6 +74,8 @@ type Function_t struct {
 	Node_t
 	// the Name of the function
 	Name string
+	// UUID for downstream processing
+	ID string
 	// the Parameters of the function
 	Parameters []string
 	// the Body of the function
@@ -90,6 +92,8 @@ type Class_t struct {
 	Name string
 	// the Base class of the class
 	Base string
+	// UUID for downstream processing
+	ID string
 	// the Methods of the class
 	Methods map[string][]Function_t
 	// the Attributes of the class
@@ -156,7 +160,7 @@ func (p *Parser) typeFunction() Function_t {
 	}
 
 	// mark anonymous functions with empty name
-	return Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: "YW5vbnltb3Vz"}, Name: "", Parameters: parameters, Body: body}
+	return Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: "YW5vbnltb3Vz"}, Name: "", ID: GetUUID(), Parameters: parameters, Body: body}
 }
 
 func getExprType(expr ast.Statement) []Node_t {
@@ -558,7 +562,7 @@ func (p *Parser) typeClass() Class_t {
 		if isFunc {
 			func_name := p.MatchIdent()
 			func_type := p.typeFunction()
-			func_node := Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: ""}, Name: func_name, Parameters: func_type.Parameters, Body: func_type.Body}
+			func_node := Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: ""}, Name: func_name, ID: GetUUID(), Parameters: func_type.Parameters, Body: func_type.Body}
 
 			kv_store_methods[func_name] = []Function_t{func_node}
 
@@ -574,7 +578,7 @@ func (p *Parser) typeClass() Class_t {
 	p.className = p.getClassName()
 	p.className = prevClassName
 
-	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, Methods: kv_store_methods, Attributes: kv_store_attrbts}
+	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, ID: GetUUID(), Methods: kv_store_methods, Attributes: kv_store_attrbts}
 }
 
 // classNum is used to generate names for anonymous classes
