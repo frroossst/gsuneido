@@ -2,6 +2,21 @@ import json
 
 from graph import Graph
 from kvstore import KVStore
+from sutypes import SuTypes
+
+
+
+def check_type_equality(lhs, rhs) -> bool:
+    if lhs == SuTypes.Any or rhs == SuTypes.Any:
+        return True
+    # does not matter if one of the types is an inbuilt operator
+    if lhs == SuTypes.InBuiltOperator or rhs == SuTypes.InBuiltOperator:
+        return True
+    if lhs == SuTypes.Unknown or rhs == SuTypes.Unknown:
+        print("Unknown type not handled in type equivalence check")
+        # ! remove this line
+        return True
+    return lhs == rhs
 
 
 def load_kv_data():
@@ -44,6 +59,12 @@ def main():
     print(ascii_graph)
     print("=" * 80)
     print(json.dumps(graph.to_json(), indent=4))
+
+    for k, v in store.db.items():
+        print(f"Type: {k}, Value: {v}")
+        if not check_type_equality(v.actual, v.inferred):
+            # raise TypeError(f"For type node {k} expected type {v.actual} but got {v.inferred} instead")
+            print(f"For type node {k} expected type {v.actual} but got {v.inferred} instead")
 
 
     # check if a path exists between two primitive types

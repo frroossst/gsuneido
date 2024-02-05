@@ -25,9 +25,9 @@ class SuTypes(Enum):
                 return SuTypes.Unknown
             case "Boolean":
                 return SuTypes.Boolean
-            case "Variable" | "Member":
+            case "Member":
                 return SuTypes.Unknown
-            case "Any":
+            case "Any" | "Variable":
                 return SuTypes.Any
             case "Object":
                 return SuTypes.Object
