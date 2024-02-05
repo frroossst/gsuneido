@@ -7,7 +7,7 @@ from kvstore import KVStore, StoreValue
 from sutypes import SuTypes
 import json
 
-from utils import catch_exception, todo
+from utils import catch_exception
 
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
@@ -15,16 +15,6 @@ def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Unknown or rhs == SuTypes.Unknown:
         raise TypeError("Unknown type in type equivalence check")
     return lhs == rhs
-
-    
-"""
-! It assumes a singular class
-! It does not handle scope level
-"""
-class Identifier:
-    @classmethod
-    def __init__(self, function_name: str, variable_name: str, scope_level: int = 1) -> str:
-        return f"{function_name}::{'@' * scope_level}{variable_name}"
 
 def load_data_body() -> dict:
 
