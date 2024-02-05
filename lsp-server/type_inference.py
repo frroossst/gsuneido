@@ -18,14 +18,14 @@ def check_type_equivalence(lhs, rhs) -> bool:
 
 def load_data_body() -> dict:
 
-    with open('output.json') as data_file:
+    with open('ast.json') as data_file:
         data = json.load(data_file)
 
     return data['Methods']
 
 def load_data_attributes() -> dict:
 
-    with open('output.json') as data_file:
+    with open('ast.json') as data_file:
         data = json.load(data_file)
 
     return data['Attributes']
@@ -152,7 +152,8 @@ def infer_nary(stmt, store, graph) -> SuTypes:
 
     valid_str = SuTypes.to_str(valid_t)
     n = graph.find_node(valid_str)
-    n.add_edge(prev)
+    # n.add_edge(prev)
+    graph.add_edge(prev.value, n.value)
 
     return valid_t
 
@@ -187,7 +188,9 @@ def infer_attribute(stmt, store, graph):
 
     n = Node(stmt["ID"])
     graph.add_node(n)
-    graph.find_node(valid_t.name).add_edge(n)
+    t = graph.find_node(valid_t.name)
+    # t.add_edge(n)
+    graph.add_edge(n.value, t.value)
 
     return valid_t
 
@@ -248,6 +251,8 @@ def main():
     print("=" * 80)
     process_methods(methods, store, graph)
 
+    # ! not sure if normalise is working as expected
+    # graph.normalise()
     graph.visualise()
     
     print("=" * 80)

@@ -10,4 +10,5 @@ def catch_exception(func):
             return func(*args, **kwargs)
         except Exception as e:
             print(f"Exception: {e}")
+            return
     return wrapper

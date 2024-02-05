@@ -11,7 +11,7 @@
     },
     "8df2e5d07df941e898aa8f71fb1f3118": {
         "value": "nil",
-        "actual": "InBuiltOperator",
+        "actual": "Unknown",
         "inferred": "Number"
     },
     "9d09c90741004c728ac7df041f0fce51": {
@@ -41,7 +41,7 @@
     },
     "a3392beb280843fca69ebb9696fc9771": {
         "value": "nil",
-        "actual": "InBuiltOperator",
+        "actual": "Unknown",
         "inferred": "Object"
     },
     "54ae1f5a860041bdb584aa3403a8f314": {
@@ -56,7 +56,7 @@
     },
     "614e3603eb074f28980b0af1b2550b33": {
         "value": "nil",
-        "actual": "InBuiltOperator",
+        "actual": "Unknown",
         "inferred": "Number"
     },
     "fb1b78a27e464df3bc84ee8be859f4cf": {
@@ -186,7 +186,7 @@
     },
     "9124ad66a324444ab54766b2c9a319f4": {
         "value": "nil",
-        "actual": "InBuiltOperator",
+        "actual": "Unknown",
         "inferred": "String"
     },
     "c0ecda3a4eae4b3cb83de24d44c4b4fc": {
@@ -196,7 +196,7 @@
     },
     "385712433b2d4024ac3993c742042203": {
         "value": "nil",
-        "actual": "InBuiltOperator",
+        "actual": "Unknown",
         "inferred": "Number"
     }
 }

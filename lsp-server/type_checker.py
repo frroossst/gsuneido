@@ -61,10 +61,10 @@ def main():
     print(json.dumps(graph.to_json(), indent=4))
 
     for k, v in store.db.items():
-        print(f"Type: {k}, Value: {v}")
+        print(f"[DEBUG] Type: {k}, Value: {v}")
         if not check_type_equality(v.actual, v.inferred):
             # raise TypeError(f"For type node {k} expected type {v.actual} but got {v.inferred} instead")
-            print(f"For type node {k} expected type {v.actual} but got {v.inferred} instead")
+            print(f"[ERROR] type node {k} expected type {v.actual} but got {v.inferred} instead")
 
 
     # check if a path exists between two primitive types

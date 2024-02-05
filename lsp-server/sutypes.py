@@ -31,7 +31,9 @@ class SuTypes(Enum):
                 return SuTypes.Any
             case "Object":
                 return SuTypes.Object
-            case "Return" | "Operator" | "PostInc" | "Callable" | "Compound" | "If" | "InBuiltOperator":
+            case "Return":
+                return SuTypes.Unknown
+            case "Operator" | "PostInc" | "Callable" | "Compound" | "If" | "InBuiltOperator":
                 return SuTypes.InBuiltOperator
             case _:
                 raise ValueError(f"Unknown type {str} converting to SuTypes enum")

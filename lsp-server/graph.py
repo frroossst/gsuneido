@@ -127,6 +127,25 @@ class Graph:
         nx.draw(G, pos, with_labels=True, labels=labels)
         plt.show()
 
+    def normalise(self):
+        """
+        This shortens the edges from the primitive types
+
+        Before:
+            String -> x -> y -> z
+        After:
+            String -> x
+            String -> y
+            String -> z
+        """
+        for node in self.nodes:
+            if node.sutype in [SuTypes.String, SuTypes.Number, SuTypes.Boolean]:
+                for edge in node.get_connected_edges():
+                    if edge.sutype not in [SuTypes.String, SuTypes.Number, SuTypes.Boolean]:
+                        for edge2 in edge.get_connected_edges():
+                            self.add_edge(node.value, edge2.value)
+                        self.nodes.remove(edge)
+
     def to_json(self) -> dict:
         graph_data = {
             'nodes': [

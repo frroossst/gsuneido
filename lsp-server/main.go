@@ -80,14 +80,14 @@ func main() {
 	}
 
 	// delete file if it exists
-	if _, err := os.Stat("output.json"); err == nil {
-		err = os.Remove("output.json")
+	if _, err := os.Stat("ast.json"); err == nil {
+		err = os.Remove("ast.json")
 		if err != nil {
 			panic(err)
 		}
 	}
 	// write json data to file
-	fobj, err := os.OpenFile("output.json", os.O_RDWR|os.O_CREATE, 0755)
+	fobj, err := os.OpenFile("ast.json", os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		panic(err)
 	}
