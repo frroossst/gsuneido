@@ -1,6 +1,6 @@
 import json
 
-from graph import Graph, Node, SuTypes
+from graph import Graph
 
 
 def load_kv_data():

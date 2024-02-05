@@ -1,6 +1,3 @@
-from typing import Any
-import json
-
 from sutypes import SuTypes
 
 
