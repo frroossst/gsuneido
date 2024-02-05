@@ -214,8 +214,6 @@ def propogate_infer(store, graph):
         p = graph.find_node(p.value)
         p.propogate_type(store, new_type=p.sutype)
 
-    return graph
-
 def parse_class(clss):
     members = {}
 
@@ -259,7 +257,7 @@ def main():
     print(ascii_blocks)
     print("=" * 80)
     process_methods(methods, store, graph)
-    graph = propogate_infer(store, graph)
+    propogate_infer(store, graph)
 
     # ! not sure if normalise is working as expected
     # graph.normalise()
