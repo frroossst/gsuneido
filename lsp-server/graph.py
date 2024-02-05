@@ -48,8 +48,10 @@ class Graph:
                 return node
         return None
         """
-        # find the node with the given value
-        return next((node for node in self.nodes if node.value == name), None)
+        for node in self.nodes:
+            if node.value == name:
+                return node
+        return None
 
     def add_node(self, node):
         """
@@ -64,7 +66,7 @@ class Graph:
         @param node2: node value
         parameters are string values not node instances
 
-        @sideeffect: adds an edge bothways
+        @side-effect: adds an edge bothways
         """
         n1 = self.find_node(node1)
         n2 = self.find_node(node2)
@@ -178,6 +180,9 @@ class Node:
     
     # type edge = Node
     def add_edge(self, edge):
+        for i in self.edges:
+            if i.value == edge.value:
+                return # edge already exists
         self.edges.append(edge)
 
 

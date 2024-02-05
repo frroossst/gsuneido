@@ -236,12 +236,42 @@ def main():
     attributes = parse_class(load_data_attributes())
     methods = parse_class(load_data_body())
 
+    print("=" * 80)
+    ascii_blocks = """
+     ____  _     ___   ____ _  ______  
+    | __ )| |   / _ \ / ___| |/ / ___| 
+    |  _ \| |  | | | | |   | ' /\___ \ 
+    | |_) | |__| |_| | |___| . \ ___) |
+    |____/|_____\___/ \____|_|\_\____/ 
+    """
+    print(ascii_blocks)
+    print("=" * 80)
     process_methods(methods, store, graph)
 
     graph.visualise()
     
     print("=" * 80)
+    ascii_store = """
+     ____ _____ ___  ____  _____ 
+    / ___|_   _/ _ \|  _ \| ____|
+    \___ \ | || | | | |_) |  _|  
+     ___) || || |_| |  _ <| |___ 
+    |____/ |_| \___/|_| \_\_____|
+
+    """
+    print(ascii_store)
+    print("=" * 80)
     print(json.dumps(store.to_json(), indent=4))
+    print("=" * 80)
+    ascii_graph = """
+      ____ ____      _    ____  _   _ 
+     / ___|  _ \    / \  |  _ \| | | |
+    | |  _| |_) |  / _ \ | |_) | |_| |
+    | |_| |  _ <  / ___ \|  __/|  _  |
+     \____|_| \_\/_/   \_\_|   |_| |_|
+
+    """
+    print(ascii_graph)
     print("=" * 80)
     print(json.dumps(graph.to_json(), indent=4))
 
