@@ -125,14 +125,14 @@ class Graph:
         nx.draw(G, pos, with_labels=True, labels=labels)
         plt.show()
 
-    def to_json(self):
+    def to_json(self) -> dict:
         graph_data = {
             'nodes': [
                 {'value': node.value, 'sutype': node.sutype.name, 'edges': [edge.value for edge in node.edges]}
                 for node in self.nodes
             ]
         }
-        return json.dumps(graph_data, indent=2)
+        return graph_data
 
     @classmethod
     def from_json(cls, json_data):

@@ -4,10 +4,10 @@
 
 from graph import Graph, Node
 from kvstore import KVStore, StoreValue
-from sutypes import SuTypes, EnumEncoder
+from sutypes import SuTypes
 import json
 
-from utils import todo
+from utils import catch_exception, todo
 
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
@@ -222,6 +222,23 @@ def parse_class(clss):
 
     return members
 
+@catch_exception
+def process_methods(methods, store, graph):
+    for k, v in methods.items():
+        # NOTE: only for debugging
+        global current_function
+        current_function = k
+        print(f"{k}: {json.dumps(v, indent=4)}")
+        for i in v["Body"]:
+            valid_t = infer_generic(i[0], store, graph)
+            if valid_t == SuTypes.NotApplicable:
+                continue
+            v = StoreValue(i[0]["Value"], SuTypes.from_str(i[0]["Type_t"]), valid_t)
+            store.set(i[0]["ID"], v)
+            n = Node(i[0]["ID"])
+            graph.add_node(n)
+            graph.add_edge(n.value, graph.find_node(valid_t.name).value)
+
 def main():
     graph = Graph()
     store = KVStore()
@@ -229,27 +246,9 @@ def main():
     attributes = parse_class(load_data_attributes())
     methods = parse_class(load_data_body())
 
-    # NOTE: only for debugging
-    global current_function
-    current_function = None
+    process_methods(methods, store, graph)
 
-    try:
-        for k, v in methods.items():
-            current_function = k
-            print(f"{k}: {json.dumps(v, indent=4)}")
-            for i in v["Body"]:
-                valid_t = infer_generic(i[0], store, graph)
-                if valid_t == SuTypes.NotApplicable:
-                    continue
-                v = StoreValue(i[0]["Value"], SuTypes.from_str(i[0]["Type_t"]), valid_t)
-                store.set(i[0]["ID"], v)
-                n = Node(i[0]["ID"])
-                graph.add_node(n)
-                graph.add_edge(n.value, graph.find_node(valid_t.name).value)
-    except Exception as e:
-        print(e)
-    finally:
-        graph.visualise()
+    graph.visualise()
     
     print("=" * 80)
     print(json.dumps(store.to_json(), indent=4))
@@ -258,10 +257,10 @@ def main():
 
 
     with open("type_store.json", "w") as fobj:
-        fobj.write(store.to_json())
+        json.dump(store.to_json(), fobj, indent=4)
 
     with open("type_graph.json", "w") as fobj:
-        fobj.write(graph.to_json())
+        json.dump(graph.to_json(), fobj, indent=4)
 
 if __name__ == "__main__":
     main()

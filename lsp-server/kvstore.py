@@ -48,7 +48,7 @@ class KVStore:
         json_data = {}
         for k, v in self.db.items():
             json_data[k] = v.to_json()
-        return json.dumps(json_data, indent=4)
+        return json_data
 
     def get(self, var) -> SuTypes | None:
         return self.db.get(var, None)

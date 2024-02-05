@@ -5,4 +5,3 @@ with open("output.json", "r") as fobj:
 
 with open("output.json", "w") as fobj:
     json.dump(content, fobj, indent=4)
-
