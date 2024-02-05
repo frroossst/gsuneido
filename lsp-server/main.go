@@ -12,7 +12,7 @@ import (
 func main() {
 
 	/*
-		1. Mark x as unknown (as it won't be known in the first pass)
+		1. Mark x as unknown (as it wont be known in the first pass)
 		2. Mark num as unknown + Number (123)
 		3. Evaluate x to be Number (as only then could it be added to 123)
 		4. Evaluate num to be Number

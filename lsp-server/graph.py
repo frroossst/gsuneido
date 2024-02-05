@@ -32,23 +32,39 @@ class Graph:
             Node("String", SuTypes.String),
             Node("Number", SuTypes.Number),
             Node("Boolean", SuTypes.Boolean),
+            # TODO: look into better ways to handle Any type on the graph
+            Node("Any", SuTypes.Any), # this is the wildcard type 
+            Node("NotApplicable", SuTypes.NotApplicable),
+            Node("Never", SuTypes.Never),
+            Node("Function", SuTypes.Function),
             Node("Object", SuTypes.Object),
-            Node("Function", SuTypes.Function)
+            Node("InBuiltOperator", SuTypes.InBuiltOperator),
         ]
 
     def find_node(self, name):
+        """
         for node in self.nodes:
             if node.value == name:
                 return node
         return None
+        """
+        # find the node with the given value
+        return next((node for node in self.nodes if node.value == name), None)
 
     def add_node(self, node):
+        """
+        @param node: Node instance
+        """
         if self.find_node(node.value) is None:
             self.nodes.append(node)
 
     def add_edge(self, node1, node2):
         """
+        @param node1: node value 
+        @param node2: node value
         parameters are string values not node instances
+
+        @sideeffect: adds an edge bothways
         """
         n1 = self.find_node(node1)
         n2 = self.find_node(node2)
@@ -103,7 +119,7 @@ class Graph:
             for edge in node.get_connected_edges():
                 G.add_edge(node.value, edge.value)
 
-        pos = nx.spring_layout(G)
+        pos = nx.spring_layout(G, k=0.95)
         labels = {node.value: node.value for node in self.nodes}
 
         nx.draw(G, pos, with_labels=True, labels=labels)

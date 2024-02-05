@@ -242,7 +242,7 @@ func getNodeType(node ast.Node) []Node_t {
 			return []Node_t{{Tag: "Object", Type_t: "Object", Value: "nil", Args: obj, ID: id}}
 		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
-			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: id}}}}
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: id}}, ID: GetUUID()}}
 	case *ast.Mem:
 		noqute := n.M.String()[1 : len(n.M.String())-1]
 		return []Node_t{{Tag: "Member", Type_t: "Member", Value: noqute, ID: id}}

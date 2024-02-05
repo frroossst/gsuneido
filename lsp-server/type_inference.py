@@ -3,6 +3,7 @@
 # Checks basic type safety
 
 from graph import Graph, Node
+from kvstore import KVStore, StoreValue
 from sutypes import SuTypes, EnumEncoder
 import json
 
@@ -16,26 +17,6 @@ def check_type_equivalence(lhs, rhs) -> bool:
     return lhs == rhs
 
     
-class KVStore:
-
-    db = {}
-
-    def __init__(self):
-        pass
-
-    def get(self, var) -> SuTypes | None:
-        return self.db.get(var, None)
-
-    # set if it doesn't exist already
-    def set_once(self, var, value) ->  bool:
-        if self.get(var) is None:
-            self.db[var] = value
-            return True
-        return False
-
-    def set(self, var, value):
-        self.db[var] = value
-
 """
 ! It assumes a singular class
 ! It does not handle scope level
@@ -101,9 +82,11 @@ def infer_generic(stmt, store, graph) -> SuTypes:
         case "Return":
             return infer_generic(stmt["Args"][0], store, graph)
         case "Object":
-            todo()
+            return infer_object(stmt["Args"], store, graph)
         case "Member":
             return infer_attribute(stmt, store, graph)
+        case "Constant":
+            return SuTypes.from_str(stmt["Type_t"])
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
@@ -111,7 +94,7 @@ def infer_unary(stmt, store, graph) -> SuTypes:
     args = stmt["Args"]
     value = stmt["Value"]
 
-    node = Node(args[0]["Value"])
+    node = Node(args[0]["ID"])
     graph.add_node(node)
 
     valid_t = get_valid_type_for_operator(value)
@@ -130,10 +113,12 @@ def infer_binary(stmt, store, graph) -> SuTypes:
     # inferred types of lhs and rhs should be the same
     lhs_t = infer_generic(lhs, store, graph)
     if lhs_t is not None and lhs["Type_t"] != "Operator":
-        store.set_once(lhs["ID"], lhs_t)
+        v = StoreValue(lhs["Value"], lhs["Type_t"], lhs_t)
+        store.set(lhs["ID"], v)
     rhs_t = infer_generic(rhs, store, graph)
     if rhs_t is not None and rhs["Type_t"] != "Operator":
-        store.set_once(rhs["ID"], rhs_t)
+        v = StoreValue(rhs["Value"], rhs["Type_t"], rhs_t)
+        store.set(rhs["ID"], v)
 
     # if not check_type_equivalence(lhs_t, rhs_t):
     #     raise TypeError(f"Type mismatch for {lhs_t} and {rhs_t}")
@@ -143,15 +128,17 @@ def infer_binary(stmt, store, graph) -> SuTypes:
     graph.add_node(rhs_n)
     graph.add_edge(lhs_n.value, rhs_n.value)
 
-    store.set_once(lhs["ID"], lhs_t)
-    store.set_once(rhs["ID"], rhs_t)
+    v = StoreValue(stmt["Value"], stmt["Type_t"], lhs_t)
+    store.set(lhs["ID"], v)
+    v = StoreValue(stmt["Value"], stmt["Type_t"], rhs_t)
+    store.set(rhs["ID"], v)
 
     # if lhs or rhs is of type Any, then the other type is inferred
     if lhs_t == SuTypes.Any:
-        store.set(lhs["ID"], rhs_t)
+        store.set(lhs["ID"], StoreValue(rhs["Value"], rhs["Type_t"], rhs_t))
         return rhs_t
     elif rhs_t == SuTypes.Any:
-        store.set(rhs["ID"], lhs_t)
+        store.set(rhs["ID"], StoreValue(lhs["Value"], lhs["Type_t"], lhs_t))
         return lhs_t
     
 
@@ -165,8 +152,9 @@ def infer_nary(stmt, store, graph) -> SuTypes:
     for i in args:
         if i["Tag"] == "Call":
             i = i["Args"][0]
-        n = Node(i["Value"], SuTypes.from_str(i["Type_t"]))
-        store.set_once(i["ID"], valid_t)
+        n = Node(i["ID"])
+        v = StoreValue(i["Value"], SuTypes.from_str(i["Type_t"]), valid_t)
+        store.set(i["ID"], v)
         graph.add_node(n)
         if prev is not None:
             graph.add_edge(prev.value, n.value)
@@ -181,15 +169,18 @@ def infer_nary(stmt, store, graph) -> SuTypes:
 def infer_if(stmt, store, graph):
     cond = stmt["Args"][0]
     cond_t = infer_generic(cond, store, graph)
-    store.set(cond["ID"], cond_t)
+    v = StoreValue(cond["Value"], SuTypes.from_str(cond["Type_t"]), cond_t)
+    store.set(cond["ID"], v)
 
     then = stmt["Args"][1]
     then_t = infer_generic(then, store, graph)
-    store.set(then["ID"], then_t)
+    v = StoreValue(then["Value"], SuTypes.from_str(then["Type_t"]), then_t)
+    store.set(then["ID"], v)
 
     if len(stmt["Args"]) == 3:
         else_t = infer_generic(stmt["Args"][2], store, graph)
-        store.set(stmt["Args"][2]["ID"], else_t)
+        v = StoreValue(stmt["Args"][2]["Value"], SuTypes.from_str(stmt["Args"][2]["Type_t"]), else_t)
+        store.set(stmt["Args"][2]["ID"], v)
 
     return SuTypes.NotApplicable
 
@@ -201,13 +192,26 @@ def infer_attribute(stmt, store, graph):
         raise TypeError(f"Attribute {value} not found")
     
     valid_t = SuTypes.from_str(attrb_t["Type_t"])
-    store.set(stmt["ID"], valid_t)
+    v = StoreValue(stmt["Value"], SuTypes.from_str(stmt["Type_t"]), valid_t)
+    store.set(stmt["ID"], v)
 
-    n = Node(stmt["Value"], sutype=valid_t)
+    n = Node(stmt["ID"])
     graph.add_node(n)
     graph.find_node(valid_t.name).add_edge(n)
 
     return valid_t
+
+def infer_object(stmt, store, graph):
+
+    for i in stmt:
+        t = infer_generic(i["Args"][0], store, graph)
+        v = StoreValue(i["Args"][0]["Value"], SuTypes.from_str(i["Args"][0]["Type_t"]), t)
+        store.set(i["Args"][0]["ID"], v)
+        n = Node(i["Args"][0]["ID"])
+        graph.add_node(n)
+        graph.add_edge(n.value, graph.find_node(t.name).value)
+
+    return SuTypes.Object
 
 
 def parse_class(clss):
@@ -225,33 +229,39 @@ def main():
     attributes = parse_class(load_data_attributes())
     methods = parse_class(load_data_body())
 
+    # NOTE: only for debugging
+    global current_function
+    current_function = None
+
     try:
         for k, v in methods.items():
+            current_function = k
             print(f"{k}: {json.dumps(v, indent=4)}")
             for i in v["Body"]:
                 valid_t = infer_generic(i[0], store, graph)
-                store.set(i[0]["ID"], valid_t)
-                n = Node(i[0]["Value"], sutype=valid_t)
+                if valid_t == SuTypes.NotApplicable:
+                    continue
+                v = StoreValue(i[0]["Value"], SuTypes.from_str(i[0]["Type_t"]), valid_t)
+                store.set(i[0]["ID"], v)
+                n = Node(i[0]["ID"])
                 graph.add_node(n)
                 graph.add_edge(n.value, graph.find_node(valid_t.name).value)
     except Exception as e:
         print(e)
     finally:
         graph.visualise()
-
     
     print("=" * 80)
-    print(json.dumps(store.db, indent=4, cls=EnumEncoder))
+    print(json.dumps(store.to_json(), indent=4))
     print("=" * 80)
     print(json.dumps(graph.to_json(), indent=4))
 
 
     with open("type_store.json", "w") as fobj:
-        json.dump(store.db, fobj, cls=EnumEncoder, indent=4)
+        fobj.write(store.to_json())
 
     with open("type_graph.json", "w") as fobj:
         fobj.write(graph.to_json())
-
 
 if __name__ == "__main__":
     main()

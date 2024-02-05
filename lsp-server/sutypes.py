@@ -12,6 +12,7 @@ class SuTypes(Enum):
     Never = 6
     Function = 7
     Object = 8
+    InBuiltOperator = 9
 
     @staticmethod
     def from_str(str):
@@ -20,10 +21,12 @@ class SuTypes(Enum):
                 return SuTypes.String
             case "Number":
                 return SuTypes.Number
-            case "Variable":
+            case "Variable" | "Member":
                 return SuTypes.Unknown
+            case "Return" | "Operator" | "PostInc" | "Callable" | "Compound" | "If":
+                return SuTypes.InBuiltOperator
             case _:
-                raise ValueError(f"Unknown type {str}")
+                raise ValueError(f"Unknown type {str} converting to SuTypes enum")
 
     @staticmethod
     def to_str(t):
@@ -34,8 +37,12 @@ class SuTypes(Enum):
                 return "Number"
             case SuTypes.Unknown:
                 return "Variable"
+            case SuTypes.InBuiltOperator:
+                return "Operator"
+            case SuTypes.Boolean:
+                return "Boolean"
             case _:
-                raise ValueError(f"Unknown type {t}")
+                raise ValueError(f"Unknown type {t} converting to string")
 
 
 class EnumEncoder(json.JSONEncoder):

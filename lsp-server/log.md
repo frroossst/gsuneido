@@ -61,9 +61,9 @@ Type cheking is then later done to constriant solve the inferred types
 
 ## TODO
 
-- [ ] Implement typeFunction() parsing
-- [ ] Implement typeClass() parsing
-- [ ] Implement type key-value store
+- [x] Implement typeFunction() parsing
+- [x] Implement typeClass() parsing
+- [x] Implement type key-value store
 
 # 30 January 2024
 
@@ -74,4 +74,4 @@ Completed complete parsing of a class, including attributes and methods.
 - [ ] Implement developer defined types for function signatures
 - [ ] Implement type inference and graph construction
 - [ ] Implement type checking on graph constraints
-- [ ] Implement object structure parsing
+- [x] Implement object structure parsing
