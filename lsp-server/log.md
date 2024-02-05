@@ -75,4 +75,16 @@ Completed complete parsing of a class, including attributes and methods.
 - [x] Implement type inference and graph construction
 - [x] Implement type checking on graph constraints
 - [x] Implement object structure parsing
+- [ ] Implement attributes infers and checks
+- [ ] Implement checks for binary eqs
+
+# 5 February 2024
+
+Separated infer and check, also, implemented graph and key value store
+
+## TODO
+
+- [ ] Implement checks for binary eqs
+- [ ] Implement attributes infers and checks
 - [ ] Implement function signature parsing and developer defined types
+
