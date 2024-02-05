@@ -183,7 +183,8 @@ class Node:
         for i in self.edges:
             if i.value == edge.value:
                 return # edge already exists
-        self.edges.append(edge)
+        if self.value != edge.value:
+            self.edges.append(edge)
 
 
 

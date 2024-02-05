@@ -1,7 +1,7 @@
 {
     "337e349e6b3a443a915837d4e6b0c3d1": {
         "value": "x",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "39fba7f6fc564dbc814d83600ae526d9": {
@@ -46,12 +46,12 @@
     },
     "54ae1f5a860041bdb584aa3403a8f314": {
         "value": "x",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "b7a3033959ce4f5fa3e9f312b9fa1352": {
         "value": "y",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "614e3603eb074f28980b0af1b2550b33": {
@@ -96,7 +96,7 @@
     },
     "e46f1836f82e4229a68eb2315d71fe23": {
         "value": "x",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "7035131c30064a898e17f17445929d72": {
@@ -141,22 +141,22 @@
     },
     "4238761388bd49e88191b270c470b149": {
         "value": "x",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "a23b3a1391684c90bbf6ac1ef6d88168": {
         "value": "y",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "7cc6cafcb7a04cb191e8e662a341dab0": {
         "value": "z",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "71b1f278669d45bdb1cf99afa0029022": {
         "value": "num",
-        "actual": "Unknown",
+        "actual": "Any",
         "inferred": "Number"
     },
     "6261ba046e984192bacfb4e98600ec10": {
