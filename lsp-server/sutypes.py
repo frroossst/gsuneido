@@ -13,6 +13,8 @@ class SuTypes(Enum):
     Function = 7
     Object = 8
     InBuiltOperator = 9
+    Union = 10
+    Intersect = 11
 
     @staticmethod
     def from_str(str):
@@ -35,6 +37,10 @@ class SuTypes(Enum):
                 return SuTypes.Unknown
             case "Operator" | "PostInc" | "Callable" | "Compound" | "If" | "InBuiltOperator":
                 return SuTypes.InBuiltOperator
+            case "Union":
+                return SuTypes.Union
+            case "Intersect":
+                return SuTypes.Intersect
             case _:
                 raise ValueError(f"Unknown type {str} converting to SuTypes enum")
 
@@ -51,6 +57,12 @@ class SuTypes(Enum):
                 return "Operator"
             case SuTypes.Boolean:
                 return "Boolean"
+            case SuTypes.Any:
+                return "Any"
+            case SuTypes.Union:
+                return "Union"
+            case SuTypes.Intersect:
+                return "Intersect"
             case _:
                 raise ValueError(f"Unknown type {t} converting to string")
 
@@ -86,7 +98,7 @@ class UnionSuType():
         pass
 
 
-class IntersectSuType:
+class IntersectSuType():
 
     types = None
 

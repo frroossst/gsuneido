@@ -85,7 +85,7 @@ Separated infer and check, also, implemented graph and key value store
 ## TODO
 
 - [ ] Implement attributes infers and checks
-- [ ] Implement deep inference
+- [x] Implement deep inference
 - [ ] Implement checks for binary eqs
 - [ ] Implement function signature parsing and developer defined types
 

@@ -41,7 +41,7 @@ func main() {
 		pvt_bar() { return .msg }
 		SetX(x) { .x = x }
 		SetMsg(msg) { .msg = msg }
-		AddBreak() { return x + "123" }
+		AddBreak() { return x + 123 }
 		}`
 
 	fmt.Println("src:", src)
