@@ -241,12 +241,22 @@ func getNodeType(node ast.Node) []Node_t {
 			fmt.Fprintln(os.Stdout, []any{v}...)
 			panic("not implemented in getNodeType " + v.String())
 		}
+		params := make([]Node_t, len(n.Args))
+		if strings.HasSuffix(value, "?") {
+			for i := 0; i < len(n.Args); i++ {
+				returnedValue := getNodeType(n.Args[i].E)
+				if len(returnedValue) > 1 {
+					panic("invalid number of return values")
+				} 
+				params[i] = returnedValue[0]
+			}
+		}
 		if value == "Object" {
 			obj := parseObjectStructure(n.Args)
 			return []Node_t{{Tag: "Object", Type_t: "Object", Value: "nil", Args: obj, ID: id}}
 		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
-			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, ID: id}}, ID: GetUUID()}}
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, Args: params, ID: id}}, ID: GetUUID()}}
 	case *ast.Mem:
 		noqute := n.M.String()[1 : len(n.M.String())-1]
 		return []Node_t{{Tag: "Member", Type_t: "Member", Value: noqute, ID: id}}
