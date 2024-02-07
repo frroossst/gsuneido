@@ -21,5 +21,5 @@ check:
 	python3 type_checker.py
 
 err_check:
-	python3 type_checker.py | grep ERROR 
+	python3 type_checker.py | grep ERROR || true
 

@@ -18,6 +18,8 @@ class SuTypes(Enum):
 
     @staticmethod
     def from_str(str):
+        if isinstance(str, SuTypes):
+            return str
         match str:
             case "String":
                 return SuTypes.String
@@ -108,6 +110,10 @@ class IntersectSuType():
 
 
 def check_type_equality(lhs, rhs) -> bool:
+
+    if not (isinstance(lhs, SuTypes) and isinstance(rhs, SuTypes)):
+        raise ValueError(f"lhs and rhs should be of type SuTypes, got {lhs} and {rhs}")
+
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
         return True
     # does not matter if one of the types is an inbuilt operator

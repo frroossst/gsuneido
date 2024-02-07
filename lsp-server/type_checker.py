@@ -3,6 +3,7 @@ import json
 from graph import Graph
 from kvstore import KVStore
 from sutypes import check_type_equality
+from type_inference import propogate_infer
 
 
 
@@ -50,8 +51,11 @@ def main():
     for k, v in store.db.items():
         print(f"[DEBUG] Type: {k}, Value: {v}")
         if not check_type_equality(v.actual, v.inferred):
-            # raise TypeError(f"For type node {k} expected type {v.actual} but got {v.inferred} instead")
-            print(f"[ERROR] type node {k} expected type {v.actual} but got {v.inferred} instead. Value = {store.get(k)}")
+            str_fmt = f"[ERROR] type node {k} expected type {v.inferred} but got {v.actual} instead. Value = {store.get(k)}"
+            # raise TypeError(str_fmt)
+            print(str_fmt)
+
+    propogate_infer(store, graph, check=True)
 
 
     # check if a path exists between two primitive types

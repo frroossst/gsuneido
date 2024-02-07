@@ -216,7 +216,7 @@ class Node:
         if self.value != edge.value:
             self.edges.append(edge)
 
-    def propogate_type(self, store, new_type:SuTypes=None, visited=None):
+    def propogate_type(self, store, new_type:SuTypes=None, visited=None, check=False):
         """
         simple DFS to find all connected edges and set their type to new_type if provided
         if new_type is not provided the current node's type is propogated
@@ -235,10 +235,10 @@ class Node:
             new_type = self.sutype
 
         if self.value not in Graph.get_primitive_type_string():
-            store.set_on_type_equivalence(self.value, StoreValue(self.value, self.sutype, new_type))
+            store.set_on_type_equivalence(self.value, StoreValue(self.value, self.sutype, new_type), check=check)
 
         for edge in self.edges:
-            edge.propogate_type(store, new_type, visited)
+            edge.propogate_type(store, new_type, visited, check=check)
 
 
 

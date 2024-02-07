@@ -64,16 +64,22 @@ class KVStore:
         else:
             raise ValueError(f"Variable already exists in the store\nexists: {self.get(var_id)},\ngot: {value}")
 
-    def set_on_type_equivalence(self, var_id, value):
+    def set_on_type_equivalence(self, var_id, value, check=False):
+
         if (val := self.get(var_id)) is None:
             self.set(var_id, value)
             return
 
-        if check_type_equality(val.inferred, value.inferred):
+        if not check_type_equality(val.inferred, value.inferred):
+            raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {val.inferred}, got: {value.inferred}")
+
+        if check_type_equality(SuTypes.from_str(val.actual), value.inferred):
             self.set(var_id, value)
             return
-        
-        raise TypeError(f"For type node {self.value} cannot assign incompatible new type {value.value} to existing type {self.sutype}")
+        else:
+            # this error is only thrown when type checking not during type inference
+            if check:
+                raise TypeError(f"For type node {var_id} type is inferred as {value.actual} but declared as {val.actual}")
 
 
 

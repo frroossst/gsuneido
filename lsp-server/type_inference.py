@@ -206,13 +206,13 @@ def infer_object(stmt, store, graph):
 
     return SuTypes.Object
 
-def propogate_infer(store, graph):
+def propogate_infer(store, graph, check=False):
     primitives = graph.get_primitive_type_nodes()
 
     # dfs through each primitive and assign the same sutype to connecting nodes
     for p in primitives:
         p = graph.find_node(p.value)
-        p.propogate_type(store, new_type=p.sutype)
+        p.propogate_type(store, new_type=p.sutype, check=check)
 
 def parse_class(clss):
     members = {}
@@ -259,9 +259,7 @@ def main():
     process_methods(methods, store, graph)
     propogate_infer(store, graph)
 
-    # ! not sure if normalise is working as expected
-    # graph.normalise()
-    graph.visualise()
+    # graph.visualise()
     
     print("=" * 80)
     ascii_store = """
