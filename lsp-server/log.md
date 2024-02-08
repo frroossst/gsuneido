@@ -84,8 +84,48 @@ Separated infer and check, also, implemented graph and key value store
 
 ## TODO
 
-- [ ] Implement attributes infers and checks
+- [x] Implement attributes infers and checks
 - [x] Implement deep inference
 - [ ] Implement checks for binary eqs
 - [ ] Implement function signature parsing and developer defined types
 
+
+# 8 February 2024
+
+Using runtime checks for type inference might make the type system Turing Complete, need to look into this.
+
+```
+function(x, y) // 'a
+    {
+    num = x + 123 // type of x inferred to be number 'b
+    if String?(x) and Number?(y)
+        {
+        // type of x inferred to be string
+        num = x + y // adding a string and a number INVALID 'c
+        }
+    else 
+        {
+        num = "hello" // reassigning num to a string INVALID 'd
+        }
+    return num
+    }
+
+/*
+no way to know if x is a string or a number via *only* inference
+
+'b should throw if x is a string
+'c should throw if x is a string
+'d should throw if x is a number
+
+'a should have the type specified via the developer and type annotations
+runtime checks should only be used for variables that are not being "used" before said runtime checks
+the type of a variable is immutable, so, num cannot be reassigned to a string
+
+*/
+```
+
+## TODO
+
+- [ ] Implement a way to scope varibales local to a function (2 way mapping of IDs to identifier name)
+- [ ] Implement function signature parsing and developer defined types
+- [ ] Add debug info and symbols

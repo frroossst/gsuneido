@@ -57,6 +57,20 @@ func GetUUID() string {
 	}
 }
 
+var FuncIDGen ScopedUUID
+
+type ScopedUUID struct {
+	cls string
+}
+
+func NewScopedUUID(cls string) *ScopedUUID {
+	return &ScopedUUID{cls: GetUUID()}
+}
+
+func (s *ScopedUUID) GetUUID(funcName string, varName string) string {
+	return s.cls + "::" + funcName + "@" + varName
+}
+
 type Node_t struct {
 	// the branch of the node (e.g. Binary, Unary, etc.)
 	Tag string
@@ -83,7 +97,7 @@ type Function_t struct {
 }
 
 func (p *Parser) TypeFunction() Function_t {
-	return p.typeFunction()
+	return p.typeFunction("")
 }
 
 type Class_t struct {
@@ -147,7 +161,7 @@ func (p *Parser) typeConst() []Node_t {
 	}
 }
 
-func (p *Parser) typeFunction() Function_t {
+func (p *Parser) typeFunction(func_name string) Function_t {
 	ast := p.WithoutKeywordFunction()
 	parameters := []string{}
 	for i := 0; i < len(ast.Params); i++ {
@@ -159,8 +173,7 @@ func (p *Parser) typeFunction() Function_t {
 		body = append(body, getExprType(ast.Body[i]))
 	}
 
-	// mark anonymous functions with empty name
-	return Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: "YW5vbnltb3Vz"}, Name: "", ID: GetUUID(), Parameters: parameters, Body: body}
+	return Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: "YW5vbnltb3Vz"}, Name: func_name, ID: GetUUID(), Parameters: parameters, Body: body}
 }
 
 func getExprType(expr ast.Statement) []Node_t {
@@ -247,7 +260,7 @@ func getNodeType(node ast.Node) []Node_t {
 				returnedValue := getNodeType(n.Args[i].E)
 				if len(returnedValue) > 1 {
 					panic("invalid number of return values")
-				} 
+				}
 				params[i] = returnedValue[0]
 			}
 		}
@@ -571,7 +584,7 @@ func (p *Parser) typeClass() Class_t {
 
 		if isFunc {
 			func_name := p.MatchIdent()
-			func_type := p.typeFunction()
+			func_type := p.typeFunction(func_name)
 			func_node := Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: ""}, Name: func_name, ID: GetUUID(), Parameters: func_type.Parameters, Body: func_type.Body}
 
 			kv_store_methods[func_name] = []Function_t{func_node}
@@ -587,6 +600,9 @@ func (p *Parser) typeClass() Class_t {
 
 	p.className = p.getClassName()
 	p.className = prevClassName
+	if p.className == "" {
+		p.className = "anonymous"
+	}
 
 	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, ID: GetUUID(), Methods: kv_store_methods, Attributes: kv_store_attrbts}
 }
