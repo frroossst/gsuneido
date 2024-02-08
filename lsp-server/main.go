@@ -27,16 +27,17 @@ func main() {
 		pvt_foo() { return .x }
 		originalTestFunc(x, y, z)
 			{
-			num = x + "123"
+			num = x + 123
 			num++
-			if Number?(x) and Number?(y) 
+			if String?(x) and Number?(y) 
 				{
 				abc = x + y + z + num
-				} 
+				}
 			else 
 				{
 				num()
 				}
+			num2 = x + 1
 			.qux()
 			}
 		JoinStrings(str) { .myMessage = .myMessage $ str }

@@ -5,7 +5,7 @@
     "Args": null,
     "Name": "",
     "Base": "class",
-    "ID": "b4d22cbf779d4fa68e9f7f6ab52b0d35",
+    "ID": "032e5e973fab45a6a661c70472b8f99c",
     "Methods": {
         "AddBreak": [
             {
@@ -14,7 +14,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "AddBreak",
-                "ID": "b47fb464832845729cfb8d04c0093851",
+                "ID": "ca5bbb1db9ab404ea6e9fd8a5c9305cd",
                 "Parameters": [],
                 "Body": [
                     [
@@ -33,20 +33,20 @@
                                             "Value": "x",
                                             "Type_t": "Variable",
                                             "Args": null,
-                                            "ID": "1d5faf3a4b664baf967e1c66d6bb6ad6"
+                                            "ID": "e63dc3c05d41427fa8a0fbbc95dafedb"
                                         },
                                         {
                                             "Tag": "Constant",
                                             "Value": "123",
                                             "Type_t": "Number",
                                             "Args": null,
-                                            "ID": "c7b784fd873b4c7dbad2e38421b158bc"
+                                            "ID": "e369ccdfe68d44c78f6b6d423cc67556"
                                         }
                                     ],
-                                    "ID": "f79da43498b24610a2e54522a58aeea1"
+                                    "ID": "5ec47a2d616d46de9790fe3af5131969"
                                 }
                             ],
-                            "ID": "b6899247f3024af087b3574d63615be0"
+                            "ID": "496ed93063324be1a52693174fa2877e"
                         }
                     ]
                 ]
@@ -59,7 +59,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "Get",
-                "ID": "48a1ed787b1847d3b9ab31873d2c9b39",
+                "ID": "59334e9440624f7dbb84e0b42904b5dc",
                 "Parameters": [],
                 "Body": [
                     [
@@ -73,36 +73,6 @@
                                     "Value": "nil",
                                     "Type_t": "Object",
                                     "Args": [
-                                        {
-                                            "Tag": "Member",
-                                            "Value": "0",
-                                            "Type_t": "Member",
-                                            "Args": [
-                                                {
-                                                    "Tag": "Constant",
-                                                    "Value": "99",
-                                                    "Type_t": "Number",
-                                                    "Args": null,
-                                                    "ID": "e4c067eda5c0418db6c444a838f7be70"
-                                                }
-                                            ],
-                                            "ID": "266f832fcae94cb491876b8733c35c63"
-                                        },
-                                        {
-                                            "Tag": "Member",
-                                            "Value": "1",
-                                            "Type_t": "Member",
-                                            "Args": [
-                                                {
-                                                    "Tag": "Constant",
-                                                    "Value": "68",
-                                                    "Type_t": "Number",
-                                                    "Args": null,
-                                                    "ID": "97e6e278e85a4efdadbc2ce6da47b826"
-                                                }
-                                            ],
-                                            "ID": "ac30c4c248f24c3c84a033692bbf263f"
-                                        },
                                         {
                                             "Tag": "Member",
                                             "Value": "ans",
@@ -133,13 +103,13 @@
                                                                     "ID": ""
                                                                 }
                                                             ],
-                                                            "ID": "f2ae760e0a0346edacc337a60eee7334"
+                                                            "ID": "48b680e3a3744223965fb72f22f645ae"
                                                         }
                                                     ],
-                                                    "ID": "dc91fce706284c86bf0f5e8c1ccaf6b1"
+                                                    "ID": "3f243b43de6249428a60795d79694b20"
                                                 }
                                             ],
-                                            "ID": "7ac769b5d42343c584a8266b13d01a4b"
+                                            "ID": "3e56e65de2594233856f0fdda763ada4"
                                         },
                                         {
                                             "Tag": "Member",
@@ -151,10 +121,10 @@
                                                     "Value": "x",
                                                     "Type_t": "Member",
                                                     "Args": null,
-                                                    "ID": "4070db4ef66844f6a003e0140507502e"
+                                                    "ID": "3a8f632bc1ba4e768f5e67a28d65b089"
                                                 }
                                             ],
-                                            "ID": "5a4281bf480c4ef382bb5783158388a3"
+                                            "ID": "b729f8f811754d5fa5f6e15834f1986f"
                                         },
                                         {
                                             "Tag": "Member",
@@ -166,16 +136,46 @@
                                                     "Value": "msg",
                                                     "Type_t": "Member",
                                                     "Args": null,
-                                                    "ID": "de873af6529344a9a483fbd4ef6e5cef"
+                                                    "ID": "a83b7abf26344c3ca5a123da1df326d8"
                                                 }
                                             ],
-                                            "ID": "40ae755506cb4c71a2ee562147a324f7"
+                                            "ID": "7335fdeb04bc4b089ffb51462a933ce4"
+                                        },
+                                        {
+                                            "Tag": "Member",
+                                            "Value": "0",
+                                            "Type_t": "Member",
+                                            "Args": [
+                                                {
+                                                    "Tag": "Constant",
+                                                    "Value": "99",
+                                                    "Type_t": "Number",
+                                                    "Args": null,
+                                                    "ID": "42511476acb848d188dc69913a938e1d"
+                                                }
+                                            ],
+                                            "ID": "fa34e352db6e42eb956fb3303afe0c77"
+                                        },
+                                        {
+                                            "Tag": "Member",
+                                            "Value": "1",
+                                            "Type_t": "Member",
+                                            "Args": [
+                                                {
+                                                    "Tag": "Constant",
+                                                    "Value": "68",
+                                                    "Type_t": "Number",
+                                                    "Args": null,
+                                                    "ID": "cd71df31d8854600b947af93e3add5de"
+                                                }
+                                            ],
+                                            "ID": "32baf6b02c2b479796e2c7adef62ade6"
                                         }
                                     ],
-                                    "ID": "ab4add43478d465fbb765678f1a3daff"
+                                    "ID": "b657291501c94f6fa08e2ffbe82d6254"
                                 }
                             ],
-                            "ID": "183e8459f2174320bdd33c85ee514e3b"
+                            "ID": "227f159d02cc48588ffc72d2e3a8d624"
                         }
                     ]
                 ]
@@ -188,7 +188,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "Hello",
-                "ID": "225072cb13564ff388f4708c990ac73e",
+                "ID": "5e82666f7d6b4f9596243a3976823328",
                 "Parameters": [
                     "x",
                     "y"
@@ -210,20 +210,20 @@
                                             "Value": "x",
                                             "Type_t": "Variable",
                                             "Args": null,
-                                            "ID": "2e5d45b86c1e49f3acb3eed35766d234"
+                                            "ID": "b235e3ebd557495cb80bacbe775487aa"
                                         },
                                         {
                                             "Tag": "Identifier",
                                             "Value": "y",
                                             "Type_t": "Variable",
                                             "Args": null,
-                                            "ID": "e038f2caf203467ab9e267c92220f22f"
+                                            "ID": "98376d0641ea42c3bfe46ad0d005011e"
                                         }
                                     ],
-                                    "ID": "b1ee21ce263449febb865297e74a3c9f"
+                                    "ID": "1fa8b1bf58e74796984f22108c929d03"
                                 }
                             ],
-                            "ID": "93858145ca454e61990c7b2eec4c8327"
+                            "ID": "d76eeb7accf147c78e17bf96eeeb1467"
                         }
                     ]
                 ]
@@ -236,7 +236,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "JoinStrings",
-                "ID": "7f142bc5e44d4006b0ac41e2aebb80f1",
+                "ID": "23e185d7348747f7b4b495fbf480d815",
                 "Parameters": [
                     "str"
                 ],
@@ -252,7 +252,7 @@
                                     "Value": "myMessage",
                                     "Type_t": "Member",
                                     "Args": null,
-                                    "ID": "332a66b7645040ba8081e3efe65d8bb0"
+                                    "ID": "a851809e00a14b11b8858b00f0c4ad17"
                                 },
                                 {
                                     "Tag": "Nary",
@@ -264,20 +264,20 @@
                                             "Value": "myMessage",
                                             "Type_t": "Member",
                                             "Args": null,
-                                            "ID": "173b185757be4b3aa304ca25377374d6"
+                                            "ID": "f0091ea80b1e41df9e4fff8b0d95322b"
                                         },
                                         {
                                             "Tag": "Identifier",
                                             "Value": "str",
                                             "Type_t": "Variable",
                                             "Args": null,
-                                            "ID": "abb0d11465cf4b4ebf11c2e06adbeedf"
+                                            "ID": "668d910b0d944a75a3a3aa3d53170dbe"
                                         }
                                     ],
-                                    "ID": "5aa34ef5632a4360a1ec41a647bf6dd8"
+                                    "ID": "5cf3eb57951e423e932d51be08153e62"
                                 }
                             ],
-                            "ID": "fe332ce585064be9baa09adea0b76aaf"
+                            "ID": "912f77f8c8be4e2cb648aac27112e589"
                         }
                     ]
                 ]
@@ -290,7 +290,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "SetMsg",
-                "ID": "45283990236f483aafab0388158e9264",
+                "ID": "497c995f15be460cb665913dadbcdb93",
                 "Parameters": [
                     "msg"
                 ],
@@ -306,17 +306,17 @@
                                     "Value": "msg",
                                     "Type_t": "Member",
                                     "Args": null,
-                                    "ID": "ecba16f80c094a4a82a131d4e64484eb"
+                                    "ID": "530cd776eaa5417ab1aa304b144d86c4"
                                 },
                                 {
                                     "Tag": "Identifier",
                                     "Value": "msg",
                                     "Type_t": "Variable",
                                     "Args": null,
-                                    "ID": "57b07f366b4f4f59b51c03a5d7319746"
+                                    "ID": "174d822739654bf19edbcd260dd6af6c"
                                 }
                             ],
-                            "ID": "f48f776fe6584e188c34119c7d034892"
+                            "ID": "9ca9ae467ba149e58722f2784ca9e868"
                         }
                     ]
                 ]
@@ -329,7 +329,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "SetX",
-                "ID": "d3edd6040ba1494a91d76fb057802621",
+                "ID": "a0c65dcdb55d4a92b8e49a1d8b59dbb4",
                 "Parameters": [
                     "x"
                 ],
@@ -345,17 +345,17 @@
                                     "Value": "x",
                                     "Type_t": "Member",
                                     "Args": null,
-                                    "ID": "efd4392e1d794446804c09ed3071c126"
+                                    "ID": "ecc5fb38fc81437e9d359842f1920ca7"
                                 },
                                 {
                                     "Tag": "Identifier",
                                     "Value": "x",
                                     "Type_t": "Variable",
                                     "Args": null,
-                                    "ID": "5adce97c9dbc4fb985494481dced0f47"
+                                    "ID": "9781016a9bcd40cbbe57d74d0a9d3d95"
                                 }
                             ],
-                            "ID": "3fe3cb15e4ba4e2d96362bd9bc3c0c07"
+                            "ID": "03391239f0b840cba3fbface58f8f98b"
                         }
                     ]
                 ]
@@ -368,7 +368,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "originalTestFunc",
-                "ID": "b53e9656756741dda12e39cadf2d339b",
+                "ID": "83e3fcd8707c448fb3538bea24205487",
                 "Parameters": [
                     "x",
                     "y",
@@ -386,7 +386,7 @@
                                     "Value": "num",
                                     "Type_t": "Variable",
                                     "Args": null,
-                                    "ID": "2c10afec5fa2433d9507969ee55d9220"
+                                    "ID": "88bd6647f17742a2b6838ee0eb6e0c41"
                                 },
                                 {
                                     "Tag": "Nary",
@@ -398,20 +398,20 @@
                                             "Value": "x",
                                             "Type_t": "Variable",
                                             "Args": null,
-                                            "ID": "2119f855135a49b08202a7bbaf425545"
+                                            "ID": "ed03b960cddd4886a7491eb248bcd1ac"
                                         },
                                         {
                                             "Tag": "Constant",
-                                            "Value": "\"123\"",
-                                            "Type_t": "String",
+                                            "Value": "123",
+                                            "Type_t": "Number",
                                             "Args": null,
-                                            "ID": "42432db8d9cf456b8672416ba332296b"
+                                            "ID": "67d040f4c268421db20a31d68c6cf5a6"
                                         }
                                     ],
-                                    "ID": "09436ab29aa94656818414079b74a1d5"
+                                    "ID": "637c7e417cd24575af27294c898bdd8e"
                                 }
                             ],
-                            "ID": "af542b388ef3437099ef3250d00dbda7"
+                            "ID": "1812d334071b4a1998246f7b5deba784"
                         }
                     ],
                     [
@@ -425,10 +425,10 @@
                                     "Value": "num",
                                     "Type_t": "Variable",
                                     "Args": null,
-                                    "ID": "350c04653b3c46ee960d75136e10b6d6"
+                                    "ID": "fceb4b540a684761a4178765e4da805c"
                                 }
                             ],
-                            "ID": "39c4c78e9ea545cbb9329d857609e41e"
+                            "ID": "372b0e8b265d459e84042fdc4723bbd1"
                         }
                     ],
                     [
@@ -449,7 +449,7 @@
                                             "Args": [
                                                 {
                                                     "Tag": "Identifier",
-                                                    "Value": "Number?",
+                                                    "Value": "String?",
                                                     "Type_t": "Callable",
                                                     "Args": [
                                                         {
@@ -457,13 +457,13 @@
                                                             "Value": "x",
                                                             "Type_t": "Variable",
                                                             "Args": null,
-                                                            "ID": "9f6a50ceaddf463898370c6a884a81df"
+                                                            "ID": "e817d810c98542c394192244c2793a84"
                                                         }
                                                     ],
-                                                    "ID": "1f9e0dd1e0424b02b89bca984cce1262"
+                                                    "ID": "4fc6739481e64b92aeb2affae21f9d58"
                                                 }
                                             ],
-                                            "ID": "0cdbd7699a3f42bea58a386ed82fbe88"
+                                            "ID": "7fd3dc9df969425a891231d463e5a64a"
                                         },
                                         {
                                             "Tag": "Call",
@@ -480,16 +480,16 @@
                                                             "Value": "y",
                                                             "Type_t": "Variable",
                                                             "Args": null,
-                                                            "ID": "271f2f2178b549108029eda69496273d"
+                                                            "ID": "d27b03598b954872bc818b4a6d3fbd60"
                                                         }
                                                     ],
-                                                    "ID": "da680697841a4269880e2d2668142b82"
+                                                    "ID": "23b3f726ce534dab8ebcbc2ad2c308bc"
                                                 }
                                             ],
-                                            "ID": "095301ab9d8f498ea37119874c54845f"
+                                            "ID": "01d93d0e5da54575b0ed727dd86727f0"
                                         }
                                     ],
-                                    "ID": "7e935bf296b24e9fbdd17ad42ee02aa1"
+                                    "ID": "2d2c3e74e62a49889d7bbe0a82902aa8"
                                 },
                                 {
                                     "Tag": "Compound",
@@ -506,7 +506,7 @@
                                                     "Value": "abc",
                                                     "Type_t": "Variable",
                                                     "Args": null,
-                                                    "ID": "f5af24d1a1a44553bc6e56223c56c52f"
+                                                    "ID": "36e874d2d3e24dc3ad2210e308dc718b"
                                                 },
                                                 {
                                                     "Tag": "Nary",
@@ -518,37 +518,37 @@
                                                             "Value": "x",
                                                             "Type_t": "Variable",
                                                             "Args": null,
-                                                            "ID": "e191067fb5a4480db0a3f4c977e162e1"
+                                                            "ID": "68aaf7e5145b48d1b2c59c9ea25b9952"
                                                         },
                                                         {
                                                             "Tag": "Identifier",
                                                             "Value": "y",
                                                             "Type_t": "Variable",
                                                             "Args": null,
-                                                            "ID": "3088699b3a90425586957223cce408ec"
+                                                            "ID": "dff665f728644119b09d674a22dc80bd"
                                                         },
                                                         {
                                                             "Tag": "Identifier",
                                                             "Value": "z",
                                                             "Type_t": "Variable",
                                                             "Args": null,
-                                                            "ID": "9dfd232012ce4a97845f5e0fedd65467"
+                                                            "ID": "61b6541a0a394ff6b6b698815911fec7"
                                                         },
                                                         {
                                                             "Tag": "Identifier",
                                                             "Value": "num",
                                                             "Type_t": "Variable",
                                                             "Args": null,
-                                                            "ID": "49a5a05d813b4f1cab1e530686663877"
+                                                            "ID": "a8cfed5166e84f4581c451648c07d30d"
                                                         }
                                                     ],
-                                                    "ID": "5643b25a8ca349aabbdf3a5d1199a786"
+                                                    "ID": "994d0e45283940c0beb603daf6f687da"
                                                 }
                                             ],
-                                            "ID": "375ecf5eca1c429ba2284ef022e30a63"
+                                            "ID": "c84857af09e24f788519073075a4ff24"
                                         }
                                     ],
-                                    "ID": "a52385a3778e41be9be3902238ab5d20"
+                                    "ID": "4e3007faa41045889c20c76abfe3b7b3"
                                 },
                                 {
                                     "Tag": "Compound",
@@ -565,16 +565,55 @@
                                                     "Value": "num",
                                                     "Type_t": "Callable",
                                                     "Args": [],
-                                                    "ID": "7e3aad66c09b4d608abadfb3064d7fde"
+                                                    "ID": "3ada2bc7d61a4227be7998e0b5dc15b1"
                                                 }
                                             ],
-                                            "ID": "7bf7d5c0358f4bb6bc4f033711712154"
+                                            "ID": "dc95bdbaf36042a5aa7e389e25b6747c"
                                         }
                                     ],
-                                    "ID": "3766dd4515114a5f81acf6296871c539"
+                                    "ID": "190fba38f1134bc29c9e933ee9696737"
                                 }
                             ],
-                            "ID": "67dceb8017054820bef6df2a6543eee6"
+                            "ID": "c65854a3666e4106ad34737cdcd32e9b"
+                        }
+                    ],
+                    [
+                        {
+                            "Tag": "Binary",
+                            "Value": "Eq",
+                            "Type_t": "Operator",
+                            "Args": [
+                                {
+                                    "Tag": "Identifier",
+                                    "Value": "num2",
+                                    "Type_t": "Variable",
+                                    "Args": null,
+                                    "ID": "3e871bff5e6045048b9fe2851231ca96"
+                                },
+                                {
+                                    "Tag": "Nary",
+                                    "Value": "Add",
+                                    "Type_t": "Operator",
+                                    "Args": [
+                                        {
+                                            "Tag": "Identifier",
+                                            "Value": "x",
+                                            "Type_t": "Variable",
+                                            "Args": null,
+                                            "ID": "ad114ee8862a470390004773e7290f3a"
+                                        },
+                                        {
+                                            "Tag": "Constant",
+                                            "Value": "1",
+                                            "Type_t": "Number",
+                                            "Args": null,
+                                            "ID": "0184c419d77e45fd82607f465056fc7d"
+                                        }
+                                    ],
+                                    "ID": "4b7255675626448991b4f54a059db34d"
+                                }
+                            ],
+                            "ID": "30e77ea84fd64377bc58855467c43267"
                         }
                     ],
                     [
@@ -588,10 +627,10 @@
                                     "Value": "this.qux",
                                     "Type_t": "Callable",
                                     "Args": [],
-                                    "ID": "023d1808051c476da45d86a53b87c4f7"
+                                    "ID": "b4fd3d999c8b44498214957d48f1fc4a"
                                 }
                             ],
-                            "ID": "9386e9cf5c29447480f2a3af2ba26bf8"
+                            "ID": "b65a04e5f9354f759ff6ed0f66142582"
                         }
                     ]
                 ]
@@ -604,7 +643,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "pvt_bar",
-                "ID": "26f229efc02e4a0aa7199a18b5838162",
+                "ID": "386f35ee0e4a412db773e75cc344bbca",
                 "Parameters": [],
                 "Body": [
                     [
@@ -618,10 +657,10 @@
                                     "Value": "msg",
                                     "Type_t": "Member",
                                     "Args": null,
-                                    "ID": "92f421b97e214ac68c4c0250357783aa"
+                                    "ID": "6d32188c244548bc8f2796437343ce04"
                                 }
                             ],
-                            "ID": "7ee6e4737fd449778b169c9b7b0cb81e"
+                            "ID": "659d0ef174d043109ead035554305fb0"
                         }
                     ]
                 ]
@@ -634,7 +673,7 @@
                 "Type_t": "Function",
                 "Args": null,
                 "Name": "pvt_foo",
-                "ID": "0f58c6bb61ee49d0be3152593734390b",
+                "ID": "a13aac4d7739486f9bbbf2171a04fbe1",
                 "Parameters": [],
                 "Body": [
                     [
@@ -648,10 +687,10 @@
                                     "Value": "x",
                                     "Type_t": "Member",
                                     "Args": null,
-                                    "ID": "787dbf4c24944522b1a8095ec0d0b614"
+                                    "ID": "b86de47d35a440d1ae2913a3158d5d06"
                                 }
                             ],
-                            "ID": "9ef421915deb49e58e0b3f1cd5060dcd"
+                            "ID": "04c0176bcc9c4032a333cfc49df93b7c"
                         }
                     ]
                 ]
@@ -665,16 +704,7 @@
                 "Value": "hello",
                 "Type_t": "String",
                 "Args": null,
-                "ID": "15f74ad7375a4673a2a86b8a2b7ecd6c"
-            }
-        ],
-        "myMessage": [
-            {
-                "Tag": "Constant",
-                "Value": "",
-                "Type_t": "String",
-                "Args": null,
-                "ID": "f5882f1b6782418680d5410b68aed8f8"
+                "ID": "9ce6b03350d3453ebe94ca632acfec98"
             }
         ],
         "x": [
@@ -683,7 +713,7 @@
                 "Value": "0",
                 "Type_t": "Number",
                 "Args": null,
-                "ID": "490e098c553b484db0b1ca32ef84816e"
+                "ID": "4b32a4a089594ec99a569b89c0989f9d"
             }
         ]
     }

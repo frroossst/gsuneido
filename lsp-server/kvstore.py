@@ -34,6 +34,13 @@ class StoreValue:
         }
 
 
+class SymbolTable:
+    """
+    This stores the mapping of one variable to multiple UUIDs 
+    To help KVStore lookup by variable key
+    It is a two way mapping
+    """
+
 
 
 class KVStore:
@@ -65,7 +72,6 @@ class KVStore:
             raise ValueError(f"Variable already exists in the store\nexists: {self.get(var_id)},\ngot: {value}")
 
     def set_on_type_equivalence(self, var_id, value, check=False):
-
         if (val := self.get(var_id)) is None:
             self.set(var_id, value)
             return

@@ -4,52 +4,32 @@
             "value": "String",
             "sutype": "String",
             "edges": [
-                "de873af6529344a9a483fbd4ef6e5cef",
-                "332a66b7645040ba8081e3efe65d8bb0",
-                "abb0d11465cf4b4ebf11c2e06adbeedf",
-                "ecba16f80c094a4a82a131d4e64484eb",
-                "f48f776fe6584e188c34119c7d034892",
-                "92f421b97e214ac68c4c0250357783aa",
-                "7ee6e4737fd449778b169c9b7b0cb81e"
+                "a83b7abf26344c3ca5a123da1df326d8"
             ]
         },
         {
             "value": "Number",
             "sutype": "Number",
             "edges": [
-                "c7b784fd873b4c7dbad2e38421b158bc",
-                "b6899247f3024af087b3574d63615be0",
-                "e4c067eda5c0418db6c444a838f7be70",
-                "97e6e278e85a4efdadbc2ce6da47b826",
-                "4070db4ef66844f6a003e0140507502e",
-                "e038f2caf203467ab9e267c92220f22f",
-                "93858145ca454e61990c7b2eec4c8327",
-                "efd4392e1d794446804c09ed3071c126",
-                "3fe3cb15e4ba4e2d96362bd9bc3c0c07",
-                "42432db8d9cf456b8672416ba332296b",
-                "af542b388ef3437099ef3250d00dbda7",
-                "350c04653b3c46ee960d75136e10b6d6",
-                "39c4c78e9ea545cbb9329d857609e41e",
-                "9f6a50ceaddf463898370c6a884a81df",
-                "271f2f2178b549108029eda69496273d",
-                "49a5a05d813b4f1cab1e530686663877",
-                "787dbf4c24944522b1a8095ec0d0b614",
-                "9ef421915deb49e58e0b3f1cd5060dcd"
+                "e369ccdfe68d44c78f6b6d423cc67556",
+                "496ed93063324be1a52693174fa2877e",
+                "3a8f632bc1ba4e768f5e67a28d65b089",
+                "42511476acb848d188dc69913a938e1d",
+                "cd71df31d8854600b947af93e3add5de",
+                "98376d0641ea42c3bfe46ad0d005011e",
+                "d76eeb7accf147c78e17bf96eeeb1467"
             ]
         },
         {
             "value": "Boolean",
             "sutype": "Boolean",
-            "edges": [
-                "da680697841a4269880e2d2668142b82"
-            ]
+            "edges": []
         },
         {
             "value": "Any",
             "sutype": "Any",
             "edges": [
-                "dc91fce706284c86bf0f5e8c1ccaf6b1",
-                "9386e9cf5c29447480f2a3af2ba26bf8"
+                "3f243b43de6249428a60795d79694b20"
             ]
         },
         {
@@ -71,7 +51,7 @@
             "value": "Object",
             "sutype": "Object",
             "edges": [
-                "183e8459f2174320bdd33c85ee514e3b"
+                "227f159d02cc48588ffc72d2e3a8d624"
             ]
         },
         {
@@ -80,319 +60,86 @@
             "edges": []
         },
         {
-            "value": "1d5faf3a4b664baf967e1c66d6bb6ad6",
+            "value": "e63dc3c05d41427fa8a0fbbc95dafedb",
             "sutype": "Number",
             "edges": [
-                "c7b784fd873b4c7dbad2e38421b158bc"
+                "e369ccdfe68d44c78f6b6d423cc67556"
             ]
         },
         {
-            "value": "c7b784fd873b4c7dbad2e38421b158bc",
+            "value": "e369ccdfe68d44c78f6b6d423cc67556",
             "sutype": "Number",
             "edges": [
-                "1d5faf3a4b664baf967e1c66d6bb6ad6",
+                "e63dc3c05d41427fa8a0fbbc95dafedb",
                 "Number"
             ]
         },
         {
-            "value": "b6899247f3024af087b3574d63615be0",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "e4c067eda5c0418db6c444a838f7be70",
+            "value": "496ed93063324be1a52693174fa2877e",
             "sutype": "Number",
             "edges": [
                 "Number"
             ]
         },
         {
-            "value": "97e6e278e85a4efdadbc2ce6da47b826",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "dc91fce706284c86bf0f5e8c1ccaf6b1",
+            "value": "3f243b43de6249428a60795d79694b20",
             "sutype": "Any",
             "edges": [
                 "Any"
             ]
         },
         {
-            "value": "4070db4ef66844f6a003e0140507502e",
+            "value": "3a8f632bc1ba4e768f5e67a28d65b089",
             "sutype": "Number",
             "edges": [
                 "Number"
             ]
         },
         {
-            "value": "de873af6529344a9a483fbd4ef6e5cef",
+            "value": "a83b7abf26344c3ca5a123da1df326d8",
             "sutype": "String",
             "edges": [
                 "String"
             ]
         },
         {
-            "value": "183e8459f2174320bdd33c85ee514e3b",
+            "value": "42511476acb848d188dc69913a938e1d",
+            "sutype": "Number",
+            "edges": [
+                "Number"
+            ]
+        },
+        {
+            "value": "cd71df31d8854600b947af93e3add5de",
+            "sutype": "Number",
+            "edges": [
+                "Number"
+            ]
+        },
+        {
+            "value": "227f159d02cc48588ffc72d2e3a8d624",
             "sutype": "Object",
             "edges": [
                 "Object"
             ]
         },
         {
-            "value": "2e5d45b86c1e49f3acb3eed35766d234",
+            "value": "b235e3ebd557495cb80bacbe775487aa",
             "sutype": "Number",
             "edges": [
-                "e038f2caf203467ab9e267c92220f22f"
+                "98376d0641ea42c3bfe46ad0d005011e"
             ]
         },
         {
-            "value": "e038f2caf203467ab9e267c92220f22f",
+            "value": "98376d0641ea42c3bfe46ad0d005011e",
             "sutype": "Number",
             "edges": [
-                "2e5d45b86c1e49f3acb3eed35766d234",
+                "b235e3ebd557495cb80bacbe775487aa",
                 "Number"
             ]
         },
         {
-            "value": "93858145ca454e61990c7b2eec4c8327",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "332a66b7645040ba8081e3efe65d8bb0",
-            "sutype": "String",
-            "edges": [
-                "String",
-                "5aa34ef5632a4360a1ec41a647bf6dd8"
-            ]
-        },
-        {
-            "value": "173b185757be4b3aa304ca25377374d6",
-            "sutype": "String",
-            "edges": [
-                "abb0d11465cf4b4ebf11c2e06adbeedf"
-            ]
-        },
-        {
-            "value": "abb0d11465cf4b4ebf11c2e06adbeedf",
-            "sutype": "String",
-            "edges": [
-                "173b185757be4b3aa304ca25377374d6",
-                "String"
-            ]
-        },
-        {
-            "value": "5aa34ef5632a4360a1ec41a647bf6dd8",
-            "sutype": "String",
-            "edges": [
-                "332a66b7645040ba8081e3efe65d8bb0"
-            ]
-        },
-        {
-            "value": "ecba16f80c094a4a82a131d4e64484eb",
-            "sutype": "String",
-            "edges": [
-                "String",
-                "57b07f366b4f4f59b51c03a5d7319746"
-            ]
-        },
-        {
-            "value": "57b07f366b4f4f59b51c03a5d7319746",
-            "sutype": "String",
-            "edges": [
-                "ecba16f80c094a4a82a131d4e64484eb"
-            ]
-        },
-        {
-            "value": "f48f776fe6584e188c34119c7d034892",
-            "sutype": "String",
-            "edges": [
-                "String"
-            ]
-        },
-        {
-            "value": "efd4392e1d794446804c09ed3071c126",
-            "sutype": "Number",
-            "edges": [
-                "Number",
-                "5adce97c9dbc4fb985494481dced0f47"
-            ]
-        },
-        {
-            "value": "5adce97c9dbc4fb985494481dced0f47",
-            "sutype": "Number",
-            "edges": [
-                "efd4392e1d794446804c09ed3071c126"
-            ]
-        },
-        {
-            "value": "3fe3cb15e4ba4e2d96362bd9bc3c0c07",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "2119f855135a49b08202a7bbaf425545",
-            "sutype": "Number",
-            "edges": [
-                "42432db8d9cf456b8672416ba332296b"
-            ]
-        },
-        {
-            "value": "42432db8d9cf456b8672416ba332296b",
-            "sutype": "Number",
-            "edges": [
-                "2119f855135a49b08202a7bbaf425545",
-                "Number"
-            ]
-        },
-        {
-            "value": "2c10afec5fa2433d9507969ee55d9220",
-            "sutype": "Unknown",
-            "edges": [
-                "09436ab29aa94656818414079b74a1d5"
-            ]
-        },
-        {
-            "value": "09436ab29aa94656818414079b74a1d5",
-            "sutype": "Unknown",
-            "edges": [
-                "2c10afec5fa2433d9507969ee55d9220"
-            ]
-        },
-        {
-            "value": "af542b388ef3437099ef3250d00dbda7",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "350c04653b3c46ee960d75136e10b6d6",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "39c4c78e9ea545cbb9329d857609e41e",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "9f6a50ceaddf463898370c6a884a81df",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "1f9e0dd1e0424b02b89bca984cce1262",
-            "sutype": "Boolean",
-            "edges": [
-                "da680697841a4269880e2d2668142b82"
-            ]
-        },
-        {
-            "value": "271f2f2178b549108029eda69496273d",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "da680697841a4269880e2d2668142b82",
-            "sutype": "Boolean",
-            "edges": [
-                "1f9e0dd1e0424b02b89bca984cce1262",
-                "Boolean"
-            ]
-        },
-        {
-            "value": "e191067fb5a4480db0a3f4c977e162e1",
-            "sutype": "Number",
-            "edges": [
-                "3088699b3a90425586957223cce408ec"
-            ]
-        },
-        {
-            "value": "3088699b3a90425586957223cce408ec",
-            "sutype": "Number",
-            "edges": [
-                "e191067fb5a4480db0a3f4c977e162e1",
-                "9dfd232012ce4a97845f5e0fedd65467"
-            ]
-        },
-        {
-            "value": "9dfd232012ce4a97845f5e0fedd65467",
-            "sutype": "Number",
-            "edges": [
-                "3088699b3a90425586957223cce408ec",
-                "49a5a05d813b4f1cab1e530686663877"
-            ]
-        },
-        {
-            "value": "49a5a05d813b4f1cab1e530686663877",
-            "sutype": "Number",
-            "edges": [
-                "9dfd232012ce4a97845f5e0fedd65467",
-                "Number"
-            ]
-        },
-        {
-            "value": "f5af24d1a1a44553bc6e56223c56c52f",
-            "sutype": "Unknown",
-            "edges": [
-                "5643b25a8ca349aabbdf3a5d1199a786"
-            ]
-        },
-        {
-            "value": "5643b25a8ca349aabbdf3a5d1199a786",
-            "sutype": "Unknown",
-            "edges": [
-                "f5af24d1a1a44553bc6e56223c56c52f"
-            ]
-        },
-        {
-            "value": "9386e9cf5c29447480f2a3af2ba26bf8",
-            "sutype": "Any",
-            "edges": [
-                "Any"
-            ]
-        },
-        {
-            "value": "92f421b97e214ac68c4c0250357783aa",
-            "sutype": "String",
-            "edges": [
-                "String"
-            ]
-        },
-        {
-            "value": "7ee6e4737fd449778b169c9b7b0cb81e",
-            "sutype": "String",
-            "edges": [
-                "String"
-            ]
-        },
-        {
-            "value": "787dbf4c24944522b1a8095ec0d0b614",
-            "sutype": "Number",
-            "edges": [
-                "Number"
-            ]
-        },
-        {
-            "value": "9ef421915deb49e58e0b3f1cd5060dcd",
+            "value": "d76eeb7accf147c78e17bf96eeeb1467",
             "sutype": "Number",
             "edges": [
                 "Number"

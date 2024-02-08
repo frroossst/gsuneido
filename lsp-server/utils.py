@@ -17,6 +17,6 @@ def catch_exception(func):
             if not args.t:
                 print(f"Exception: {e}")
             else:
-                raise RuntimeError(e) from e
+                raise e
             return
     return wrapper
