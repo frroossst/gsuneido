@@ -79,7 +79,7 @@ class KVStore:
         else:
             # this error is only thrown when type checking not during type inference
             if check:
-                raise TypeError(f"For type node {var_id} type is inferred as {value.actual} but declared as {val.actual}")
+                raise TypeError(f"For type node {var_id} type is inferred as {value.actual} but declared as {val.actual} \n{val}")
 
 
 

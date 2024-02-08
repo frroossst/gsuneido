@@ -21,14 +21,15 @@ func main() {
 	src := `class {
 			x: 0
 			msg: "hello"
+			myMessage: ""
 		Get() { return Object(99, 68, ans: Hello(1, 2), numx: .x, strmsg: .msg) }
 		Hello(x, y) { return x + y }
 		pvt_foo() { return .x }
 		originalTestFunc(x, y, z)
 			{
-			num = x + 123
+			num = x + "123"
 			num++
-			if String?(x) and Number?(y) 
+			if Number?(x) and Number?(y) 
 				{
 				abc = x + y + z + num
 				} 
@@ -38,11 +39,18 @@ func main() {
 				}
 			.qux()
 			}
+		JoinStrings(str) { .myMessage = .myMessage $ str }
 		pvt_bar() { return .msg }
 		SetX(x) { .x = x }
 		SetMsg(msg) { .msg = msg }
-		AddBreak() { return x + "123" }
+		AddBreak() { return x + 123 }
 		}`
+
+	/*
+		 * Discarded Lines
+
+		DeletePriority(a, b) { return 12345679 - a - b }
+	*/
 
 	fmt.Println("src:", src)
 	fmt.Println()

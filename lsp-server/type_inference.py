@@ -1,12 +1,11 @@
 # Proof Of Concept
 # Takes in a json object and dumps type information to a file
 # Checks basic type safety
+import json
 
 from graph import Graph, Node
 from kvstore import KVStore, StoreValue
 from sutypes import SuTypes
-import json
-
 from utils import catch_exception
 
 def check_type_equivalence(lhs, rhs) -> bool:
@@ -43,6 +42,8 @@ def constraint_type_with_operator_value(value, type) -> bool:
         return True
 
     valid_types = valid_constraints.get(value, None)
+    if valid_types is None:
+        raise NotImplementedError("constraint and operator not implemented")
     return type in valid_types
 
 def get_valid_type_for_operator(value) -> SuTypes:
@@ -50,9 +51,23 @@ def get_valid_type_for_operator(value) -> SuTypes:
         "Add": SuTypes.Number,
         "PostInc": SuTypes.Number,
         "And": SuTypes.Boolean,
+        "Cat": SuTypes.String,
     }
 
-    return valid_types[value]
+    if (x:= valid_types.get(value, None) )is None:
+        raise NotImplementedError("valid operator type not implemented")
+    return x
+
+def get_type_assertion_functions() -> list[str]:
+    return [
+        "String?",
+        "Number?",
+        "Boolean?",
+        "Object?",
+        "Class?",
+        "Function?",
+        "Date?",
+    ]
 
 
 def infer_generic(stmt, store, graph) -> SuTypes:
@@ -130,6 +145,8 @@ def infer_binary(stmt, store, graph) -> SuTypes:
     elif rhs_t == SuTypes.Any:
         store.set(rhs["ID"], StoreValue(lhs["Value"], lhs["Type_t"], lhs_t))
         return lhs_t
+    else:
+        return SuTypes.NotApplicable
     
 
 def infer_nary(stmt, store, graph) -> SuTypes:
@@ -142,6 +159,24 @@ def infer_nary(stmt, store, graph) -> SuTypes:
     for i in args:
         if i["Tag"] == "Call":
             i = i["Args"][0]
+            if i["Value"] in get_type_assertion_functions():
+                typed_check_t = SuTypes.from_str(i["Value"].removesuffix("?"))
+
+                type_checked_var = i["Args"][0]
+
+                n = Node(type_checked_var["ID"])
+                v = StoreValue(type_checked_var["Value"], SuTypes.from_str(type_checked_var["Type_t"]), typed_check_t)
+                store.set(type_checked_var["ID"], v)
+                graph.add_node(n)
+
+                primitive_type_node = graph.find_node(SuTypes.to_str(typed_check_t))
+                graph.add_edge(n.value, primitive_type_node.value)
+
+        """
+        NOTE: Infer Generic cause Args might not always be constants and variables,
+                so infer a generic somewhere here to infer further
+        """
+
         n = Node(i["ID"])
         v = StoreValue(i["Value"], SuTypes.from_str(i["Type_t"]), valid_t)
         store.set(i["ID"], v)
@@ -231,7 +266,7 @@ def process_methods(methods, store, graph):
         print(f"{k}: {json.dumps(v, indent=4)}")
         for i in v["Body"]:
             valid_t = infer_generic(i[0], store, graph)
-            if valid_t == SuTypes.NotApplicable:
+            if valid_t == SuTypes.NotApplicable or valid_t is None:
                 continue
             v = StoreValue(i[0]["Value"], SuTypes.from_str(i[0]["Type_t"]), valid_t)
             store.set(i[0]["ID"], v)

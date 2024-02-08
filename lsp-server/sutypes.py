@@ -12,9 +12,10 @@ class SuTypes(Enum):
     Never = 6
     Function = 7
     Object = 8
-    InBuiltOperator = 9
-    Union = 10
-    Intersect = 11
+    Date = 9
+    InBuiltOperator = 10
+    Union = 11
+    Intersect = 12
 
     @staticmethod
     def from_str(str):
@@ -35,6 +36,8 @@ class SuTypes(Enum):
                 return SuTypes.Any
             case "Object":
                 return SuTypes.Object
+            case "Date":
+                return SuTypes.Date
             case "Return":
                 return SuTypes.Unknown
             case "Operator" | "PostInc" | "Callable" | "Compound" | "If" | "InBuiltOperator":
@@ -61,6 +64,8 @@ class SuTypes(Enum):
                 return "Boolean"
             case SuTypes.Any:
                 return "Any"
+            case SuTypes.Date:
+                return "Date"
             case SuTypes.Union:
                 return "Union"
             case SuTypes.Intersect:

@@ -15,7 +15,7 @@ compile:
 	python3 prettify.py
 
 infer:
-	python3 type_inference.py
+	python3 type_inference.py -t
 
 check:
 	python3 type_checker.py

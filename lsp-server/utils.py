@@ -1,3 +1,5 @@
+import argparse
+
 def todo(str = ""):
     raise NotImplementedError(f"TODO {str}")
 
@@ -9,6 +11,12 @@ def catch_exception(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            print(f"Exception: {e}")
+            p = argparse.ArgumentParser("Type Inference")
+            p.add_argument("-t", action="store_true")
+            args = p.parse_args()
+            if not args.t:
+                print(f"Exception: {e}")
+            else:
+                raise RuntimeError(e) from e
             return
     return wrapper
