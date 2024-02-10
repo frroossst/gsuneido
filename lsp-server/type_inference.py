@@ -70,32 +70,32 @@ def get_type_assertion_functions() -> list[str]:
     ]
 
 
-def infer_generic(stmt, store, graph) -> SuTypes:
+def infer_generic(stmt, store, graph, attributes) -> SuTypes:
     match stmt["Tag"]:
         case "Unary":
-            return infer_unary(stmt, store, graph)
+            return infer_unary(stmt, store, graph, attributes)
         case "Binary":
-            return infer_binary(stmt, store, graph)
+            return infer_binary(stmt, store, graph, attributes)
         case "Nary":
-            return infer_nary(stmt, store, graph)
+            return infer_nary(stmt, store, graph, attributes)
         case "Identifier":
             return SuTypes.Any
         case "If":
-            return infer_if(stmt, store, graph)
+            return infer_if(stmt, store, graph, attributes)
         case "Call" | "Compound":
-            return infer_generic(stmt["Args"][0], store, graph)
+            return infer_generic(stmt["Args"][0], store, graph, attributes)
         case "Return":
-            return infer_generic(stmt["Args"][0], store, graph)
+            return infer_generic(stmt["Args"][0], store, graph, attributes)
         case "Object":
-            return infer_object(stmt["Args"], store, graph)
+            return infer_object(stmt["Args"], store, graph, attributes)
         case "Member":
-            return infer_attribute(stmt, store, graph)
+            return infer_attribute(stmt, store, graph, attributes)
         case "Constant":
             return SuTypes.from_str(stmt["Type_t"])
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
-def infer_unary(stmt, store, graph) -> SuTypes:
+def infer_unary(stmt, store, graph, attributes) -> SuTypes:
     args = stmt["Args"]
     value = stmt["Value"]
 
@@ -110,17 +110,17 @@ def infer_unary(stmt, store, graph) -> SuTypes:
     return valid_t
 
 
-def infer_binary(stmt, store, graph) -> SuTypes:
+def infer_binary(stmt, store, graph, attributes) -> SuTypes:
     args = stmt["Args"]
     lhs = args[0]
     rhs = args[1::][0]
 
     # inferred types of lhs and rhs should be the same
-    lhs_t = infer_generic(lhs, store, graph)
+    lhs_t = infer_generic(lhs, store, graph, attributes)
     if lhs_t is not None and lhs["Type_t"] != "Operator":
         v = StoreValue(lhs["Value"], lhs["Type_t"], lhs_t)
         store.set(lhs["ID"], v)
-    rhs_t = infer_generic(rhs, store, graph)
+    rhs_t = infer_generic(rhs, store, graph, attributes)
     if rhs_t is not None and rhs["Type_t"] != "Operator":
         v = StoreValue(rhs["Value"], rhs["Type_t"], rhs_t)
         store.set(rhs["ID"], v)
@@ -149,7 +149,7 @@ def infer_binary(stmt, store, graph) -> SuTypes:
         return SuTypes.NotApplicable
     
 
-def infer_nary(stmt, store, graph) -> SuTypes:
+def infer_nary(stmt, store, graph, attributes) -> SuTypes:
     value = stmt["Value"]
     args = stmt["Args"]
 
@@ -192,25 +192,25 @@ def infer_nary(stmt, store, graph) -> SuTypes:
 
     return valid_t
 
-def infer_if(stmt, store, graph):
+def infer_if(stmt, store, graph, attributes):
     cond = stmt["Args"][0]
-    cond_t = infer_generic(cond, store, graph)
+    cond_t = infer_generic(cond, store, graph, attributes)
     v = StoreValue(cond["Value"], SuTypes.from_str(cond["Type_t"]), cond_t)
     store.set(cond["ID"], v)
 
     then = stmt["Args"][1]
-    then_t = infer_generic(then, store, graph)
+    then_t = infer_generic(then, store, graph, attributes)
     v = StoreValue(then["Value"], SuTypes.from_str(then["Type_t"]), then_t)
     store.set(then["ID"], v)
 
     if len(stmt["Args"]) == 3:
-        else_t = infer_generic(stmt["Args"][2], store, graph)
+        else_t = infer_generic(stmt["Args"][2], store, graph, attributes)
         v = StoreValue(stmt["Args"][2]["Value"], SuTypes.from_str(stmt["Args"][2]["Type_t"]), else_t)
         store.set(stmt["Args"][2]["ID"], v)
 
     return SuTypes.NotApplicable
 
-def infer_attribute(stmt, store, graph):
+def infer_attribute(stmt, store, graph, attributes):
     value = stmt["Value"]
     attrb_t = attributes.get(value, None)
 
@@ -229,10 +229,10 @@ def infer_attribute(stmt, store, graph):
 
     return valid_t
 
-def infer_object(stmt, store, graph):
+def infer_object(stmt, store, graph, attributes):
 
     for i in stmt:
-        t = infer_generic(i["Args"][0], store, graph)
+        t = infer_generic(i["Args"][0], store, graph, attributes)
         v = StoreValue(i["Args"][0]["Value"], SuTypes.from_str(i["Args"][0]["Type_t"]), t)
         store.set(i["Args"][0]["ID"], v)
         n = Node(i["Args"][0]["ID"])
@@ -258,14 +258,14 @@ def parse_class(clss):
     return members
 
 @catch_exception
-def process_methods(methods, store, graph):
+def process_methods(methods, store, graph, attributes):
     for k, v in methods.items():
         # NOTE: only for debugging
         global current_function
         current_function = k
         print(f"{k}: {json.dumps(v, indent=4)}")
         for i in v["Body"]:
-            valid_t = infer_generic(i[0], store, graph)
+            valid_t = infer_generic(i[0], store, graph, attributes)
             if valid_t == SuTypes.NotApplicable or valid_t is None:
                 continue
             v = StoreValue(i[0]["Value"], SuTypes.from_str(i[0]["Type_t"]), valid_t)
@@ -277,7 +277,6 @@ def process_methods(methods, store, graph):
 def main():
     graph = Graph()
     store = KVStore()
-    global attributes
     attributes = parse_class(load_data_attributes())
     methods = parse_class(load_data_body())
 
@@ -291,8 +290,8 @@ def main():
     """
     print(ascii_blocks)
     print("=" * 80)
-    process_methods(methods, store, graph)
-    propogate_infer(store, graph)
+    process_methods(methods, store, graph, attributes)
+    propogate_infer(store, graph, attributes)
 
     # graph.visualise()
     
