@@ -1,12 +1,13 @@
 # Proof Of Concept
 # Takes in a json object and dumps type information to a file
 # Checks basic type safety
+import argparse
 import json
 
 from graph import Graph, Node
 from kvstore import KVStore, StoreValue
 from sutypes import SuTypes
-from utils import catch_exception
+from utils import DebugInfo
 
 def check_type_equivalence(lhs, rhs) -> bool:
     if lhs == SuTypes.Any or rhs == SuTypes.Any:
@@ -71,6 +72,7 @@ def get_type_assertion_functions() -> list[str]:
 
 
 def infer_generic(stmt, store, graph, attributes) -> SuTypes:
+    print(f"[LOG] {store.get('e13f80ba58bf46138a09eef589eb0c76')}")
     match stmt["Tag"]:
         case "Unary":
             return infer_unary(stmt, store, graph, attributes)
@@ -259,16 +261,14 @@ def parse_class(clss):
 
     return members
 
-@catch_exception
 def process_methods(methods, store, graph, attributes):
     for k, v in methods.items():
-        # NOTE: only for debugging
-        global current_function
-        current_function = k
-        if current_function == "SameVarID":
+        debug_info.set_func(k)
+        if debug_info.func_name == "SameVarID":
             pass
         print(f"{k}: {json.dumps(v, indent=4)}")
-        for i in v["Body"]:
+        for x, i in enumerate(v["Body"]):
+            debug_info.set_line(x + 1)
             valid_t = infer_generic(i[0], store, graph, attributes)
             if valid_t == SuTypes.NotApplicable or valid_t is None:
                 continue
@@ -279,6 +279,13 @@ def process_methods(methods, store, graph, attributes):
             graph.add_edge(n.value, graph.find_node(valid_t.name).value)
 
 def main():
+    global debug_info
+    debug_info = DebugInfo()
+
+    p = argparse.ArgumentParser("Type Inference")
+    p.add_argument("-t", action="store_true")
+    args = p.parse_args()
+
     graph = Graph()
     store = KVStore()
     attributes = parse_class(load_data_attributes())
@@ -294,8 +301,15 @@ def main():
     """
     print(ascii_blocks)
     print("=" * 80)
-    process_methods(methods, store, graph, attributes)
-    propogate_infer(store, graph, attributes)
+
+    try:
+        process_methods(methods, store, graph, attributes)
+        propogate_infer(store, graph, attributes)
+    except Exception as e:
+        if not not args.t:
+            print(f"Exception: {e}")
+        else:
+            debug_info.trigger(e)
 
     # graph.visualise()
     
