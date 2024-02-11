@@ -19,6 +19,10 @@ def load_graph_data():
 
     return content
 
+def check_against_declated_types(typedefs, store, graph):
+    pass
+
+
 def main():
 
     store = KVStore().from_json(load_kv_data())
@@ -55,6 +59,10 @@ def main():
             # raise TypeError(str_fmt)
             print(str_fmt)
 
+    with open("typedefs.json", "r") as fobj:
+        typedefs = json.load(fobj)
+
+    check_against_declated_types(typedefs, store, graph)
     propogate_infer(store, graph, check=True)
 
 

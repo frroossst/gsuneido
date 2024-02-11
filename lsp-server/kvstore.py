@@ -1,6 +1,7 @@
 from sutypes import SuTypes, check_type_equal_or_subtype, check_type_equality
 
 
+
 class StoreValue:
 
     def __init__(self, value, actual: SuTypes, inferred: SuTypes) -> None:

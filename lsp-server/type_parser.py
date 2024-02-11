@@ -12,3 +12,9 @@ class Parser:
     def parse(self) -> SuTypes:
         pass
 
+
+def get_test_parameter_type_values():
+    return {
+        "originalTestFunc":  {"x": SuTypes.String, "y": SuTypes.Number, "z": SuTypes.Number},
+    }
+

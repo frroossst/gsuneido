@@ -7,6 +7,7 @@ import json
 from graph import Graph, Node
 from kvstore import KVStore, StoreValue
 from sutypes import SuTypes
+from type_parser import get_test_parameter_type_values
 from utils import DebugInfo
 
 def check_type_equivalence(lhs, rhs) -> bool:
@@ -292,6 +293,7 @@ def main():
     store = KVStore()
     attributes = parse_class(load_data_attributes())
     methods = parse_class(load_data_body())
+    param_t = get_test_parameter_type_values()
 
     print("=" * 80)
     ascii_blocks = """

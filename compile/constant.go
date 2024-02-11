@@ -100,7 +100,7 @@ type Function_t struct {
 	// UUID for downstream processing
 	ID string
 	// the Parameters of the function
-	Parameters []string
+	Parameters []Node_t
 	// the Body of the function
 	Body [][]Node_t
 }
@@ -174,9 +174,10 @@ func (p *Parser) typeFunction(func_name string) Function_t {
 	ScopedUUIDGen.SetFuncName(func_name)
 	ast := p.WithoutKeywordFunction()
 
-	parameters := []string{}
+	parameters := []Node_t{}
 	for i := 0; i < len(ast.Params); i++ {
-		parameters = append(parameters, ast.Params[i].Name.Name)
+		param_node := Node_t{Value: ast.Params[i].Name.Name, Tag: "Parameter", ID: ScopedUUIDGen.GetScopedUUID(ast.Params[i].Name.Name)}
+		parameters = append(parameters, param_node)
 	}
 
 	body := [][]Node_t{}
