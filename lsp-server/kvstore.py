@@ -5,7 +5,7 @@ class StoreValue:
 
     def __init__(self, value, actual: SuTypes, inferred: SuTypes) -> None:
         """
-        @param value: The value of the variable
+        @param value: The name of the variable
         @param actual: The actual type of the variable
         @param inferred: The inferred type of the variable
         """

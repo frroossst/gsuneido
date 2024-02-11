@@ -115,7 +115,6 @@ class IntersectSuType():
 
 
 def check_type_equality(lhs, rhs) -> bool:
-
     if not (isinstance(lhs, SuTypes) and isinstance(rhs, SuTypes)):
         raise ValueError(f"lhs and rhs should be of type SuTypes, got {lhs} and {rhs}")
 
@@ -129,6 +128,5 @@ def check_type_equality(lhs, rhs) -> bool:
         # ! remove this line
         return True
     return lhs == rhs
-
 
 

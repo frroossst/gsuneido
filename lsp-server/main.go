@@ -22,6 +22,17 @@ func main() {
 			x: 0
 			msg: "hello"
 			myMessage: ""
+		SameVarID() 
+			{
+			x = "123"
+			x = 123
+			y = x + 123
+			y = "hello"
+			z = 123.456
+			x = z
+			y = z
+			z = x + y
+			}
 		Get() { return Object(99, 68, ans: Hello(1, 2), numx: .x, strmsg: .msg) }
 		Hello(x, y) { return x + y }
 		pvt_foo() { return .x }

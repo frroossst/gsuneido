@@ -49,26 +49,35 @@ func Checked(th *Thread, src string) (Value, []string) {
 	return v, p.CheckResults()
 }
 
-func GetUUID() string {
+var ScopedUUIDGen UUIDGen
+
+type UUIDGen struct {
+	// the name of the current function
+	func_name string
+	// map to store all func_var and their uuids
+	store map[string]string
+}
+
+func (u *UUIDGen) SetFuncName(fn string) {
+	u.func_name = fn
+	u.store = make(map[string]string)
+}
+
+func (u *UUIDGen) GetScopedUUID(vr string) string {
+	if u.store[u.func_name + "_" + vr] != "" {
+		return u.store[u.func_name + "_" +vr]
+	} else {
+		u.store[u.func_name + "_" + vr] = getUUID()
+		return u.store[u.func_name + "_" + vr]
+	}
+}
+
+func getUUID() string {
 	if uuid.New().String() != "" {
 		return strings.Replace(uuid.New().String(), "-", "", -1)
 	} else {
 		panic("UUID generation failed")
 	}
-}
-
-var FuncIDGen ScopedUUID
-
-type ScopedUUID struct {
-	cls string
-}
-
-func NewScopedUUID(cls string) *ScopedUUID {
-	return &ScopedUUID{cls: GetUUID()}
-}
-
-func (s *ScopedUUID) GetUUID(funcName string, varName string) string {
-	return s.cls + "::" + funcName + "@" + varName
 }
 
 type Node_t struct {
@@ -129,7 +138,7 @@ func (p *Parser) TypeConst() []Node_t {
 }
 
 func (p *Parser) typeConst() []Node_t {
-	id := GetUUID()
+	id := getUUID()
 
 	switch p.Token {
 	case tok.String:
@@ -162,7 +171,9 @@ func (p *Parser) typeConst() []Node_t {
 }
 
 func (p *Parser) typeFunction(func_name string) Function_t {
+	ScopedUUIDGen.SetFuncName(func_name)
 	ast := p.WithoutKeywordFunction()
+
 	parameters := []string{}
 	for i := 0; i < len(ast.Params); i++ {
 		parameters = append(parameters, ast.Params[i].Name.Name)
@@ -173,14 +184,14 @@ func (p *Parser) typeFunction(func_name string) Function_t {
 		body = append(body, getExprType(ast.Body[i]))
 	}
 
-	return Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: "YW5vbnltb3Vz"}, Name: func_name, ID: GetUUID(), Parameters: parameters, Body: body}
+	return Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: "YW5vbnltb3Vz"}, Name: func_name, ID: getUUID(), Parameters: parameters, Body: body}
 }
 
 func getExprType(expr ast.Statement) []Node_t {
 	// coerce ast.Expr to ast.Node
 	node := expr.(ast.Node)
 
-	id := GetUUID()
+	id := getUUID()
 
 	// node matches with *ast.ExprStmt in a switch-case
 	// convert node to type node.Expr
@@ -210,7 +221,7 @@ func getExprType(expr ast.Statement) []Node_t {
 
 func getNodeType(node ast.Node) []Node_t {
 
-	id := GetUUID()
+	id := getUUID()
 
 	switch n := node.(type) {
 	case *ast.Unary:
@@ -236,6 +247,7 @@ func getNodeType(node ast.Node) []Node_t {
 		}
 		return []Node_t{{Tag: "Compound", Type_t: "Compound", Value: "nil", Args: cmps, ID: id}}
 	case *ast.Ident:
+		id = ScopedUUIDGen.GetScopedUUID(n.Name)
 		return []Node_t{{Tag: "Identifier", Type_t: "Variable", Value: n.Name, ID: id}}
 	case *ast.Constant:
 		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String(), ID: id}}
@@ -269,7 +281,7 @@ func getNodeType(node ast.Node) []Node_t {
 			return []Node_t{{Tag: "Object", Type_t: "Object", Value: "nil", Args: obj, ID: id}}
 		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
-			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, Args: params, ID: id}}, ID: GetUUID()}}
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, Args: params, ID: id}}, ID: getUUID()}}
 	case *ast.Mem:
 		noqute := n.M.String()[1 : len(n.M.String())-1]
 		return []Node_t{{Tag: "Member", Type_t: "Member", Value: noqute, ID: id}}
@@ -310,7 +322,7 @@ func parseObjectStructure(object_args []ast.Arg) []Node_t {
 	members_arr := []Node_t{}
 
 	for k, v := range members {
-		members_arr = append(members_arr, Node_t{Tag: "Member", Type_t: "Member", Value: k, Args: []Node_t{v}, ID: GetUUID()})
+		members_arr = append(members_arr, Node_t{Tag: "Member", Type_t: "Member", Value: k, Args: []Node_t{v}, ID: getUUID()})
 	}
 
 	return members_arr
@@ -585,7 +597,7 @@ func (p *Parser) typeClass() Class_t {
 		if isFunc {
 			func_name := p.MatchIdent()
 			func_type := p.typeFunction(func_name)
-			func_node := Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: ""}, Name: func_name, ID: GetUUID(), Parameters: func_type.Parameters, Body: func_type.Body}
+			func_node := Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: ""}, Name: func_name, ID: getUUID(), Parameters: func_type.Parameters, Body: func_type.Body}
 
 			kv_store_methods[func_name] = []Function_t{func_node}
 
@@ -604,7 +616,7 @@ func (p *Parser) typeClass() Class_t {
 		p.className = "anonymous"
 	}
 
-	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, ID: GetUUID(), Methods: kv_store_methods, Attributes: kv_store_attrbts}
+	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, ID: getUUID(), Methods: kv_store_methods, Attributes: kv_store_attrbts}
 }
 
 // classNum is used to generate names for anonymous classes
