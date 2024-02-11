@@ -60,14 +60,23 @@ class KVStore:
         return self.db.get(var, None)
 
     def set(self, var_id, value) ->  bool:
+        if var_id.startswith("e13f80"):
+            pass
+
         if not isinstance(value, StoreValue):
             raise TypeError("Value should be of type Value")
 
-        if self.get(var_id) is None:
+        if (curr_val := self.get(var_id)) is None:
             self.db[var_id] = value
-        elif (val := self.get(var_id)) is not None:
-            if value.actual == val.actual and value.inferred == val.inferred and value.value == val.value:
+
+        elif curr_val is not None:
+            if value.actual == curr_val.actual and value.inferred == curr_val.inferred and value.value == curr_val.value:
                 pass
+
+            # check if the new type is a subtype of the existing type
+            # or if it is an equivalent type
+            if not check_type_equality(curr_val.inferred, value.inferred):
+                raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {curr_val.inferred}, got: {value.inferred}") 
         else:
             raise ValueError(f"Variable already exists in the store\nexists: {self.get(var_id)},\ngot: {value}")
 

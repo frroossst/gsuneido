@@ -79,6 +79,8 @@ def infer_generic(stmt, store, graph, attributes) -> SuTypes:
         case "Nary":
             return infer_nary(stmt, store, graph, attributes)
         case "Identifier":
+            if store.get(stmt["ID"]) is not None:
+                return store.get(stmt["ID"]).inferred
             return SuTypes.Any
         case "If":
             return infer_if(stmt, store, graph, attributes)
@@ -133,10 +135,10 @@ def infer_binary(stmt, store, graph, attributes) -> SuTypes:
     graph.add_node(rhs_n)
     graph.add_edge(lhs_n.value, rhs_n.value)
 
-    v = StoreValue(stmt["Value"], stmt["Type_t"], lhs_t)
-    store.set(lhs["ID"], v)
-    v = StoreValue(stmt["Value"], stmt["Type_t"], rhs_t)
-    store.set(rhs["ID"], v)
+    # v = StoreValue(stmt["Value"], stmt["Type_t"], lhs_t)
+    # store.set(lhs["ID"], v)
+    # v = StoreValue(stmt["Value"], stmt["Type_t"], rhs_t)
+    # store.set(rhs["ID"], v)
 
     # if lhs or rhs is of type Any, then the other type is inferred
     if lhs_t == SuTypes.Any:
@@ -263,6 +265,8 @@ def process_methods(methods, store, graph, attributes):
         # NOTE: only for debugging
         global current_function
         current_function = k
+        if current_function == "SameVarID":
+            pass
         print(f"{k}: {json.dumps(v, indent=4)}")
         for i in v["Body"]:
             valid_t = infer_generic(i[0], store, graph, attributes)
