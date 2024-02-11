@@ -264,6 +264,25 @@ def parse_class(clss):
 
     return members
 
+def process_parameters(methods, param_t, store, graph, attributes):
+    for k, v in methods.items():
+        if v["Parameters"] != []:
+            if param_t.get(k) is None:
+                continue
+            for p in v["Parameters"]:
+                p_id = p["ID"]
+                p_t = param_t.get(k).get(p["Value"])
+                if p_t is not None:
+                    v = StoreValue(p["Value"], p["Type_t"], SuTypes.from_str(p_t))
+                    store.set(p_id, v)
+                    n = Node(p_id)
+                    graph.add_node(n)
+                    primitive_type_node = graph.find_node(SuTypes.to_str(p_t))
+                    graph.add_edge(n.value, primitive_type_node.value)
+
+        
+            
+
 def process_methods(methods, store, graph, attributes):
     for k, v in methods.items():
         debug_info.set_func(k)
@@ -295,6 +314,7 @@ def main():
     methods = parse_class(load_data_body())
     param_t = get_test_parameter_type_values()
 
+
     print("=" * 80)
     ascii_blocks = """
      ____  _     ___   ____ _  ______  
@@ -307,6 +327,7 @@ def main():
     print("=" * 80)
 
     try:
+        process_parameters(methods, param_t, store, graph, attributes)
         process_methods(methods, store, graph, attributes)
         propogate_infer(store, graph, attributes)
     except Exception as e:

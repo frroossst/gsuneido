@@ -16,5 +16,6 @@ class Parser:
 def get_test_parameter_type_values():
     return {
         "originalTestFunc":  {"x": SuTypes.String, "y": SuTypes.Number, "z": SuTypes.Number},
+        "SameVarID": {"x": SuTypes.String},
     }
 

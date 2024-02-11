@@ -22,7 +22,7 @@ func main() {
 			x: 0
 			msg: "hello"
 			myMessage: ""
-		SameVarID() 
+		SameVarID(x) 
 			{
 			x = "123"
 			x = 123

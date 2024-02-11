@@ -1,95 +1,110 @@
 {
-    "823ff3a6b3444da8b80914ef1fd66a13": {
+    "c989498c37624497a1eb946d1a616f64": {
+        "value": "x",
+        "actual": "",
+        "inferred": "String"
+    },
+    "c331def7c95b44c1a0386bc712645ecb": {
+        "value": "y",
+        "actual": "",
+        "inferred": "Number"
+    },
+    "f2140e0a1a1e4bfd8cd4f2412b72ec88": {
+        "value": "z",
+        "actual": "",
+        "inferred": "Number"
+    },
+    "8cc6ee034c634222924d7798936ab09b": {
         "value": "x",
         "actual": "Any",
         "inferred": "Number"
     },
-    "ae2a1d560ff14fccbc030a1329e83069": {
+    "7fe9b93df4a14fb0875149d6702f5288": {
         "value": "123",
         "actual": "Number",
         "inferred": "Number"
     },
-    "d7299d86ba1646f0a3fca1132947e86c": {
+    "fa41360f74ad44aa8769f6c503e501f0": {
         "value": "nil",
         "actual": "Unknown",
         "inferred": "Number"
     },
-    "2820b158bf3a42bcabc50d59284e0a65": {
+    "f614a34d708543ea8ca028b9b6946751": {
         "value": "99",
         "actual": "Number",
         "inferred": "Number"
     },
-    "74f2eab6787549fa8313962d8c3c7935": {
+    "d40808b12e7d48438dbc7840274c2227": {
         "value": "68",
         "actual": "Number",
         "inferred": "Number"
     },
-    "37c317af026d48cd9b121ebe4c0ea849": {
+    "e959ef5a1c8349c988c729dfb36b4242": {
         "value": "nil",
         "actual": "InBuiltOperator",
         "inferred": "Any"
     },
-    "ed9538ecbb2e4ffc9516b756fe45eb2b": {
+    "f675d292d4ee4d5b9f000e61fd4de135": {
         "value": "x",
         "actual": "Unknown",
         "inferred": "Number"
     },
-    "38603f5e83344131925f86f3eeee6c57": {
+    "a5d5da3be06747528c094fd7920e7806": {
         "value": "msg",
         "actual": "Unknown",
         "inferred": "String"
     },
-    "0307ae652afc42fb9c444d9294f77f9a": {
+    "2b11a4d65af5444d80a8e8f80ff7deb7": {
         "value": "nil",
         "actual": "Unknown",
         "inferred": "Object"
     },
-    "9372ebd9529b40c2b386c216f997d96d": {
+    "ed3ea876047544308cc58b2189306119": {
         "value": "x",
         "actual": "Any",
         "inferred": "Number"
     },
-    "dc7e90cf34b942089b3bb0ddd6268c3c": {
+    "3e1035825ac44589baa6236ef371ef50": {
         "value": "y",
         "actual": "Any",
         "inferred": "Number"
     },
-    "fd83ca7d91a44a4180e18c47bb59bdde": {
+    "6c1dbe2b66d147c7a9a7bb89bf680c05": {
         "value": "nil",
         "actual": "Unknown",
         "inferred": "Number"
     },
-    "48265e8cf7844442a48b55eee6e88cfe": {
+    "6a8405bc0b6043a995990e7d9bbdf007": {
         "value": "myMessage",
         "actual": "Member",
         "inferred": "String"
     },
-    "467acb38e11340d89fbdb3d8a4f73168": {
+    "2b40f827c0ca429b9e0e8ee1b892a4ea": {
         "value": "myMessage",
         "actual": "Unknown",
         "inferred": "String"
     },
-    "fa51bd5852c14ca99c0edd1a978213b3": {
+    "39657151c538432fba72b5aae7710aa0": {
         "value": "str",
         "actual": "Any",
         "inferred": "String"
     },
-    "3b157d04c6a04af39ca17b37cb38bb93": {
+    "7e610871361d48a6b82b98a46dcfb68e": {
         "value": "x",
         "actual": "Variable",
         "inferred": "String"
     },
-    "150c179280df435b90f5c5429ada3f5d": {
+    "859e3f0971cd4f0a9770601b3e7a8ade": {
         "value": "\"123\"",
         "actual": "String",
         "inferred": "String"
     },
-    "7949cb5a2e7d4d7bbd8e12a54d3814dc": {
+    "e6526d04393b474499bc80b01235c586": {
         "value": "Eq",
         "actual": "InBuiltOperator",
         "inferred": "String"
     },
-    "e0caf6523fc84503946d1cabb8848ac3": {
+    "e2a5ffd9a0384b20b3bea4e12ffdb6dd": {
         "value": "123",
         "actual": "Number",
         "inferred": "Number"
