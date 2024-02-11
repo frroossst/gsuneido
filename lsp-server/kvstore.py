@@ -61,9 +61,6 @@ class KVStore:
         return self.db.get(var, None)
 
     def set(self, var_id, value) ->  bool:
-        if var_id.startswith("e13f80"):
-            pass
-
         if not isinstance(value, StoreValue):
             raise TypeError("Value should be of type Value")
 

@@ -73,7 +73,6 @@ def get_type_assertion_functions() -> list[str]:
 
 
 def infer_generic(stmt, store, graph, attributes) -> SuTypes:
-    print(f"[LOG] {store.get('e13f80ba58bf46138a09eef589eb0c76')}")
     match stmt["Tag"]:
         case "Unary":
             return infer_unary(stmt, store, graph, attributes)
