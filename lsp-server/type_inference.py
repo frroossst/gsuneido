@@ -149,6 +149,8 @@ def infer_binary(stmt, store, graph, attributes) -> SuTypes:
     elif rhs_t == SuTypes.Any:
         store.set(rhs["ID"], StoreValue(lhs["Value"], lhs["Type_t"], lhs_t))
         return lhs_t
+    elif not check_type_equivalence(lhs_t, rhs_t):
+        raise TypeError(f"Conflicting inferred types for variable {lhs['ID']}\nexisting: {lhs_t}, got: {rhs_t}")
     else:
         return SuTypes.NotApplicable
     
@@ -219,7 +221,7 @@ def infer_attribute(stmt, store, graph, attributes):
     attrb_t = attributes.get(value, None)
 
     if attrb_t is None:
-        raise TypeError(f"Attribute {value} not found")
+        raise TypeError(f"Attribute `{value}` not found in current class")
     
     valid_t = SuTypes.from_str(attrb_t["Type_t"])
     v = StoreValue(stmt["Value"], SuTypes.from_str(stmt["Type_t"]), valid_t)
@@ -306,7 +308,7 @@ def main():
         process_methods(methods, store, graph, attributes)
         propogate_infer(store, graph, attributes)
     except Exception as e:
-        if not not args.t:
+        if not args.t:
             print(f"Exception: {e}")
         else:
             debug_info.trigger(e)

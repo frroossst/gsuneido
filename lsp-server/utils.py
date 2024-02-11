@@ -19,5 +19,5 @@ class DebugInfo:
         self.line_num = line_num
 
     def trigger(self, e, msg = ""):
-        raise Exception(f"Error in {self.func_name} at line {self.line_num}: {msg} {e}") from e
+        raise TypeError(f"Error in {self.func_name}() at line {self.line_num}: {msg} {e}") from e
 

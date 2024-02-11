@@ -126,6 +126,6 @@ the type of a variable is immutable, so, num cannot be reassigned to a string
 
 ## TODO
 
-- [ ] Implement a way to scope varibales local to a function (2 way mapping of IDs to identifier name)
+- [x] Implement a way to scope varibales local to a function (2 way mapping of IDs to identifier name)
 - [ ] Implement function signature parsing and developer defined types
-- [ ] Add debug info and symbols
+- [x] Add debug info and symbols

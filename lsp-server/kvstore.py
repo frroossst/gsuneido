@@ -1,4 +1,4 @@
-from sutypes import SuTypes, check_type_equality
+from sutypes import SuTypes, check_type_equal_or_subtype, check_type_equality
 
 
 class StoreValue:
@@ -68,15 +68,13 @@ class KVStore:
 
         if (curr_val := self.get(var_id)) is None:
             self.db[var_id] = value
-
         elif curr_val is not None:
-            if value.actual == curr_val.actual and value.inferred == curr_val.inferred and value.value == curr_val.value:
-                pass
-
             # check if the new type is a subtype of the existing type
             # or if it is an equivalent type
-            if not check_type_equality(curr_val.inferred, value.inferred):
+            if not check_type_equal_or_subtype(value.inferred, curr_val.inferred):
                 raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {curr_val.inferred}, got: {value.inferred}") 
+            else:
+                self.db[var_id] = value
         else:
             raise ValueError(f"Variable already exists in the store\nexists: {self.get(var_id)},\ngot: {value}")
 

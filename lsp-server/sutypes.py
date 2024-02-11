@@ -129,4 +129,16 @@ def check_type_equality(lhs, rhs) -> bool:
         return True
     return lhs == rhs
 
+def check_type_equal_or_subtype(parent, child):
+    """
+    @param parent: SuTypes
+    @param child: SuTypes
+    returns if the child is a subtype of the parent or is equal
+    """
+    if not (isinstance(parent, SuTypes) and isinstance(child, SuTypes)):
+        raise ValueError(f"lhs and rhs should be of type SuTypes, got {parent} and {child}")
+
+    are_equal = check_type_equality(parent, child)
+    if are_equal:
+        return True
 
