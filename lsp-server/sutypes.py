@@ -21,6 +21,7 @@ class SuTypes(Enum):
     def from_str(str):
         if isinstance(str, SuTypes):
             return str
+
         match str:
             case "String":
                 return SuTypes.String
@@ -81,39 +82,6 @@ class EnumEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-class UnionSuType():
-
-    # types is a set
-    types = None
-
-    def __init__(self, args: list):
-        self.types = set(args)
-
-    def __str__(self):
-        return f"UnionSuType({', '.join([str(x) for x in self.types])})"
-
-    def __repr__(self):
-        return f"UnionSuType({', '.join([str(x) for x in self.types])})"
-
-    def add_type(self, t: SuTypes):
-        self.types.add(t)
-
-    def remove_type(self, t: SuTypes):
-        self.type.remove(t)
-
-    def unify(self):
-        pass
-
-
-class IntersectSuType():
-
-    types = None
-
-    def __init__(self) -> None:
-        pass
-
-
-
 def check_type_equality(lhs, rhs) -> bool:
     if not (isinstance(lhs, SuTypes) and isinstance(rhs, SuTypes)):
         raise ValueError(f"lhs and rhs should be of type SuTypes, got {lhs} and {rhs}")
@@ -124,8 +92,8 @@ def check_type_equality(lhs, rhs) -> bool:
     if lhs == SuTypes.InBuiltOperator or rhs == SuTypes.InBuiltOperator:
         return True
     if lhs == SuTypes.Unknown or rhs == SuTypes.Unknown:
-        print("Unknown type not handled in type equivalence check")
-        # ! remove this line
+        # NOTE: Unknown is treated the same as Any; 
+        # TODO: unknown would be removed as a type OR unknown checks would be enforced
         return True
     return lhs == rhs
 

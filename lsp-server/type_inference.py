@@ -7,7 +7,7 @@ import json
 from graph import Graph, Node
 from kvstore import KVStore, StoreValue
 from sutypes import SuTypes
-from type_parser import get_test_parameter_type_values
+from type_parser import get_test_custom_type_bindings, get_test_custom_type_values, get_test_parameter_type_values
 from utils import DebugInfo
 
 def check_type_equivalence(lhs, rhs) -> bool:
@@ -167,14 +167,13 @@ def infer_nary(stmt, store, graph, attributes) -> SuTypes:
             i = i["Args"][0]
             if i["Value"] in get_type_assertion_functions():
                 typed_check_t = SuTypes.from_str(i["Value"].removesuffix("?"))
-
                 type_checked_var = i["Args"][0]
 
-                n = Node(type_checked_var["ID"])
                 v = StoreValue(type_checked_var["Value"], SuTypes.from_str(type_checked_var["Type_t"]), typed_check_t)
                 store.set(type_checked_var["ID"], v)
-                graph.add_node(n)
 
+                n = Node(type_checked_var["ID"])
+                graph.add_node(n)
                 primitive_type_node = graph.find_node(SuTypes.to_str(typed_check_t))
                 graph.add_edge(n.value, primitive_type_node.value)
 
@@ -285,9 +284,6 @@ def process_parameters(methods, param_t, store, graph, attributes):
 def process_methods(methods, store, graph, attributes):
     for k, v in methods.items():
         debug_info.set_func(k)
-        if debug_info.func_name == "SameVarID":
-            pass
-        print(f"{k}: {json.dumps(v, indent=4)}")
         for x, i in enumerate(v["Body"]):
             debug_info.set_line(x + 1)
             valid_t = infer_generic(i[0], store, graph, attributes)
@@ -325,8 +321,12 @@ def main():
     print(ascii_blocks)
     print("=" * 80)
 
+    typedefs = get_test_custom_type_values()
+    bindings = get_test_custom_type_bindings()
+
     try:
         process_parameters(methods, param_t, store, graph, attributes)
+        process_custom_types(methods, typedefs, bindings, store, graph, attributes)
         process_methods(methods, store, graph, attributes)
         propogate_infer(store, graph, attributes)
     except Exception as e:

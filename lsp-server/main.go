@@ -22,6 +22,12 @@ func main() {
 			x: 0
 			msg: "hello"
 			myMessage: ""
+		currencyTypeAlias()
+			{
+			u = "USD"
+			nu = "usd"
+			ou = "other"
+			}
 		SameVarID(x) 
 			{
 			x = "123"
