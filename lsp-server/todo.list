@@ -1,3 +1,10 @@
-Get scoped UUIDs working correctly
-Get String?(x) type func runtime checks working 
-Attach debug info
+Custom TypeRepr 
+- Function type
+- Type aliases
+- Unions
+- Intersections
+
+Unit Tests
+DSL Parser for user defined types
+Runtime checks for inference
+Insert asserts and logger to verify the correctness of the inference 

@@ -1,8 +1,8 @@
 type originalTestFunc >>= fn(x: Number, y: Number, z: Number) -> Any
 
-type Currency >>= "CAD" | "USD" | "GBP"
-
 type MyNumber >>= Number
+
+type Currency >>= "CAD" | "USD" | "GBP"
 
 type StrNum >>= String | Number
 
