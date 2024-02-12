@@ -138,6 +138,7 @@ class TypeRepr:
         self.solve_definition()
         other.solve_definition()
 
+        # ? can there be a case where the types are unequal but the definitions are the same or vice-versa?
         return self.sutype_t == other.sutype_t and self.definition == other.definition 
 
     def solve_definition(self):

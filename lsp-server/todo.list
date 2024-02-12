@@ -5,7 +5,8 @@
     - [ ] Function type
     - [ ] Type aliases
     - [ ] Unions
-    - [ ] Intersections
+    - [ ] Intersectionear
+    
 
 - [ ] DSL Parser for user defined types
 - [ ] Runtime checks for inference

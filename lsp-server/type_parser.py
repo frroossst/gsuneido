@@ -89,3 +89,10 @@ if __name__ == "__main__":
     p.parse("type originalTestFunc >>= fn(x: String, y: Number, z: Number) -> Any")
     print(p.generate_json())
 
+    p = Parser()    
+    p.parse("type MyNumber >>= Number")
+    print(p.generate_json())
+
+    p = Parser()
+    p.parse('type Currency >>= "USD" | "CAD" | "GBP"')
+    print(p.generate_json())

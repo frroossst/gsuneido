@@ -22,9 +22,6 @@ func main() {
 			x: 0
 			msg: "hello"
 			myMessage: ""
-		ParameterMismatch(x) {
-			x = "hello"
-		}
 		currencyTypeAlias()
 			{
 			u = "USD"

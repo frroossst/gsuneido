@@ -19,18 +19,33 @@ def should_pass(func):
     def wrapper(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except Exception as e:
+        except Exception:
             print(f"[FAILED] {func.__name__} should NOT raise a TypeError")
         else:
             pass
 
     return wrapper
 
+def type_inference_test(methods, attributes, param_t, typedefs, bindings):
+    graph = Graph()
+    store = KVStore()
 
+    process_parameters(methods, param_t, store, graph, attributes)
+    process_custom_types(methods, typedefs, bindings, store, graph, attributes)
+    process_methods(methods, store, graph, attributes)
+    propogate_infer(store, graph, check=True)
+
+"""
+ _____         _       
+|_   _|__  ___| |_ ___ 
+  | |/ _ \/ __| __/ __|
+  | |  __/\__ \ |_\__ \
+  |_|\___||___/\__|___/
+"""
 
 @should_fail
 def test_single_line_type_mismatch():
-    src = """
+    _src = """
     class 
     	{
     	foo() 
@@ -95,10 +110,9 @@ def test_single_line_type_mismatch():
 
     type_inference_test(methods, attributes, param_t, typedefs, bindings)
 
-
 @should_fail
 def test_single_variable_reassignment():
-    src = """
+    _src = """
     class 
     	{
     	foo() 
@@ -188,7 +202,6 @@ def test_single_variable_reassignment():
 
     type_inference_test(methods, attributes, param_t, typedefs, bindings)
 
-
 @should_fail
 def test_parameter_type_mismatch():
 
@@ -256,16 +269,6 @@ def test_parameter_type_mismatch():
 
     type_inference_test(methods, attributes, param_t, typedefs, bindings)
 
-
-
-def type_inference_test(methods, attributes, param_t, typedefs, bindings):
-    graph = Graph()
-    store = KVStore()
-
-    process_parameters(methods, param_t, store, graph, attributes)
-    process_custom_types(methods, typedefs, bindings, store, graph, attributes)
-    process_methods(methods, store, graph, attributes)
-    propogate_infer(store, graph, check=True)
 
 
 def main():
