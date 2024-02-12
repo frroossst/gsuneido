@@ -22,8 +22,7 @@ func main() {
 			x: 0
 			msg: "hello"
 			myMessage: ""
-		Reassignment() {
-			x = 123
+		ParameterMismatch(x) {
 			x = "hello"
 		}
 		currencyTypeAlias()

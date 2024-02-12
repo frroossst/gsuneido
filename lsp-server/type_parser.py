@@ -67,6 +67,7 @@ def get_test_parameter_type_values():
     return {
         "originalTestFunc":  {"x": SuTypes.Number, "y": SuTypes.Number, "z": SuTypes.Number},
         "SameVarID": {"x": SuTypes.String},
+        "ParameterMismatch": {"x": SuTypes.String},
     }
 
 def get_test_custom_type_bindings():

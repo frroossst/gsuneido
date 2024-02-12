@@ -1,5 +1,6 @@
 from graph import Graph
 from kvstore import KVStore
+from sutypes import SuTypes
 from type_inference import parse_class, process_parameters, process_methods, process_custom_types, propogate_infer
 
 
@@ -28,9 +29,7 @@ def should_pass(func):
 
 
 @should_fail
-def single_line_type_mismatch():
-    global current_function
-    current_function = "single_line_type_mismatch"
+def test_single_line_type_mismatch():
     src = """
     class 
     	{
@@ -98,9 +97,7 @@ def single_line_type_mismatch():
 
 
 @should_fail
-def single_variable_reassignment():
-    global current_function
-    current_function = "single_variable_reassignment"
+def test_single_variable_reassignment():
     src = """
     class 
     	{
@@ -192,6 +189,75 @@ def single_variable_reassignment():
     type_inference_test(methods, attributes, param_t, typedefs, bindings)
 
 
+@should_fail
+def test_parameter_type_mismatch():
+
+    ast = {
+        "Tag": "Class",
+        "Value": "nil",
+        "Type_t": "Class",
+        "Args": None,
+        "Name": "",
+        "Base": "class",
+        "ID": "1f9d089323e0446ba607abd71291c4d5",
+        "Methods": {
+            "ParameterMismatch": [
+                {
+                    "Tag": "Function",
+                    "Value": "",
+                    "Type_t": "Function",
+                    "Args": None,
+                    "Name": "ParameterMismatch",
+                    "ID": "bb642a69c4924a07b471472137dcc7a0",
+                    "Parameters": [
+                        {
+                            "Tag": "Parameter",
+                            "Value": "x",
+                            "Type_t": "",
+                            "Args": None,
+                            "ID": "33d1feb10715407e91d988d7a44d6d71"
+                        }
+                    ],
+                    "Body": [
+                        [
+                            {
+                                "Tag": "Binary",
+                                "Value": "Eq",
+                                "Type_t": "Operator",
+                                "Args": [
+                                    {
+                                        "Tag": "Identifier",
+                                        "Value": "x",
+                                        "Type_t": "Variable",
+                                        "Args": None,
+                                        "ID": "33d1feb10715407e91d988d7a44d6d71"
+                                    },
+                                    {
+                                        "Tag": "Constant",
+                                        "Value": "\"hello\"",
+                                        "Type_t": "String",
+                                        "Args": None,
+                                        "ID": "14eeb65ae9a74560815e7ed66b46ff1c"
+                                    }
+                                ],
+                                "ID": "f55c62417fba4a62ade969e1c9b532c9"
+                            }
+                        ]
+                    ]
+                }
+            ],
+        },
+        "Attributes": {}
+    }
+
+    methods = parse_class(ast["Methods"])
+    attributes = parse_class(ast["Attributes"])
+    param_t, typedefs, bindings = { "ParameterMismatch": {"x": SuTypes.Number} }, {}, {}
+
+    type_inference_test(methods, attributes, param_t, typedefs, bindings)
+
+
+
 def type_inference_test(methods, attributes, param_t, typedefs, bindings):
     graph = Graph()
     store = KVStore()
@@ -202,12 +268,10 @@ def type_inference_test(methods, attributes, param_t, typedefs, bindings):
     propogate_infer(store, graph, check=True)
 
 
-
-
 def main():
-    single_line_type_mismatch()
-    single_variable_reassignment()
+    test_single_line_type_mismatch()
+    test_single_variable_reassignment()
+    test_parameter_type_mismatch()
     
-
 if __name__ == "__main__":
     main()
