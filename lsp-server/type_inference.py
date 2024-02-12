@@ -279,11 +279,13 @@ def process_parameters(methods, param_t, store, graph, attributes):
                     graph.add_edge(n.value, primitive_type_node.value)
             
 
-def process_methods(methods, store, graph, attributes):
+def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
-        debug_info.set_func(k)
+        if dbg is not None:
+            dbg.set_func(k)
         for x, i in enumerate(v["Body"]):
-            debug_info.set_line(x + 1)
+            if dbg is not None:
+                dbg.set_line(x + 1)
             valid_t = infer_generic(i[0], store, graph, attributes)
             if valid_t == SuTypes.NotApplicable or valid_t is None:
                 continue
@@ -298,7 +300,6 @@ def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
 
 
 def main():
-    global debug_info
     debug_info = DebugInfo()
 
     p = argparse.ArgumentParser("Type Inference")
@@ -329,7 +330,7 @@ def main():
     try:
         process_parameters(methods, param_t, store, graph, attributes)
         process_custom_types(methods, typedefs, bindings, store, graph, attributes)
-        process_methods(methods, store, graph, attributes)
+        process_methods(methods, store, graph, attributes, dbg=debug_info)
         propogate_infer(store, graph, attributes)
     except Exception as e:
         if not args.t:

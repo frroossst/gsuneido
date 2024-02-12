@@ -1,3 +1,4 @@
+- [ ] Unit Tests
 - [ ] Replace existing interface with TypeRepr
 
 - [ ] Custom TypeRepr 
@@ -6,7 +7,6 @@
     - [ ] Unions
     - [ ] Intersections
 
-- [ ] Unit Tests
 - [ ] DSL Parser for user defined types
 - [ ] Runtime checks for inference
 - [ ] Insert asserts and logger to verify the correctness of the inference 

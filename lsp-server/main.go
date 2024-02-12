@@ -22,6 +22,10 @@ func main() {
 			x: 0
 			msg: "hello"
 			myMessage: ""
+		Reassignment() {
+			x = 123
+			x = "hello"
+		}
 		currencyTypeAlias()
 			{
 			u = "USD"
