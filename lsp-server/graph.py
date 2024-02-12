@@ -16,6 +16,7 @@ a path is found, then the constraints are satisfiable, otherwise they are not
 class Graph:
 
     nodes = None
+    primitive_type_nodes = None
 
     def __repr__(self) -> str:
         return f"Graph(\n\t{self.nodes}\n)"
@@ -26,6 +27,7 @@ class Graph:
         # add primitive types
         for i in self.get_primitive_type_nodes():
             self.add_node(i)
+            self.primitive_type_nodes.append(i)
 
     @classmethod
     def get_primitive_type_nodes(cls):
@@ -45,6 +47,12 @@ class Graph:
     @staticmethod
     def get_primitive_type_string():
         return "StringNumberBooleanAnyNotApplicableNeverFunctionObjectInBuiltOperator"
+
+    def get_basal_types(self):
+        return self.primitive_type_nodes
+
+    def add_basal_type(self, ty):
+        pass
 
     def get_nodes(self):
         return self.nodes

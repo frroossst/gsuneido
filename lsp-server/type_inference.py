@@ -277,8 +277,6 @@ def process_parameters(methods, param_t, store, graph, attributes):
                     graph.add_node(n)
                     primitive_type_node = graph.find_node(SuTypes.to_str(p_t))
                     graph.add_edge(n.value, primitive_type_node.value)
-
-        
             
 
 def process_methods(methods, store, graph, attributes):
@@ -294,6 +292,10 @@ def process_methods(methods, store, graph, attributes):
             n = Node(i[0]["ID"])
             graph.add_node(n)
             graph.add_edge(n.value, graph.find_node(valid_t.name).value)
+
+def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
+    pass
+
 
 def main():
     global debug_info

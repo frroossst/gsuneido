@@ -1,5 +1,6 @@
 from enum import Enum
 import json
+import uuid
 
 
 class SuTypes(Enum):
@@ -82,6 +83,82 @@ class EnumEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+class TypeRepr:
+
+    name = None
+
+    sutype_t = None
+
+    definition = None
+    """
+    definition is a dictionary of the form:
+    {
+        "form": "Primitive",
+        "name": "Number",
+        "meaning": SuTypes.Number
+    }
+
+    {
+        "form": "Union",
+        "name": "StrNum",
+        "meaning": [SuTypes.String, SuTypes.Number]
+    }
+
+    {
+        "form": "Alias",
+        "name": "MyType",
+        "meaning": [SuTypes.Boolean]
+    }
+
+    {
+        "form": "Object",
+        "name": "User",
+        "meaning": {
+            "name": SuTypes.String,
+            "age": SuTypes.Number
+        }
+    }
+
+    """
+
+    def __init__(self, definition):
+        self.name = str(uuid.uuid1()).replace("-", "")
+        self.definition = definition
+
+    def __repr__(self):
+        return f"TypeRepr(type={self.sutype_t.name}, definition={self.definition})"
+
+    def __str__(self):
+        return f"TypeRepr(type={self.sutype_t.name}, definition={self.definition})"
+
+    def __eq__(self, other):
+        if not isinstance(other, TypeRepr):
+            raise ValueError(f"Cannot compare SuTypes with {other}")
+
+        self.solve_definition()
+        other.solve_definition()
+
+        return self.sutype_t == other.sutype_t and self.definition == other.definition 
+
+    def solve_definition(self):
+        match self.definition["form"]:
+            case "Union":
+                return self.define_union()
+            case "Intersect":
+                return self.define_intersect()
+            case "Alias":
+                return self.define_alias()
+            case "Function":
+                return self.define_function()
+            case "Object":
+                return self.define_object()
+            case "Primitive":
+                self.sutype_t = SuTypes.from_str(self.definition["name"])
+            case _:
+                raise ValueError(f"Unknown form {self.definition['form']}")
+
+
+
 def check_type_equality(lhs, rhs) -> bool:
     if not (isinstance(lhs, SuTypes) and isinstance(rhs, SuTypes)):
         raise ValueError(f"lhs and rhs should be of type SuTypes, got {lhs} and {rhs}")
@@ -109,4 +186,10 @@ def check_type_equal_or_subtype(parent, child):
     are_equal = check_type_equality(parent, child)
     if are_equal:
         return True
+
+
+if __name__ == "__main__":
+    a = TypeRepr({"form": "Primitive", "name": "Number", "meaning": SuTypes.Number})
+    b = TypeRepr({"form": "Primitive", "name": "Number", "meaning": SuTypes.Number})
+    assert a == b
 
