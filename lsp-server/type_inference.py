@@ -247,7 +247,7 @@ def infer_object(stmt, store, graph, attributes):
     return SuTypes.Object
 
 def propogate_infer(store, graph, check=False):
-    primitives = graph.get_primitive_type_nodes()
+    primitives = graph.get_basal_types()
 
     # dfs through each primitive and assign the same sutype to connecting nodes
     for p in primitives:

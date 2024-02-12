@@ -5,7 +5,7 @@
         "arguments": [
             {
                 "name": "x",
-                "type": "String"
+                "type": "Number"
             },
             {
                 "name": "y",

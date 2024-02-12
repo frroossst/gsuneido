@@ -23,6 +23,7 @@ class Graph:
 
     def __init__(self):
         self.nodes = []
+        self.primitive_type_nodes = []
 
         # add primitive types
         for i in self.get_primitive_type_nodes():

@@ -1,10 +1,12 @@
-Custom TypeRepr 
-- Function type
-- Type aliases
-- Unions
-- Intersections
+- [ ] Replace existing interface with TypeRepr
 
-Unit Tests
-DSL Parser for user defined types
-Runtime checks for inference
-Insert asserts and logger to verify the correctness of the inference 
+- [ ] Custom TypeRepr 
+    - [ ] Function type
+    - [ ] Type aliases
+    - [ ] Unions
+    - [ ] Intersections
+
+- [ ] Unit Tests
+- [ ] DSL Parser for user defined types
+- [ ] Runtime checks for inference
+- [ ] Insert asserts and logger to verify the correctness of the inference 
