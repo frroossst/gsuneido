@@ -87,7 +87,7 @@ class TypeRepr:
 
     name = None
 
-    sutype_t = None
+    solved_t = None
 
     definition = None
     """
@@ -95,7 +95,7 @@ class TypeRepr:
     {
         "form": "Primitive",
         "name": "Number",
-        "meaning": SuTypes.Number
+        "meaning": [SuTypes.Number]
     }
 
     {
@@ -122,14 +122,24 @@ class TypeRepr:
     """
 
     def __init__(self, definition):
-        self.name = str(uuid.uuid1()).replace("-", "")
+        if not isinstance(definition, dict):
+            raise ValueError(f"definition should be a dictionary, got {definition}")
+        if definition.get("form") is None or definition.get("meaning") is None:
+            raise ValueError(f"definition should have form, name and meaning, got {definition}")
+
+        if (name:= definition.get("name")) is None:
+            self.name = str(uuid.uuid1()).replace("-", "")
+        else:
+            self.name = name
+
         self.definition = definition
+        self.solve_definition()
 
     def __repr__(self):
-        return f"TypeRepr(type={self.sutype_t.name}, definition={self.definition})"
+        return f"TypeRepr(type={self.name}, definition={self.definition})"
 
     def __str__(self):
-        return f"TypeRepr(type={self.sutype_t.name}, definition={self.definition})"
+        return f"TypeRepr(type={self.name}, definition={self.definition})"
 
     def __eq__(self, other):
         if not isinstance(other, TypeRepr):
@@ -139,7 +149,27 @@ class TypeRepr:
         other.solve_definition()
 
         # ? can there be a case where the types are unequal but the definitions are the same or vice-versa?
-        return self.sutype_t == other.sutype_t and self.definition == other.definition 
+        return self.name == other.name and self.definition == other.definition 
+
+    def __le__(self, other):
+        if not isinstance(other, TypeRepr):
+            raise ValueError(f"Cannot compare SuTypes with {other}")
+
+        self.solve_definition()
+        other.solve_definition()
+
+        # impl subtype checking here 
+        raise NotImplementedError("Subtype checking not implemented")
+
+
+    def get_name(self):
+        return self.name
+
+    def to_json(self):
+        return json.dumps(self, cls=TypeReprEncoder)
+    
+    def from_json(self, json_str):
+        return json.loads(json_str)
 
     def solve_definition(self):
         match self.definition["form"]:
@@ -154,9 +184,26 @@ class TypeRepr:
             case "Object":
                 return self.define_object()
             case "Primitive":
-                self.sutype_t = SuTypes.from_str(self.definition["name"])
+                return self.define_primitive()
             case _:
                 raise ValueError(f"Unknown form {self.definition['form']}")
+
+    def define_primitive(self):
+        if len(self.definition["meaning"]) != 1:
+            raise ValueError(f"Primitive type should have only one meaning, got {self.definition['meaning']}")
+        self.solved_t = SuTypes.from_str(self.definition["meaning"][0])
+
+
+class TypeReprEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, TypeRepr):
+            return {
+                "name": obj.name,
+                "sutype_t": obj.solved_t.name,
+                "definition": obj.definition
+            }
+        return json.JSONEncoder.default(self, obj)
+
 
 
 

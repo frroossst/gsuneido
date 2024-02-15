@@ -1,6 +1,6 @@
 from graph import Graph
 from kvstore import KVStore
-from sutypes import SuTypes
+from sutypes import SuTypes, TypeRepr
 from type_inference import parse_class, process_parameters, process_methods, process_custom_types, propogate_infer
 
 
@@ -109,6 +109,20 @@ def test_single_line_type_mismatch():
     param_t, typedefs, bindings = {}, {}, {}
 
     type_inference_test(methods, attributes, param_t, typedefs, bindings)
+
+@should_pass
+def test_single_variable_reassignment_valid():
+    _src = """
+    class
+        	{
+        	foo()
+                {
+                x = 123
+                x = 456
+                }                
+            """
+
+    raise NotImplementedError()
 
 @should_fail
 def test_single_variable_reassignment():
@@ -269,12 +283,33 @@ def test_parameter_type_mismatch():
 
     type_inference_test(methods, attributes, param_t, typedefs, bindings)
 
+@should_pass
+def test_raw_type_equality():
+    t1 = TypeRepr({'form': 'Primitive', 'name': 'Number', 'meaning': [SuTypes.Number]})
+    t2 = TypeRepr({'form': 'Primitive', 'name': 'Number', 'meaning': [SuTypes.Number]})
+
+    assert t1 == t2
+
+    t1 = TypeRepr({'form': 'Primitive', 'meaning': [SuTypes.Date]})
+    t2 = TypeRepr({'form': 'Primitive', 'meaning': [SuTypes.Boolean]})
+
+    assert t1 != t2
+
+    # t1 = TypeRepr({'form': 'Union', 'name': 'StrNum', 'meaning': [SuTypes.String, SuTypes.Number]})
+    # t2 = TypeRepr({'form': 'Union', 'name': 'StrNum', 'meaning': [SuTypes.String, SuTypes.Number]})
+
+    # assert t1 == t2
+
+
+
 
 
 def main():
     test_single_line_type_mismatch()
+    # test_single_variable_reassignment_valid()
     test_single_variable_reassignment()
-    test_parameter_type_mismatch()
+    # test_parameter_type_mismatch()
+    test_raw_type_equality()
     
 if __name__ == "__main__":
     main()

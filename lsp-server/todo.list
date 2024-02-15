@@ -2,12 +2,12 @@
 - [ ] Replace existing interface with TypeRepr
 
 - [ ] Custom TypeRepr 
-    - [ ] Function type
+    - [ ] Parameter type
     - [ ] Type aliases
+    - [ ] Function Return type
     - [ ] Unions
-    - [ ] Intersectionear
-    
+    - [ ] Intersections
 
 - [ ] DSL Parser for user defined types
-- [ ] Runtime checks for inference
+- [ ] Runtime type guards for inference
 - [ ] Insert asserts and logger to verify the correctness of the inference 

@@ -1,4 +1,4 @@
-from sutypes import SuTypes, check_type_equal_or_subtype, check_type_equality
+from sutypes import SuTypes, check_type_equal_or_subtype, check_type_equality, TypeRepr
 
 
 
@@ -61,8 +61,8 @@ class KVStore:
         return self.db.get(var, None)
 
     def set(self, var_id, value) ->  bool:
-        if not isinstance(value, StoreValue):
-            raise TypeError("Value should be of type Value")
+        if not isinstance(value, TypeRepr):
+            raise TypeError("Value should be of type TypeRepr")
 
         if (curr_val := self.get(var_id)) is None:
             self.db[var_id] = value

@@ -6,7 +6,7 @@ import json
 
 from graph import Graph, Node
 from kvstore import KVStore, StoreValue
-from sutypes import SuTypes
+from sutypes import SuTypes, TypeRepr
 from type_parser import get_test_custom_type_bindings, get_test_custom_type_values, get_test_parameter_type_values
 from utils import DebugInfo
 
@@ -271,11 +271,11 @@ def process_parameters(methods, param_t, store, graph, attributes):
                 p_id = p["ID"]
                 p_t = param_t.get(k).get(p["Value"])
                 if p_t is not None:
-                    v = StoreValue(p["Value"], p["Type_t"], SuTypes.from_str(p_t))
+                    v = TypeRepr(p_t)
                     store.set(p_id, v)
                     n = Node(p_id)
                     graph.add_node(n)
-                    primitive_type_node = graph.find_node(SuTypes.to_str(p_t))
+                    primitive_type_node = graph.find_node(v.get_name())
                     graph.add_edge(n.value, primitive_type_node.value)
             
 

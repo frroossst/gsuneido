@@ -65,7 +65,7 @@ class Parser:
 
 def get_test_parameter_type_values():
     return {
-        "originalTestFunc":  {"x": SuTypes.Number, "y": SuTypes.Number, "z": SuTypes.Number},
+        "originalTestFunc":  {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }, "y": SuTypes.Number, "z": SuTypes.Number},
         "SameVarID": {"x": SuTypes.String},
         "ParameterMismatch": {"x": SuTypes.String},
     }
