@@ -1,4 +1,4 @@
-from sutypes import SuTypes, check_type_equal_or_subtype, check_type_equality, TypeRepr
+from sutypes import SuTypes, check_type_equality, TypeRepr
 
 
 
@@ -72,7 +72,11 @@ class KVStore:
         elif curr_val is not None:
             # check if the new type is a subtype of the existing type
             # or if it is an equivalent type
-            if not check_type_equal_or_subtype(value.inferred, curr_val.inferred):
+            # if not check_type_equal_or_subtype(value.inferred, curr_val.inferred):
+            if curr_val.inferred == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any)):
+                # if current is Any then it should be overwritable
+                pass
+            elif not (curr_val.inferred <= value.inferred):
                 raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {curr_val.inferred}, got: {value.inferred}") 
             else:
                 self.db[var_id] = value
@@ -85,7 +89,7 @@ class KVStore:
             return
 
         if not check_type_equality(val.inferred, value.inferred):
-            raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {val.inferred}, got: {value.inferred}")
+            raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {val.inferred}, \ngot: {value.inferred}")
 
         if check_type_equality(SuTypes.from_str(val.actual), value.inferred):
             self.set(var_id, value)

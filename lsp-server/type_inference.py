@@ -48,7 +48,7 @@ def constraint_type_with_operator_value(value, type) -> bool:
         raise NotImplementedError("constraint and operator not implemented")
     return type in valid_types
 
-def get_valid_type_for_operator(value) -> SuTypes:
+def get_valid_type_for_operator(value) -> TypeRepr:
     valid_types = {
         "Add": SuTypes.Number,
         "PostInc": SuTypes.Number,
@@ -72,7 +72,7 @@ def get_type_assertion_functions() -> list[str]:
     ]
 
 
-def infer_generic(stmt, store, graph, attributes) -> SuTypes:
+def infer_generic(stmt, store, graph, attributes) -> TypeRepr:
     match stmt["Tag"]:
         case "Unary":
             return infer_unary(stmt, store, graph, attributes)
@@ -83,7 +83,7 @@ def infer_generic(stmt, store, graph, attributes) -> SuTypes:
         case "Identifier":
             if store.get(stmt["ID"]) is not None:
                 return store.get(stmt["ID"]).inferred
-            return SuTypes.Any
+            return TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any))
         case "If":
             return infer_if(stmt, store, graph, attributes)
         case "Call" | "Compound":
@@ -95,7 +95,7 @@ def infer_generic(stmt, store, graph, attributes) -> SuTypes:
         case "Member":
             return infer_attribute(stmt, store, graph, attributes)
         case "Constant":
-            return SuTypes.from_str(stmt["Type_t"])
+            return TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(stmt["Type_t"])))
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
@@ -122,11 +122,18 @@ def infer_binary(stmt, store, graph, attributes) -> SuTypes:
     # inferred types of lhs and rhs should be the same
     lhs_t = infer_generic(lhs, store, graph, attributes)
     if lhs_t is not None and lhs["Type_t"] != "Operator":
-        v = StoreValue(lhs["Value"], lhs["Type_t"], lhs_t)
+        v = StoreValue(
+            lhs["Value"], 
+            TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(lhs["Type_t"]))),
+            lhs_t
+        )
         store.set(lhs["ID"], v)
     rhs_t = infer_generic(rhs, store, graph, attributes)
     if rhs_t is not None and rhs["Type_t"] != "Operator":
-        v = StoreValue(rhs["Value"], rhs["Type_t"], rhs_t)
+        v = StoreValue(
+            rhs["Value"], 
+            TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(rhs["Type_t"]))),
+            rhs_t)
         store.set(rhs["ID"], v)
 
     # if not check_type_equivalence(lhs_t, rhs_t):
@@ -143,19 +150,27 @@ def infer_binary(stmt, store, graph, attributes) -> SuTypes:
     # store.set(rhs["ID"], v)
 
     # if lhs or rhs is of type Any, then the other type is inferred
-    if lhs_t == SuTypes.Any:
-        store.set(lhs["ID"], StoreValue(rhs["Value"], rhs["Type_t"], rhs_t))
+    if lhs_t == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any)):
+        store.set(lhs["ID"], StoreValue(rhs["Value"], 
+            TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(rhs["Type_t"]))),
+            rhs_t
+            )
+        )
         return rhs_t
-    elif rhs_t == SuTypes.Any:
-        store.set(rhs["ID"], StoreValue(lhs["Value"], lhs["Type_t"], lhs_t))
+    elif rhs_t == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any)):
+        store.set(rhs["ID"], StoreValue(lhs["Value"], 
+                TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(lhs["Type_t"]))),
+                lhs_t
+            )
+        )
         return lhs_t
-    elif not check_type_equivalence(lhs_t, rhs_t):
+    elif lhs_t != rhs_t:
         raise TypeError(f"Conflicting inferred types for variable {lhs['ID']}\nexisting: {lhs_t}, got: {rhs_t}")
     else:
-        return SuTypes.NotApplicable
+        return None
     
 
-def infer_nary(stmt, store, graph, attributes) -> SuTypes:
+def infer_nary(stmt, store, graph, attributes) -> TypeRepr:
     value = stmt["Value"]
     args = stmt["Args"]
 
@@ -219,20 +234,23 @@ def infer_if(stmt, store, graph, attributes):
 
     return SuTypes.NotApplicable
 
-def infer_attribute(stmt, store, graph, attributes):
+def infer_attribute(stmt, store, graph, attributes) -> TypeRepr:
     value = stmt["Value"]
     attrb_t = attributes.get(value, None)
 
     if attrb_t is None:
         raise TypeError(f"Attribute `{value}` not found in current class")
     
-    valid_t = SuTypes.from_str(attrb_t["Type_t"])
-    v = StoreValue(stmt["Value"], SuTypes.from_str(stmt["Type_t"]), valid_t)
+    valid_t = TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(attrb_t["Type_t"])))
+    v = StoreValue(stmt["Value"], 
+                   TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(stmt["Type_t"]))),
+                   valid_t
+                )
     store.set(stmt["ID"], v)
 
     n = Node(stmt["ID"])
     graph.add_node(n)
-    t = graph.find_node(valid_t.name)
+    t = graph.find_node(valid_t.get_name())
     # t.add_edge(n)
     graph.add_edge(n.value, t.value)
 
@@ -242,13 +260,13 @@ def infer_object(stmt, store, graph, attributes):
 
     for i in stmt:
         t = infer_generic(i["Args"][0], store, graph, attributes)
-        v = StoreValue(i["Args"][0]["Value"], SuTypes.from_str(i["Args"][0]["Type_t"]), t)
+        v = StoreValue(i["Args"][0]["Value"], TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(i["Args"][0]["Type_t"]))), t)
         store.set(i["Args"][0]["ID"], v)
         n = Node(i["Args"][0]["ID"])
         graph.add_node(n)
-        graph.add_edge(n.value, graph.find_node(t.name).value)
+        graph.add_edge(n.value, graph.find_node(t.get_name()).value)
 
-    return SuTypes.Object
+    return TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Object))
 
 def propogate_infer(store, graph, check=False):
     primitives = graph.get_basal_types()
@@ -288,6 +306,7 @@ def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
         if dbg is not None:
             dbg.set_func(k)
+            print(f"Processing method {k}")
         for x, i in enumerate(v["Body"]):
             if dbg is not None:
                 dbg.set_line(x + 1)
@@ -302,7 +321,7 @@ def process_methods(methods, store, graph, attributes, dbg=None):
             store.set(i[0]["ID"], v)
             n = Node(i[0]["ID"])
             graph.add_node(n)
-            graph.add_edge(n.value, graph.find_node(valid_t.name).value)
+            graph.add_edge(n.value, graph.find_node(valid_t.get_name()).value)
 
 def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
     pass

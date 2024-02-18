@@ -149,18 +149,28 @@ class TypeRepr:
         other.solve_definition()
 
         # ? can there be a case where the types are unequal but the definitions are the same or vice-versa?
-        return self.name == other.name and self.definition == other.definition 
+        return set(self.definition.get("meaning", None)) == set(other.definition.get("meaning", None))
+
+    def __ne__(self, __value: object) -> bool:
+        return not self.__eq__(__value)
+
+    def __lt__(self, other):
+        if not isinstance(other, TypeRepr):
+            raise ValueError(f"Cannot compare SuTypes with {other}")
+        
+        self.solve_definition()
+        other.solve_definition()
+
+        if other.definition.get("meaning", None)[0] == SuTypes.Any:
+            return True
+
+        return set(self.definition.get("meaning", None)) < set(other.definition.get("meaning", None))
 
     def __le__(self, other):
         if not isinstance(other, TypeRepr):
             raise ValueError(f"Cannot compare SuTypes with {other}")
 
-        self.solve_definition()
-        other.solve_definition()
-
-        # impl subtype checking here 
-        raise NotImplementedError("Subtype checking not implemented")
-
+        return (self == other) or (self < other)
 
     def get_name(self):
         return self.name
