@@ -193,6 +193,14 @@ class TypeRepr:
             raise ValueError(f"Primitive type should have only one meaning, got {self.definition['meaning']}")
         self.solved_t = SuTypes.from_str(self.definition["meaning"][0])
 
+    @staticmethod
+    def construct_definition_from_primitive(t: SuTypes):
+        return {
+            "form": "Primitive",
+            "name": t.name,
+            "meaning": [t]
+        }
+
 
 class TypeReprEncoder(json.JSONEncoder):
     def default(self, obj):

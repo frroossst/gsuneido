@@ -4,12 +4,15 @@ from sutypes import SuTypes, check_type_equal_or_subtype, check_type_equality, T
 
 class StoreValue:
 
-    def __init__(self, value, actual: SuTypes, inferred: SuTypes) -> None:
+    def __init__(self, value, actual: TypeRepr, inferred: TypeRepr) -> None:
         """
         @param value: The name of the variable
         @param actual: The actual type of the variable
         @param inferred: The inferred type of the variable
         """
+        if not isinstance(actual, TypeRepr) or not isinstance(inferred, TypeRepr):
+            raise ValueError("actual and inferred should be of type TypeRepr")
+
         self.value = value
         self.actual = actual
         self.inferred = inferred
@@ -61,8 +64,8 @@ class KVStore:
         return self.db.get(var, None)
 
     def set(self, var_id, value) ->  bool:
-        if not isinstance(value, TypeRepr):
-            raise TypeError("Value should be of type TypeRepr")
+        if not isinstance(value, StoreValue):
+            raise ValueError("Value should be of type StoreVale")
 
         if (curr_val := self.get(var_id)) is None:
             self.db[var_id] = value

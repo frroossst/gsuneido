@@ -65,9 +65,11 @@ class Parser:
 
 def get_test_parameter_type_values():
     return {
-        "originalTestFunc":  {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }, "y": SuTypes.Number, "z": SuTypes.Number},
-        "SameVarID": {"x": SuTypes.String},
-        "ParameterMismatch": {"x": SuTypes.String},
+        "originalTestFunc":  {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }, 
+                              "y": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] },
+                              "z": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }},
+        "SameVarID": {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.String]}},
+        "ParameterMismatch": {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.String]}},
     }
 
 def get_test_custom_type_bindings():

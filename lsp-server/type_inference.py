@@ -58,7 +58,7 @@ def get_valid_type_for_operator(value) -> SuTypes:
 
     if (x:= valid_types.get(value, None) )is None:
         raise NotImplementedError("valid operator type not implemented")
-    return x
+    return TypeRepr({ "form": "Primitive", "meaning": [x], "name": SuTypes.to_str(x) })
 
 def get_type_assertion_functions() -> list[str]:
     return [
@@ -169,12 +169,16 @@ def infer_nary(stmt, store, graph, attributes) -> SuTypes:
                 typed_check_t = SuTypes.from_str(i["Value"].removesuffix("?"))
                 type_checked_var = i["Args"][0]
 
-                v = StoreValue(type_checked_var["Value"], SuTypes.from_str(type_checked_var["Type_t"]), typed_check_t)
+                v = StoreValue(
+                    type_checked_var["Value"], 
+                    TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(type_checked_var["Type_t"]))),
+                    typed_check_t
+                    )
                 store.set(type_checked_var["ID"], v)
 
                 n = Node(type_checked_var["ID"])
                 graph.add_node(n)
-                primitive_type_node = graph.find_node(SuTypes.to_str(typed_check_t))
+                primitive_type_node = graph.find_node(typed_check_t.get_name())
                 graph.add_edge(n.value, primitive_type_node.value)
 
         """
@@ -183,14 +187,14 @@ def infer_nary(stmt, store, graph, attributes) -> SuTypes:
         """
 
         n = Node(i["ID"])
-        v = StoreValue(i["Value"], SuTypes.from_str(i["Type_t"]), valid_t)
+        v = StoreValue(i["Value"], TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(i["Type_t"]))), valid_t)
         store.set(i["ID"], v)
         graph.add_node(n)
         if prev is not None:
             graph.add_edge(prev.value, n.value)
         prev = n
 
-    valid_str = SuTypes.to_str(valid_t)
+    valid_str = valid_t.get_name()
     n = graph.find_node(valid_str)
     # n.add_edge(prev)
     graph.add_edge(prev.value, n.value)
@@ -271,11 +275,12 @@ def process_parameters(methods, param_t, store, graph, attributes):
                 p_id = p["ID"]
                 p_t = param_t.get(k).get(p["Value"])
                 if p_t is not None:
-                    v = TypeRepr(p_t)
+                    tr = TypeRepr(p_t)
+                    v = StoreValue(p_id, TypeRepr(p_t), TypeRepr(p_t))
                     store.set(p_id, v)
                     n = Node(p_id)
                     graph.add_node(n)
-                    primitive_type_node = graph.find_node(v.get_name())
+                    primitive_type_node = graph.find_node(tr.get_name())
                     graph.add_edge(n.value, primitive_type_node.value)
             
 
@@ -287,9 +292,13 @@ def process_methods(methods, store, graph, attributes, dbg=None):
             if dbg is not None:
                 dbg.set_line(x + 1)
             valid_t = infer_generic(i[0], store, graph, attributes)
-            if valid_t == SuTypes.NotApplicable or valid_t is None:
+            if valid_t is None:
                 continue
-            v = StoreValue(i[0]["Value"], SuTypes.from_str(i[0]["Type_t"]), valid_t)
+            v = StoreValue(
+                i[0]["Value"], 
+                TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(i[0]["Type_t"]))), 
+                valid_t
+                )
             store.set(i[0]["ID"], v)
             n = Node(i[0]["ID"])
             graph.add_node(n)
@@ -327,16 +336,16 @@ def main():
     typedefs = get_test_custom_type_values()
     bindings = get_test_custom_type_bindings()
 
-    try:
-        process_parameters(methods, param_t, store, graph, attributes)
-        process_custom_types(methods, typedefs, bindings, store, graph, attributes)
-        process_methods(methods, store, graph, attributes, dbg=debug_info)
-        propogate_infer(store, graph, attributes)
-    except Exception as e:
-        if not args.t:
-            print(f"Exception: {e}")
-        else:
-            debug_info.trigger(e)
+    # try:
+    process_parameters(methods, param_t, store, graph, attributes)
+    process_custom_types(methods, typedefs, bindings, store, graph, attributes)
+    process_methods(methods, store, graph, attributes, dbg=debug_info)
+    propogate_infer(store, graph, attributes)
+    # except Exception as e:
+    #     if not args.t:
+    #         print(f"Exception: {e}")
+    #     else:
+    #         debug_info.trigger(e)
 
     # graph.visualise()
     
