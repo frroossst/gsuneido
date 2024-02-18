@@ -187,7 +187,7 @@ def infer_nary(stmt, store, graph, attributes) -> TypeRepr:
                 v = StoreValue(
                     type_checked_var["Value"], 
                     TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(type_checked_var["Type_t"]))),
-                    typed_check_t
+                    TypeRepr(TypeRepr.construct_definition_from_primitive(typed_check_t))
                     )
                 store.set(type_checked_var["ID"], v)
 
@@ -308,6 +308,8 @@ def process_methods(methods, store, graph, attributes, dbg=None):
             dbg.set_func(k)
             print(f"Processing method {k}")
         for x, i in enumerate(v["Body"]):
+            if x == 2 and k == "originalTestFunc":
+                pass
             if dbg is not None:
                 dbg.set_line(x + 1)
             valid_t = infer_generic(i[0], store, graph, attributes)
