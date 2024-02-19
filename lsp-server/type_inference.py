@@ -182,12 +182,13 @@ def infer_nary(stmt, store, graph, attributes) -> TypeRepr:
             i = i["Args"][0]
             if i["Value"] in get_type_assertion_functions():
                 typed_check_t = SuTypes.from_str(i["Value"].removesuffix("?"))
+                typed_check_t = TypeRepr(TypeRepr.construct_definition_from_primitive(typed_check_t))
                 type_checked_var = i["Args"][0]
 
                 v = StoreValue(
                     type_checked_var["Value"], 
                     TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(type_checked_var["Type_t"]))),
-                    TypeRepr(TypeRepr.construct_definition_from_primitive(typed_check_t))
+                    typed_check_t 
                     )
                 store.set(type_checked_var["ID"], v)
 
@@ -219,20 +220,29 @@ def infer_nary(stmt, store, graph, attributes) -> TypeRepr:
 def infer_if(stmt, store, graph, attributes):
     cond = stmt["Args"][0]
     cond_t = infer_generic(cond, store, graph, attributes)
-    v = StoreValue(cond["Value"], SuTypes.from_str(cond["Type_t"]), cond_t)
+    v = StoreValue(
+        cond["Value"], 
+        TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(cond["Type_t"]))),
+        cond_t)
     store.set(cond["ID"], v)
 
     then = stmt["Args"][1]
     then_t = infer_generic(then, store, graph, attributes)
-    v = StoreValue(then["Value"], SuTypes.from_str(then["Type_t"]), then_t)
+    v = StoreValue(
+        then["Value"], 
+        TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(then["Type_t"]))), 
+        then_t)
     store.set(then["ID"], v)
 
     if len(stmt["Args"]) == 3:
         else_t = infer_generic(stmt["Args"][2], store, graph, attributes)
-        v = StoreValue(stmt["Args"][2]["Value"], SuTypes.from_str(stmt["Args"][2]["Type_t"]), else_t)
+        v = StoreValue(
+            stmt["Args"][2]["Value"], 
+            TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(stmt["Args"][2]["Type_t"]))), 
+            else_t)
         store.set(stmt["Args"][2]["ID"], v)
 
-    return SuTypes.NotApplicable
+    return None
 
 def infer_attribute(stmt, store, graph, attributes) -> TypeRepr:
     value = stmt["Value"]
@@ -268,13 +278,13 @@ def infer_object(stmt, store, graph, attributes):
 
     return TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Object))
 
-def propogate_infer(store, graph, check=False):
+def propogate_infer(store, graph, attributes, check=False):
     primitives = graph.get_basal_types()
 
     # dfs through each primitive and assign the same sutype to connecting nodes
     for p in primitives:
         p = graph.find_node(p.value)
-        p.propogate_type(store, new_type=p.sutype, check=check)
+        p.propogate_type(store, new_type=TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(p.value))), check=check)
 
 def parse_class(clss):
     members = {}
@@ -298,6 +308,7 @@ def process_parameters(methods, param_t, store, graph, attributes):
                     store.set(p_id, v)
                     n = Node(p_id)
                     graph.add_node(n)
+                    
                     primitive_type_node = graph.find_node(tr.get_name())
                     graph.add_edge(n.value, primitive_type_node.value)
             
@@ -306,10 +317,7 @@ def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
         if dbg is not None:
             dbg.set_func(k)
-            print(f"Processing method {k}")
         for x, i in enumerate(v["Body"]):
-            if x == 2 and k == "originalTestFunc":
-                pass
             if dbg is not None:
                 dbg.set_line(x + 1)
             valid_t = infer_generic(i[0], store, graph, attributes)
@@ -361,7 +369,7 @@ def main():
     process_parameters(methods, param_t, store, graph, attributes)
     process_custom_types(methods, typedefs, bindings, store, graph, attributes)
     process_methods(methods, store, graph, attributes, dbg=debug_info)
-    propogate_infer(store, graph, attributes)
+    propogate_infer(store, graph, attributes, check=False)
     # except Exception as e:
     #     if not args.t:
     #         print(f"Exception: {e}")

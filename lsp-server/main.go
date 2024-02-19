@@ -35,7 +35,7 @@ func main() {
 			{
 			num = x + 123
 			num++
-			if String?(x) and Number?(y) 
+			if Number?(x) and Number?(y) 
 				{
 				abc = x + y + z + num
 				}

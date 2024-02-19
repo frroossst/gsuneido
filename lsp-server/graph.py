@@ -3,7 +3,7 @@ import networkx as nx
 import json
 
 from kvstore import StoreValue
-from sutypes import SuTypes
+from sutypes import SuTypes, TypeRepr
 
 """
 A graph data structure with nodes and edges
@@ -33,16 +33,16 @@ class Graph:
     @classmethod
     def get_primitive_type_nodes(cls):
         return [
-            Node("String", SuTypes.String),
-            Node("Number", SuTypes.Number),
-            Node("Boolean", SuTypes.Boolean),
+            Node("String"),
+            Node("Number"),
+            Node("Boolean"),
             # TODO: look into better ways to handle Any type on the graph
-            Node("Any", SuTypes.Any), # this is the wildcard type 
-            Node("NotApplicable", SuTypes.NotApplicable),
-            Node("Never", SuTypes.Never),
-            Node("Function", SuTypes.Function),
-            Node("Object", SuTypes.Object),
-            Node("InBuiltOperator", SuTypes.InBuiltOperator),
+            Node("Any"), # this is the wildcard type 
+            Node("NotApplicable"),
+            Node("Never"),
+            Node("Function"),
+            Node("Object"),
+            Node("InBuiltOperator"),
         ]
 
     @staticmethod
@@ -53,7 +53,8 @@ class Graph:
         return self.primitive_type_nodes
 
     def add_basal_type(self, ty):
-        pass
+        if ty not in self.primitive_type_nodes:
+            self.nodes.append(ty)
 
     def get_nodes(self):
         return self.nodes
@@ -195,21 +196,18 @@ class Graph:
 class Node:
 
     # this is the value of the type i.e. "hello", 12.43
+    # this is more of the UUID of the node
     value = None
-
-    # this is the type of the value i.e. String, Number
-    sutype = None
 
     # neighbours, what it can see
     edges = None
 
     def __repr__(self) -> str:
-        return f"Node(type = {self.sutype}, value = {self.value}, edges = {self.edges})"
+        return f"Node(value = {self.value}, edges = {self.edges})"
 
-    def __init__(self, value, sutype = SuTypes.Unknown):
-        self.value = value
+    def __init__(self, uuid):
+        self.value = uuid
         self.edges = []
-        self.sutype = sutype
 
     def get_connected_edges(self):
         return self.edges
@@ -225,7 +223,7 @@ class Node:
         if self.value != edge.value:
             self.edges.append(edge)
 
-    def propogate_type(self, store, new_type:SuTypes=None, visited=None, check=False):
+    def propogate_type(self, store, new_type:TypeRepr=None, visited=None, check=False):
         """
         simple DFS to find all connected edges and set their type to new_type if provided
         if new_type is not provided the current node's type is propogated

@@ -148,6 +148,12 @@ class TypeRepr:
         self.solve_definition()
         other.solve_definition()
 
+        s = self.definition.get("meaning")
+        o = other.definition.get("meaning")
+        if len(s) == 1 or len(o) == 1:
+            if set(s) <= set([SuTypes.Any, SuTypes.Unknown]) or set(o) <= set([SuTypes.Any, SuTypes.Unknown]):
+                return True
+
         # ? can there be a case where the types are unequal but the definitions are the same or vice-versa?
         return set(self.definition.get("meaning", None)) == set(other.definition.get("meaning", None))
 
@@ -161,8 +167,11 @@ class TypeRepr:
         self.solve_definition()
         other.solve_definition()
 
-        if other.definition.get("meaning", None)[0] == SuTypes.Any:
-            return True
+        s = self.definition.get("meaning")
+        o = other.definition.get("meaning")
+        if len(s) == 1 or len(o) == 1:
+            if set(s) <= set([SuTypes.Any, SuTypes.Unknown]) or set(o) <= set([SuTypes.Any, SuTypes.Unknown]):
+                return True
 
         return set(self.definition.get("meaning", None)) < set(other.definition.get("meaning", None))
 

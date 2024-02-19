@@ -88,10 +88,10 @@ class KVStore:
             self.set(var_id, value)
             return
 
-        if not check_type_equality(val.inferred, value.inferred):
+        if not (val.inferred <= value.inferred):
             raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {val.inferred}, \ngot: {value.inferred}")
 
-        if check_type_equality(SuTypes.from_str(val.actual), value.inferred):
+        if val.actual == value.inferred:
             self.set(var_id, value)
             return
         else:
