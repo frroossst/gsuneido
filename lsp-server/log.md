@@ -129,3 +129,25 @@ the type of a variable is immutable, so, num cannot be reassigned to a string
 - [x] Implement a way to scope varibales local to a function (2 way mapping of IDs to identifier name)
 - [ ] Implement function signature parsing and developer defined types
 - [x] Add debug info and symbols
+
+
+# 19 February 2024
+
+Changed SuTypes interface to now use TypeRepr
+Added a check to see if correct number of function parameters are typed
+Added infer_generic to handle parentheses
+Added Mul and Sub operator support
+Added unit tests
+Runtime type guards are sorta working (still run into comptime eval problem for types that are only known at runtime)
+Implemented stricter equality checking
+
+## TODO
+
+- [ ] Implement union and intersection types
+- [ ] Implement type aliasing
+- [ ] Implement return types
+- [ ] Implement type checking for function calls
+- [ ] Implement stricter runtime type guards
+- [ ] Implement DSL parser for type annotations`
+- [ ] Implement assertions and loggers for verification of type system
+

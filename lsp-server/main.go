@@ -51,12 +51,16 @@ func main() {
 		SetX(x) { .x = x }
 		SetMsg(msg) { .msg = msg }
 		AddBreak() { return x + 123 }
+		ParenthesisTest(x, y, z) { return (x + y) * z }
 		}`
 
 	/*
 		 * Discarded Lines
 
 		DeletePriority(a, b) { return 12345679 - a - b }
+		ParameterMismatch(x) { x = "IAmAString" $ "adfs" }
+		DeletePriority(a, b) { return 12345679 + '-a' - b } // this works
+		IncorrectNumberOfParamsTyped(x, y) { return x + y }
 		SameVarID(x)
 			{
 			x = "123"

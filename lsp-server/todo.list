@@ -1,8 +1,8 @@
 - [ ] Unit Tests
-- [ ] Replace existing interface with TypeRepr
+- [x] Replace existing interface with TypeRepr
 
 - [ ] Custom TypeRepr 
-    - [ ] Parameter type
+    - [x] Parameter type
     - [ ] Type aliases
     - [ ] Function Return type
     - [ ] Unions

@@ -52,11 +52,13 @@ def get_valid_type_for_operator(value) -> TypeRepr:
     valid_types = {
         "Add": SuTypes.Number,
         "PostInc": SuTypes.Number,
+        "Sub": SuTypes.Number,
+        "Mul": SuTypes.Number,
         "And": SuTypes.Boolean,
         "Cat": SuTypes.String,
     }
 
-    if (x:= valid_types.get(value, None) )is None:
+    if (x:= valid_types.get(value, None)) is None:
         raise NotImplementedError("valid operator type not implemented")
     return TypeRepr({ "form": "Primitive", "meaning": [x], "name": SuTypes.to_str(x) })
 
@@ -102,6 +104,15 @@ def infer_generic(stmt, store, graph, attributes) -> TypeRepr:
 def infer_unary(stmt, store, graph, attributes) -> SuTypes:
     args = stmt["Args"]
     value = stmt["Value"]
+
+    if value in ["LParen", "RParen"]:
+        ret_t = infer_generic(args[0], store, graph, attributes)
+        v = StoreValue(args[0]["Value"], 
+                       TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(args[0]["Type_t"]))),
+                       ret_t)
+        store.set(args[0]["ID"], v)
+        return ret_t
+     
 
     node = Node(args[0]["ID"])
     graph.add_node(node)
@@ -149,8 +160,9 @@ def infer_binary(stmt, store, graph, attributes) -> SuTypes:
     # v = StoreValue(stmt["Value"], stmt["Type_t"], rhs_t)
     # store.set(rhs["ID"], v)
 
-    # if lhs or rhs is of type Any, then the other type is inferred
-    if lhs_t == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any)):
+    if lhs_t != rhs_t:
+        raise TypeError(f"Conflicting inferred types for variable {lhs['ID']}\nexisting: {lhs_t}, \ngot: {rhs_t}")
+    elif lhs_t == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any)):
         store.set(lhs["ID"], StoreValue(rhs["Value"], 
             TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(rhs["Type_t"]))),
             rhs_t
@@ -164,8 +176,6 @@ def infer_binary(stmt, store, graph, attributes) -> SuTypes:
             )
         )
         return lhs_t
-    elif lhs_t != rhs_t:
-        raise TypeError(f"Conflicting inferred types for variable {lhs['ID']}\nexisting: {lhs_t}, got: {rhs_t}")
     else:
         return None
     
@@ -197,13 +207,14 @@ def infer_nary(stmt, store, graph, attributes) -> TypeRepr:
                 primitive_type_node = graph.find_node(typed_check_t.get_name())
                 graph.add_edge(n.value, primitive_type_node.value)
 
+        n = Node(i["ID"])
         """
         NOTE: Infer Generic cause Args might not always be constants and variables,
                 so infer a generic somewhere here to infer further
         """
-
-        n = Node(i["ID"])
-        v = StoreValue(i["Value"], TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(i["Type_t"]))), valid_t)
+        n_infer = infer_generic(i, store, graph, attributes)
+        # v = StoreValue(i["Value"], TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(i["Type_t"]))), valid_t)
+        v = StoreValue(i["Value"], n_infer, valid_t)
         store.set(i["ID"], v)
         graph.add_node(n)
         if prev is not None:
@@ -299,6 +310,8 @@ def process_parameters(methods, param_t, store, graph, attributes):
         if v["Parameters"] != []:
             if param_t.get(k) is None:
                 continue
+            if len(v["Parameters"]) != len(param_t.get(k)):
+                raise ValueError(f"Parameter length mismatch for method {k}, function expects {len(v['Parameters'])} got {len(param_t.get(k))}")
             for p in v["Parameters"]:
                 p_id = p["ID"]
                 p_t = param_t.get(k).get(p["Value"])
@@ -308,7 +321,7 @@ def process_parameters(methods, param_t, store, graph, attributes):
                     store.set(p_id, v)
                     n = Node(p_id)
                     graph.add_node(n)
-                    
+
                     primitive_type_node = graph.find_node(tr.get_name())
                     graph.add_edge(n.value, primitive_type_node.value)
             
@@ -365,16 +378,16 @@ def main():
     typedefs = get_test_custom_type_values()
     bindings = get_test_custom_type_bindings()
 
-    # try:
-    process_parameters(methods, param_t, store, graph, attributes)
-    process_custom_types(methods, typedefs, bindings, store, graph, attributes)
-    process_methods(methods, store, graph, attributes, dbg=debug_info)
-    propogate_infer(store, graph, attributes, check=False)
-    # except Exception as e:
-    #     if not args.t:
-    #         print(f"Exception: {e}")
-    #     else:
-    #         debug_info.trigger(e)
+    try:
+        process_parameters(methods, param_t, store, graph, attributes)
+        process_custom_types(methods, typedefs, bindings, store, graph, attributes)
+        process_methods(methods, store, graph, attributes, dbg=debug_info)
+        propogate_infer(store, graph, attributes, check=False)
+    except Exception as e:
+        if not args.t:
+            print(f"Exception: {e}")
+        else:
+            debug_info.trigger(e)
 
     # graph.visualise()
     

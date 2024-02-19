@@ -69,7 +69,9 @@ def get_test_parameter_type_values():
                               "y": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] },
                               "z": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }},
         "SameVarID": {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.String]}},
-        "ParameterMismatch": {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.String]}},
+        "ParameterMismatch": {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number]}},
+        # "IncorrectNumberOfParamsTyped":  {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }, 
+        #                       "z": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }},
     }
 
 def get_test_custom_type_bindings():

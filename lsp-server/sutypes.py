@@ -147,7 +147,28 @@ class TypeRepr:
     def __str__(self):
         return f"TypeRepr(name={self.name}, definition={self.definition})"
 
+    def is_(self, other):
+        """
+        a is b, when a or b is Any, Unknown will return False
+        NOTE: a is_ b, is stricter than a == b
+        """
+        if not isinstance(other, TypeRepr):
+            raise ValueError(f"Cannot compare SuTypes with {other}")
+
+        self.solve_definition()
+        other.solve_definition()
+
+        # ? can there be a case where the types are unequal but the definitions are the same or vice-versa?
+        return set(self.definition.get("meaning", None)) == set(other.definition.get("meaning", None))
+
+    def is_not(self, other):
+        return not self.is_(other)
+
     def __eq__(self, other):
+        """
+        a == b, when a or b is Any, Unknown will return True
+        For more strict comparison use is_
+        """
         if not isinstance(other, TypeRepr):
             raise ValueError(f"Cannot compare SuTypes with {other}")
 
