@@ -23,8 +23,8 @@ class StoreValue:
     def to_json(self) -> dict:
         return {
             "value": self.value,
-            "actual": str(self.actual),
-            "inferred": str(self.inferred)
+            "actual": self.actual.to_json(),
+            "inferred": self.inferred.to_json(),
         }
         
 class SymbolTable:
@@ -96,9 +96,17 @@ class KVStore:
 
         for k, v in json_data.items():
             value = v.get("value")
-            actual = SuTypes.from_str(v.get("actual"))
-            inferred = SuTypes.from_str(v.get("inferred"))
-            store_value = StoreValue(value, actual, inferred)
+            actual = TypeRepr.from_json(v.get("actual"))
+            actual_meaning = [ SuTypes.from_str(x) for x in actual["meaning"] ]
+            actual["meaning"] = actual_meaning
+            inferred = TypeRepr.from_json(v.get("inferred"))
+            inferred_meaning = [ SuTypes.from_str(x) for x in inferred["meaning"] ]
+            inferred["meaning"] = inferred_meaning
+            store_value = StoreValue(
+                value,
+                TypeRepr(actual),
+                TypeRepr(inferred),
+                )
             kv_instance.set(k, store_value)
 
         return kv_instance

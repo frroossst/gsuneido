@@ -1,6 +1,6 @@
 import json
 
-from sutypes import EnumEncoder, SuTypes
+from sutypes import SuTypesEncoder, SuTypes
 
 
 class Parser:
@@ -61,7 +61,7 @@ class Parser:
         return SuTypes.from_str(type_name)
 
     def generate_json(self):
-        return json.dumps(self.typedef, indent=4, cls=EnumEncoder)
+        return json.dumps(self.typedef, indent=4, cls=SuTypesEncoder)
 
 def get_test_parameter_type_values():
     return {

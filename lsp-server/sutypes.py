@@ -82,7 +82,7 @@ class SuTypes(Enum):
                 raise ValueError(f"Unknown type {t} converting to string")
 
 
-class EnumEncoder(json.JSONEncoder):
+class SuTypesEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Enum):
             return obj.name
@@ -193,8 +193,11 @@ class TypeRepr:
     def to_json(self):
         return json.dumps(self, cls=TypeReprEncoder)
     
+    @classmethod
     def from_json(self, json_str):
-        return json.loads(json_str)
+        temp =  json.loads(json_str)
+        temp_def = json.loads(temp["definition"])
+        return temp_def
 
     def solve_definition(self):
         match self.definition["form"]:
@@ -232,8 +235,7 @@ class TypeReprEncoder(json.JSONEncoder):
         if isinstance(obj, TypeRepr):
             return {
                 "name": obj.name,
-                "sutype_t": obj.solved_t.name,
-                "definition": obj.definition
+                "definition": json.dumps(obj.definition, cls=SuTypesEncoder)
             }
         return json.JSONEncoder.default(self, obj)
 
@@ -270,7 +272,7 @@ def check_type_equal_or_subtype(parent, child):
 
 
 if __name__ == "__main__":
-    a = TypeRepr({"form": "Primitive", "name": "Number", "meaning": SuTypes.Number})
-    b = TypeRepr({"form": "Primitive", "name": "Number", "meaning": SuTypes.Number})
+    a = TypeRepr({"form": "Primitive", "name": "Number", "meaning": [SuTypes.Number]})
+    b = TypeRepr({"form": "Primitive", "name": "Number", "meaning": [SuTypes.Number]})
     assert a == b
 

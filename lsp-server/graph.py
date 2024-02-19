@@ -182,8 +182,7 @@ class Graph:
 
         for node_data in graph_data.get('nodes', []):
             value = node_data.get('value')
-            sutype = SuTypes[node_data.get('sutype', 'Unknown')]
-            node = Node(value, sutype)
+            node = Node(value)
             graph_instance.add_node(node)
 
             edges = node_data.get('edges', [])

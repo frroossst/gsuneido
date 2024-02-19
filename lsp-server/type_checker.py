@@ -2,8 +2,8 @@ import json
 
 from graph import Graph
 from kvstore import KVStore
-from sutypes import check_type_equality
-from type_inference import propogate_infer
+from sutypes import TypeRepr, SuTypes
+from type_inference import load_data_attributes
 
 
 
@@ -48,14 +48,19 @@ def main():
     print("=" * 80)
     print(json.dumps(graph.to_json(), indent=4))
 
+    attributes = load_data_attributes()
+
     for k, v in store.db.items():
         print(f"[DEBUG] Type: {k}, Value: {v}")
-        if not check_type_equality(v.actual, v.inferred):
-            str_fmt = f"[ERROR] type node {k} expected type {v.inferred} but got {v.actual} instead. Value = {store.get(k)}"
+        if v.actual == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.InBuiltOperator)):
+            # NOTE: currently avoids checking for inbuilt operators types
+            continue
+        if v.actual != v.inferred:
+            str_fmt = f"[ERROR] type node {k} expected \ntype: {v.inferred} but \ngot: {v.actual} instead. \nValue = {store.get(k)}\n"
             # raise TypeError(str_fmt)
             print(str_fmt)
 
-    propogate_infer(store, graph, check=True)
+    # propogate_infer(store, graph, attributes, check=True)
 
     # check if a path exists between two primitive types
     primitive_types = Graph.get_primitive_type_nodes()
