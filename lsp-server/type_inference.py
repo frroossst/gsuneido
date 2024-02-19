@@ -325,6 +325,52 @@ def process_parameters(methods, param_t, store, graph, attributes):
                     primitive_type_node = graph.find_node(tr.get_name())
                     graph.add_edge(n.value, primitive_type_node.value)
             
+def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
+
+    for fn, body in methods.items():
+        print(fn)
+        # get all keys and values in bindings that begin with k_
+        b = {k: v for k, v in bindings.items() if k.startswith(f"{fn}_")}
+        if b != {}:
+            for var, var_t in b.items():
+                for i in body["Body"]:
+                    var = var.removeprefix(fn + "_")
+                    id_found = lookup_variable(var, i[0])
+                    if id_found is not None:
+                        print(id_found)
+                        unknown_type = TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Unknown))
+                        inf_t = TypeRepr(typedefs[var_t])
+                        v = StoreValue(var, unknown_type, inf_t)
+
+
+# like infer_generic, but no inference, just matches the string of the variable passed in and return the ID
+def lookup_variable(var, stmt):
+    match stmt["Tag"]:
+        case "Unary":
+            return lookup_variable(var, stmt["Args"][0])
+        case "Binary":
+            return lookup_variable(var, stmt["Args"][0]) or lookup_variable(var, stmt["Args"][1])
+        case "Nary":
+            return [lookup_variable(var, i) for i in stmt["Args"]]
+        case "Identifier":
+            if stmt["Value"] == var:
+                return stmt["ID"]
+            return None
+        case "If":
+            return lookup_variable(var, stmt["Args"][0]) or lookup_variable(var, stmt["Args"][1]) or lookup_variable(var, stmt["Args"][2])
+        case "Call" | "Compound":
+            return lookup_variable(var, stmt["Args"][0])
+        case "Return":
+            return lookup_variable(var, stmt["Args"][0])
+        case "Object":
+            return [lookup_variable(var, i) for i in stmt["Args"]]
+        case "Member":
+            return lookup_variable(var, stmt["Args"][0])
+        case "Constant":
+            return None
+        case _:
+            raise NotImplementedError(f"missed case {stmt['Tag']}")
+
 
 def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
@@ -346,8 +392,6 @@ def process_methods(methods, store, graph, attributes, dbg=None):
             graph.add_node(n)
             graph.add_edge(n.value, graph.find_node(valid_t.get_name()).value)
 
-def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
-    pass
 
 
 def main():
@@ -361,10 +405,8 @@ def main():
     store = KVStore()
     attributes = parse_class(load_data_attributes())
     methods = parse_class(load_data_body())
-    param_t = get_test_parameter_type_values()
 
-
-    print("=" * 80)
+    # print("=" * 80)
     ascii_blocks = """
      ____  _     ___   ____ _  ______  
     | __ )| |   / _ \ / ___| |/ / ___| 
@@ -372,9 +414,10 @@ def main():
     | |_) | |__| |_| | |___| . \ ___) |
     |____/|_____\___/ \____|_|\_\____/ 
     """
-    print(ascii_blocks)
-    print("=" * 80)
+    # print(ascii_blocks)
+    # print("=" * 80)
 
+    param_t = get_test_parameter_type_values()
     typedefs = get_test_custom_type_values()
     bindings = get_test_custom_type_bindings()
 
@@ -391,7 +434,7 @@ def main():
 
     # graph.visualise()
     
-    print("=" * 80)
+    # print("=" * 80)
     ascii_store = """
      ____ _____ ___  ____  _____ 
     / ___|_   _/ _ \|  _ \| ____|
@@ -400,10 +443,10 @@ def main():
     |____/ |_| \___/|_| \_\_____|
 
     """
-    print(ascii_store)
-    print("=" * 80)
-    print(json.dumps(store.to_json(), indent=4))
-    print("=" * 80)
+    # print(ascii_store)
+    # print("=" * 80)
+    # print(json.dumps(store.to_json(), indent=4))
+    # print("=" * 80)
     ascii_graph = """
       ____ ____      _    ____  _   _ 
      / ___|  _ \    / \  |  _ \| | | |
@@ -412,9 +455,9 @@ def main():
      \____|_| \_\/_/   \_\_|   |_| |_|
 
     """
-    print(ascii_graph)
-    print("=" * 80)
-    print(json.dumps(graph.to_json(), indent=4))
+    # print(ascii_graph)
+    # print("=" * 80)
+    # print(json.dumps(graph.to_json(), indent=4))
 
 
     with open("type_store.json", "w") as fobj:

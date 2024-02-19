@@ -131,7 +131,7 @@ class TypeRepr:
         if not isinstance(definition, dict):
             raise ValueError(f"definition should be a dictionary, got {definition}")
         if definition.get("form") is None or definition.get("meaning") is None:
-            raise ValueError(f"definition should have form, name and meaning, got {definition}")
+            raise ValueError(f"definition should have form, meaning, got {definition}")
 
         if (name:= definition.get("name")) is None:
             self.name = str(uuid.uuid1()).replace("-", "")
@@ -169,6 +169,12 @@ class TypeRepr:
         a == b, when a or b is Any, Unknown will return True
         For more strict comparison use is_
         """
+        # UNION
+        if self.definition["form"] == "Union":
+            return self.in_union(other)
+
+
+        # PRIMITIVE
         if not isinstance(other, TypeRepr):
             raise ValueError(f"Cannot compare SuTypes with {other}")
 
@@ -237,6 +243,17 @@ class TypeRepr:
             case _:
                 raise ValueError(f"Unknown form {self.definition['form']}")
 
+    def define_union(self):
+        self.solve_t = []
+        for i in self.definition["meaning"]:
+            pass
+           
+
+    def in_union(self, literal):
+        if self.definition["form"] != "Union":
+            raise ValueError(f"Type should be a Union, got {self.definition['form']}")
+        return literal in self.definition["meaning"]
+
     def define_primitive(self):
         if len(self.definition["meaning"]) != 1:
             raise ValueError(f"Primitive type should have only one meaning, got {self.definition['meaning']}")
@@ -296,4 +313,11 @@ if __name__ == "__main__":
     a = TypeRepr({"form": "Primitive", "name": "Number", "meaning": [SuTypes.Number]})
     b = TypeRepr({"form": "Primitive", "name": "Number", "meaning": [SuTypes.Number]})
     assert a == b
+
+    a = TypeRepr({"form": "Union", "name": "Currency", "meaning": ["USD", "CAD", "GBP"]})
+    b = TypeRepr({"form": "Union", "name": "Currency", "meaning": ["USD", "CAD", "GBP"]})
+    assert a == b
+
+    a = TypeRepr({"form": "Union", "name": "Currency", "meaning": ["USD", "CAD", "GBP"]})
+    assert a.in_union("USD")
 

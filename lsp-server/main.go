@@ -52,6 +52,7 @@ func main() {
 		SetMsg(msg) { .msg = msg }
 		AddBreak() { return x + 123 }
 		ParenthesisTest(x, y, z) { return (x + y) * z }
+		simpleTypeAlias(a) { a = "thisShouldNotAssign" }
 		}`
 
 	/*
