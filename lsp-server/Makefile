@@ -29,5 +29,5 @@ tests:
 	python3 unit_tests.py
 
 err_check:
-	python3 type_checker.py | grep ERROR || true
+	python3 type_checker.py | grep --color='auto' -A3 ERROR || true
 
