@@ -48,6 +48,12 @@ class SuTypes(Enum):
                 return SuTypes.Union
             case "Intersect":
                 return SuTypes.Intersect
+            case "NotApplicable":
+                return SuTypes.NotApplicable
+            case "Never":
+                return SuTypes.Never
+            case "Function":
+                return SuTypes.Function
             case _:
                 raise ValueError(f"Unknown type {str} converting to SuTypes enum")
 
@@ -136,10 +142,10 @@ class TypeRepr:
         self.solve_definition()
 
     def __repr__(self):
-        return f"TypeRepr(type={self.name}, definition={self.definition})"
+        return f"TypeRepr(name={self.name}, definition={self.definition})"
 
     def __str__(self):
-        return f"TypeRepr(type={self.name}, definition={self.definition})"
+        return f"TypeRepr(name={self.name}, definition={self.definition})"
 
     def __eq__(self, other):
         if not isinstance(other, TypeRepr):

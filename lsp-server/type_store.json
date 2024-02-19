@@ -1,267 +1,272 @@
 {
-    "742b6732e9f94ef3886c8c1ed8e5d894": {
-        "value": "742b6732e9f94ef3886c8c1ed8e5d894",
-        "actual": "Number",
-        "inferred": "Number"
+    "df167b731a64475db777a09011d9f949": {
+        "value": "df167b731a64475db777a09011d9f949",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "0b3bc1ccecfa4411b0af1b6439e2a2f4": {
-        "value": "0b3bc1ccecfa4411b0af1b6439e2a2f4",
-        "actual": "Number",
-        "inferred": "Number"
+    "f31d647bd62f45c59cb5010b653e2df2": {
+        "value": "f31d647bd62f45c59cb5010b653e2df2",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "3aeaf6a6b364435ab7502dbfe952fd7f": {
-        "value": "3aeaf6a6b364435ab7502dbfe952fd7f",
-        "actual": "Number",
-        "inferred": "Number"
+    "eedea07d127d4ca6ab4d16764947993b": {
+        "value": "eedea07d127d4ca6ab4d16764947993b",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "c133812568434e3a9a6f71f05b18ab18": {
-        "value": "c133812568434e3a9a6f71f05b18ab18",
-        "actual": "Number",
-        "inferred": "Number"
+    "d810448bc0304294ab84a9d8c5b8d13b": {
+        "value": "x",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "a94b6f1fdba545a9bf7b617bee86eaca": {
-        "value": "a94b6f1fdba545a9bf7b617bee86eaca",
-        "actual": "Number",
-        "inferred": "Number"
+    "df7aac25fdc0436bb03b969e01591d79": {
+        "value": "123",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "9d18ed9b60274efbb093b923fb0b19ff": {
-        "value": "9d18ed9b60274efbb093b923fb0b19ff",
-        "actual": "Number",
-        "inferred": "Number"
+    "462398d55aab4316b03b40db5871e4ae": {
+        "value": "nil",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "a40906bb0c544bbdadebe10009935c4b": {
-        "value": "a40906bb0c544bbdadebe10009935c4b",
-        "actual": "Number",
-        "inferred": "Number"
+    "fe112b1c433c43408a61a94e9c794306": {
+        "value": "68",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "5d5def81683a436cbcf653b5b2047c53": {
-        "value": "5d5def81683a436cbcf653b5b2047c53",
-        "actual": "String",
-        "inferred": "String"
+    "563244985e6a4a45a17dc161cae8f190": {
+        "value": "nil",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "33c02f34358241ad8f38b1e44ebabf94": {
-        "value": "33c02f34358241ad8f38b1e44ebabf94",
-        "actual": "Number",
-        "inferred": "Number"
+    "9382e00609444d0d952e68ace4365866": {
+        "value": "x",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "8726d60960aa4c9c9ccef04b9e26a9c9": {
-        "value": "8726d60960aa4c9c9ccef04b9e26a9c9",
-        "actual": "Number",
-        "inferred": "Number"
+    "e29620afeeb6496d8d11e1b085ac31e0": {
+        "value": "msg",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "395cf5586c104b4380da7683387fbb92": {
-        "value": "395cf5586c104b4380da7683387fbb92",
-        "actual": "Any",
-        "inferred": "Any"
+    "68b9efc94fa743268f87db661665f9c7": {
+        "value": "99",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "e752c34b584544c1888033ea0c6563b4": {
-        "value": "e752c34b584544c1888033ea0c6563b4",
-        "actual": "Object",
-        "inferred": "Object"
+    "4d231ac4d0a9439698c41f72aeefa45f": {
+        "value": "nil",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=Object, definition={'form': 'Primitive', 'name': 'Object', 'meaning': [<SuTypes.Object: 8>]})"
     },
-    "5924b82f067b4d249e051b6275cb2515": {
-        "value": "5924b82f067b4d249e051b6275cb2515",
-        "actual": "Number",
-        "inferred": "Number"
+    "d3aadbdd70e745b28cf067b26ddd8f7e": {
+        "value": "x",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "818c68e10ee84bca9ae665ede94e26ca": {
-        "value": "818c68e10ee84bca9ae665ede94e26ca",
-        "actual": "Number",
-        "inferred": "Number"
+    "03d49a2ee4ba41d3b6394806f05219b0": {
+        "value": "y",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "ed7f3324087948e8a1ca96b75f5ddb54": {
-        "value": "ed7f3324087948e8a1ca96b75f5ddb54",
-        "actual": "Number",
-        "inferred": "Number"
+    "755adf66b6e54ec2a0e4fe53acda719a": {
+        "value": "nil",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "76a5fb6f95d245649ed5439d14dac5ea": {
-        "value": "76a5fb6f95d245649ed5439d14dac5ea",
-        "actual": "String",
-        "inferred": "String"
+    "840a8fe467d94acd98a110ffe82d9928": {
+        "value": "myMessage",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "6f1262ca7c234fc88b414f375f4130fb": {
-        "value": "6f1262ca7c234fc88b414f375f4130fb",
-        "actual": "String",
-        "inferred": "String"
+    "423f7f0189e349fa9c1b367fa80ba32e": {
+        "value": "myMessage",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'meaning': [<SuTypes.String: 1>], 'name': 'String'})"
     },
-    "6f6965bf3d7a49ab853cafea864a2aa4": {
-        "value": "6f6965bf3d7a49ab853cafea864a2aa4",
-        "actual": "String",
-        "inferred": "String"
+    "8468b47ed4eb44779608b0b60e075f72": {
+        "value": "str",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'meaning': [<SuTypes.String: 1>], 'name': 'String'})"
     },
-    "58d18312648b48889c06a1a1c0e2a13f": {
-        "value": "58d18312648b48889c06a1a1c0e2a13f",
-        "actual": "String",
-        "inferred": "String"
+    "318129f8b1fe4efbaf14edfb89e0070b": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'meaning': [<SuTypes.String: 1>], 'name': 'String'})"
     },
-    "46c4b7e24c2f4ddc8873ba12de904796": {
-        "value": "46c4b7e24c2f4ddc8873ba12de904796",
-        "actual": "String",
-        "inferred": "String"
+    "55570df6e46f4b048f1bcd22c496b00d": {
+        "value": "msg",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "0ca5efa3c6584aadbd3a962667357099": {
-        "value": "0ca5efa3c6584aadbd3a962667357099",
-        "actual": "String",
-        "inferred": "String"
+    "027fc05ed2834023b7277d4a55705f0c": {
+        "value": "msg",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "acf082c6e16e432284294d27cc3fd99a": {
-        "value": "acf082c6e16e432284294d27cc3fd99a",
-        "actual": "Number",
-        "inferred": "Number"
+    "410931dd99614ff991d4e46912489c36": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "1e32a46283e8439582d129bd9f2119b2": {
-        "value": "1e32a46283e8439582d129bd9f2119b2",
-        "actual": "Number",
-        "inferred": "Number"
+    "95049bf339da442ab18db44a2f4b0240": {
+        "value": "x",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "4c609505605a40ec9c0f1d716f39d3bc": {
-        "value": "4c609505605a40ec9c0f1d716f39d3bc",
-        "actual": "Number",
-        "inferred": "Number"
+    "e8bce5a75acf4b309df7fa92335751c6": {
+        "value": "x",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "01d44bcc1acc403ea3fd44dbe408f2b0": {
+    "7782abb65d6d43998391a5914e0ef095": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
+    },
+    "28e66961d0e74f01890e930e9c363b94": {
+        "value": "u",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
+    },
+    "4ed06b5f1ab247b2846e449fb9536166": {
         "value": "\"USD\"",
-        "actual": "String",
-        "inferred": "String"
+        "actual": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "d899d395199045e4bccdb3762942f35f": {
-        "value": "\"USD\"",
-        "actual": "String",
-        "inferred": "String"
+    "397d1fc79f5e4fe2a9eacb240687fafc": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "e1cea7c5c3b04b8f931d578af5570c8f": {
-        "value": "e1cea7c5c3b04b8f931d578af5570c8f",
-        "actual": "String",
-        "inferred": "String"
+    "2c6e62639bab4409aec5c5c3c520c447": {
+        "value": "nu",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "9abf25864b994ddca9d9980c3d380564": {
+    "455ab0af18314c2da4533f3135220eb0": {
         "value": "\"usd\"",
-        "actual": "String",
-        "inferred": "String"
+        "actual": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "db596cff381e4a29b47fb9972f73147e": {
-        "value": "\"usd\"",
-        "actual": "String",
-        "inferred": "String"
+    "5fdf477515714b17b011c42b752b2ee2": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "51cf8dd3d9e4487baf49d33fa9e588ea": {
-        "value": "51cf8dd3d9e4487baf49d33fa9e588ea",
-        "actual": "String",
-        "inferred": "String"
+    "dd7f9643278a4f078e0bb8bf530fd051": {
+        "value": "ou",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "4cdc55a745514c29ac481dce38522196": {
+    "a4adfd846cb54d12a7a43c21685bebf0": {
         "value": "\"other\"",
-        "actual": "String",
-        "inferred": "String"
+        "actual": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "638e36f8dab34a3d851bc1baeaa9538c": {
-        "value": "\"other\"",
-        "actual": "String",
-        "inferred": "String"
+    "ab52c1baff3e4d71a4d9e1e13bfb6650": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "66a1f2700a674be0ae47937808216655": {
-        "value": "66a1f2700a674be0ae47937808216655",
-        "actual": "String",
-        "inferred": "String"
+    "fc05a24dd6d741a28691af34dcb3ae82": {
+        "value": "num",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "da1f3146cf38436385b33d6d12c97f89": {
-        "value": "da1f3146cf38436385b33d6d12c97f89",
-        "actual": "Number",
-        "inferred": "Number"
+    "f5bb36844268409e9c3e8045975a7d17": {
+        "value": "123",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "04349c9e1a2347c48e1e7bd471914a97": {
-        "value": "04349c9e1a2347c48e1e7bd471914a97",
-        "actual": "Number",
-        "inferred": "Number"
+    "be73677c262343b1864e6c8a79b4c69f": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "6f6679912c854e91930185a70f21016e": {
-        "value": "6f6679912c854e91930185a70f21016e",
-        "actual": "Number",
-        "inferred": "Number"
+    "d7cf35c819084024bc80fd1dd73e8c68": {
+        "value": "PostInc",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "ad648be4423d409b9fdf46cfb0abf287": {
-        "value": "ad648be4423d409b9fdf46cfb0abf287",
-        "actual": "Number",
-        "inferred": "Number"
+    "a50c1bd16d904035be948b74ae8990f0": {
+        "value": "Number?",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Boolean, definition={'form': 'Primitive', 'meaning': [<SuTypes.Boolean: 3>], 'name': 'Boolean'})"
     },
-    "b89b0db0ad214ba9b4a7b4548a1d9546": {
-        "value": "b89b0db0ad214ba9b4a7b4548a1d9546",
-        "actual": "Boolean",
-        "inferred": "Boolean"
+    "5f0cd22ceb4e46f5ad0a23776aae60af": {
+        "value": "Number?",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Boolean, definition={'form': 'Primitive', 'meaning': [<SuTypes.Boolean: 3>], 'name': 'Boolean'})"
     },
-    "47b0978d46634e49aabd37435a84303c": {
-        "value": "47b0978d46634e49aabd37435a84303c",
-        "actual": "Boolean",
-        "inferred": "Boolean"
-    },
-    "f93228883c514aecac3edd426acc9a9a": {
+    "9b936221e2724d8297e423cdb5245368": {
         "value": "And",
-        "actual": "InBuiltOperator",
-        "inferred": "Boolean"
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Boolean, definition={'form': 'Primitive', 'meaning': [<SuTypes.Boolean: 3>], 'name': 'Boolean'})"
     },
-    "f2a6e4919d1a41e3bd4cf6d9a55cde60": {
-        "value": "Add",
-        "actual": "Operator",
-        "inferred": "Number"
+    "1a7b6e767532438194b40301032879fc": {
+        "value": "abc",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "006598ccdd0f42b59a9021f03959d4f6": {
+    "0c7109bb02cb4863a8749416f59b79ef": {
         "value": "nil",
-        "actual": "InBuiltOperator",
-        "inferred": "Number"
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "19a408fc5ac3438287a99cd328dc6b45": {
+    "0042db6b731c49e788524923bd217f3d": {
         "value": "nil",
-        "actual": "InBuiltOperator",
-        "inferred": "Any"
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "ba8eca41095645e59b0f40bbae11303c": {
-        "value": "Add",
-        "actual": "Operator",
-        "inferred": "Number"
+    "fac574c90b62476188dedce6b6fb5787": {
+        "value": "num2",
+        "actual": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "2dfeaeaba18d493dbd36ad048992eae2": {
-        "value": "2dfeaeaba18d493dbd36ad048992eae2",
-        "actual": "Number",
-        "inferred": "Number"
+    "a8f2e7173350460c88f20ce4950d2916": {
+        "value": "1",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "5ab019a240ea47a5ba27b99f84510e2d": {
-        "value": "5ab019a240ea47a5ba27b99f84510e2d",
-        "actual": "Number",
-        "inferred": "Number"
+    "da5a4cbee5cb4a57b9cfd25ec729badb": {
+        "value": "Eq",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'meaning': [<SuTypes.Number: 2>], 'name': 'Number'})"
     },
-    "902759de1f7c4d95a90faad94e285704": {
-        "value": "902759de1f7c4d95a90faad94e285704",
-        "actual": "Any",
-        "inferred": "Any"
+    "cf5246da8d4a4eea92fd242350d3fdcf": {
+        "value": "nil",
+        "actual": "TypeRepr(name=InBuiltOperator, definition={'form': 'Primitive', 'name': 'InBuiltOperator', 'meaning': [<SuTypes.InBuiltOperator: 10>]})",
+        "inferred": "TypeRepr(name=Any, definition={'form': 'Primitive', 'name': 'Any', 'meaning': [<SuTypes.Any: 4>]})"
     },
-    "baeb0f697ae0499a934c10ea8ee1950e": {
-        "value": "baeb0f697ae0499a934c10ea8ee1950e",
-        "actual": "String",
-        "inferred": "String"
+    "16ed4197423244f898f5060f97252dfc": {
+        "value": "msg",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "9ceb05937b39435880c4a13151ec091c": {
-        "value": "9ceb05937b39435880c4a13151ec091c",
-        "actual": "String",
-        "inferred": "String"
+    "ee5a733e9a7647ad99b7d50f7b029977": {
+        "value": "nil",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "d6c40f167bad448097329a0c13dfcd80": {
-        "value": "d6c40f167bad448097329a0c13dfcd80",
-        "actual": "Number",
-        "inferred": "Number"
+    "195c1a33e05440338df9f3f879ff338f": {
+        "value": "x",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "bd335bef51ec432c94751b9836f1db07": {
-        "value": "bd335bef51ec432c94751b9836f1db07",
-        "actual": "Number",
-        "inferred": "Number"
+    "f96c261d0ea84e7db4f7091b36513dd9": {
+        "value": "nil",
+        "actual": "TypeRepr(name=Unknown, definition={'form': 'Primitive', 'name': 'Unknown', 'meaning': [<SuTypes.Unknown: 0>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     },
-    "1b3efd28ab4340e8be8f304b53c71051": {
-        "value": "1b3efd28ab4340e8be8f304b53c71051",
-        "actual": "String",
-        "inferred": "String"
+    "4b91cbbe068640568c5822df6eb0d294": {
+        "value": "4b91cbbe068640568c5822df6eb0d294",
+        "actual": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})",
+        "inferred": "TypeRepr(name=String, definition={'form': 'Primitive', 'name': 'String', 'meaning': [<SuTypes.String: 1>]})"
     },
-    "8982c99d54ef433a95cb17ef829b87e7": {
-        "value": "8982c99d54ef433a95cb17ef829b87e7",
-        "actual": "Number",
-        "inferred": "Number"
+    "50bd53146ccc4be98301eead6b9af382": {
+        "value": "50bd53146ccc4be98301eead6b9af382",
+        "actual": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})",
+        "inferred": "TypeRepr(name=Number, definition={'form': 'Primitive', 'name': 'Number', 'meaning': [<SuTypes.Number: 2>]})"
     }
 }

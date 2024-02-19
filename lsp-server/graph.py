@@ -165,13 +165,15 @@ class Graph:
                         self.nodes.remove(edge)
 
     def to_json(self) -> dict:
-        graph_data = {
-            'nodes': [
-                {'value': node.value, 'sutype': node.sutype.name, 'edges': [edge.value for edge in node.edges]}
+        return {
+            "nodes": [
+                {
+                    "value": node.value,
+                    "edges": [edge.value for edge in node.get_connected_edges()]
+                }
                 for node in self.nodes
             ]
         }
-        return graph_data
 
     @classmethod
     def from_json(cls, json_data):

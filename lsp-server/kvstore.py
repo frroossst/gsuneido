@@ -1,4 +1,4 @@
-from sutypes import SuTypes, check_type_equality, TypeRepr
+from sutypes import SuTypes, TypeRepr
 
 
 
@@ -21,23 +21,12 @@ class StoreValue:
         return f"Value(value = {self.value}, actual = {self.actual}, inferred = {self.inferred})"
 
     def to_json(self) -> dict:
-        if isinstance(self.actual, SuTypes):
-            actual = self.actual.name
-        else:
-            actual = self.actual
-
-        if isinstance(self.inferred, SuTypes):
-            inferred = self.inferred.name
-        else:
-            inferred = self.inferred
-        
         return {
             "value": self.value,
-            "actual": actual,
-            "inferred": inferred,
+            "actual": str(self.actual),
+            "inferred": str(self.inferred)
         }
-
-
+        
 class SymbolTable:
     """
     This stores the mapping of one variable to multiple UUIDs 
