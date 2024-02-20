@@ -326,9 +326,7 @@ def process_parameters(methods, param_t, store, graph, attributes):
                     graph.add_edge(n.value, primitive_type_node.value)
             
 def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
-
     for fn, body in methods.items():
-        print(fn)
         # get all keys and values in bindings that begin with k_
         b = {k: v for k, v in bindings.items() if k.startswith(f"{fn}_")}
         if b != {}:
@@ -337,11 +335,19 @@ def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
                     var = var.removeprefix(fn + "_")
                     id_found = lookup_variable(var, i[0])
                     if id_found is not None:
-                        print(id_found)
                         unknown_type = TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Unknown))
                         inf_t = TypeRepr(typedefs[var_t])
                         v = StoreValue(var, unknown_type, inf_t)
+                        store.set(id_found, v)
 
+                        if graph.find_node(typedefs[var_t]) is None:
+                            graph.add_basal_type(Node(var_t))
+                        
+                        n = Node(id_found)
+                        graph.add_node(n)
+
+                        primitive_type_node = graph.find_node(var_t)
+                        graph.add_edge(n.value, primitive_type_node.value)
 
 # like infer_generic, but no inference, just matches the string of the variable passed in and return the ID
 def lookup_variable(var, stmt):
@@ -422,8 +428,8 @@ def main():
     bindings = get_test_custom_type_bindings()
 
     try:
-        process_parameters(methods, param_t, store, graph, attributes)
         process_custom_types(methods, typedefs, bindings, store, graph, attributes)
+        process_parameters(methods, param_t, store, graph, attributes)
         process_methods(methods, store, graph, attributes, dbg=debug_info)
         propogate_infer(store, graph, attributes, check=False)
     except Exception as e:
@@ -458,7 +464,6 @@ def main():
     # print(ascii_graph)
     # print("=" * 80)
     # print(json.dumps(graph.to_json(), indent=4))
-
 
     with open("type_store.json", "w") as fobj:
         json.dump(store.to_json(), fobj, indent=4)

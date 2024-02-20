@@ -169,23 +169,21 @@ class TypeRepr:
         a == b, when a or b is Any, Unknown will return True
         For more strict comparison use is_
         """
+        # ANY CATCH
+        s = self.definition.get("meaning", None)
+        o = other.definition.get("meaning", None)
+        if (s is None or o is None) or (len(s) == 1 or len(o) == 1):
+            if set(s) <= set([SuTypes.Any, SuTypes.Unknown]) or set(o) <= set([SuTypes.Any, SuTypes.Unknown]):
+                return True
+
         # UNION
         if self.definition["form"] == "Union":
             return self.in_union(other)
-
 
         # PRIMITIVE
         if not isinstance(other, TypeRepr):
             raise ValueError(f"Cannot compare SuTypes with {other}")
 
-        self.solve_definition()
-        other.solve_definition()
-
-        s = self.definition.get("meaning")
-        o = other.definition.get("meaning")
-        if len(s) == 1 or len(o) == 1:
-            if set(s) <= set([SuTypes.Any, SuTypes.Unknown]) or set(o) <= set([SuTypes.Any, SuTypes.Unknown]):
-                return True
 
         # ? can there be a case where the types are unequal but the definitions are the same or vice-versa?
         return set(self.definition.get("meaning", None)) == set(other.definition.get("meaning", None))
@@ -217,6 +215,9 @@ class TypeRepr:
     def get_name(self):
         return self.name
 
+    def get_equivalent_primitive_type(self):
+        return self.solved_t
+
     def to_json(self):
         return json.dumps(self, cls=TypeReprEncoder)
     
@@ -244,15 +245,18 @@ class TypeRepr:
                 raise ValueError(f"Unknown form {self.definition['form']}")
 
     def define_union(self):
-        self.solve_t = []
+        self.solved_t = []
         for i in self.definition["meaning"]:
             pass
-           
 
     def in_union(self, literal):
-        if self.definition["form"] != "Union":
-            raise ValueError(f"Type should be a Union, got {self.definition['form']}")
-        return literal in self.definition["meaning"]
+        return True
+        # if self.definition["form"] != "Union":
+        #     raise ValueError(f"Type should be a Union, got {self.definition['form']}")
+        # return literal in self.definition["meaning"]
+
+    def define_alias(self):
+        pass
 
     def define_primitive(self):
         if len(self.definition["meaning"]) != 1:

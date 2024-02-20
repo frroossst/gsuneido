@@ -53,8 +53,16 @@ class Graph:
         return self.primitive_type_nodes
 
     def add_basal_type(self, ty):
+        """
+        @side-effect: also adds the node to the graph
+        """
+        if not isinstance(ty, Node):
+            raise ValueError("ty must be of type Node")
+
         if ty not in self.primitive_type_nodes:
             self.nodes.append(ty)
+
+        self.add_node(ty)
 
     def get_nodes(self):
         return self.nodes

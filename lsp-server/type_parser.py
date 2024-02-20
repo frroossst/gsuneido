@@ -72,7 +72,7 @@ def get_test_parameter_type_values():
         "ParameterMismatch": {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number]}},
         # "IncorrectNumberOfParamsTyped":  {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }, 
         #                       "z": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }},
-        "simpleTypeAlias": {"x": { "form": "Alias", "name": "Number2", "meaning": [SuTypes.Number] }},
+        "simpleTypeAlias": {"a": { "form": "Alias", "name": "Number2", "meaning": [SuTypes.Number] }},
     }
 
 def get_test_custom_type_bindings():
@@ -80,7 +80,7 @@ def get_test_custom_type_bindings():
         "currencyTypeAlias_u": "Currency",
         "currencyTypeAlias_nu": "Currency",
         "currencyTypeAlias_ou": "Currency",
-        "simpleTypeAlias_x": "Number2",
+        "simpleTypeAlias_a": "Number2",
     }
 
 def get_test_custom_type_values():

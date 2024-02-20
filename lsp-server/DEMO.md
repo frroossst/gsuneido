@@ -47,3 +47,21 @@ class()
 TypeError: Conflicting inferred types for variable 17650a1119d644b3817651625465b494
 existing: SuTypes.String, got: SuTypes.Number
 ```
+
+# Type aliasing
+```
+type Number2 >>= Number
+```
+```
+class()
+    {
+    SimplePrimitiveTypeAlias(a)
+        {
+        a = "thisShouldNotAssign"
+        }
+    }
+```
+```
+TypeError: Conflicting inferred types for variable 56197b2885cc4e00846e891faa982fca
+existing: SuTypes.Number, got: SuTypes.String
+```
