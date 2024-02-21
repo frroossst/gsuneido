@@ -36,7 +36,7 @@ type IncorrectParam >>= fn(x: Number) -> None
 ```
 class()
     {
-    IncorrectParam(x)
+    IncorrectParam(x: Number)
         {
         x = "IAmAString"
         }
@@ -55,7 +55,7 @@ type Number2 >>= Number
 ```
 class()
     {
-    SimplePrimitiveTypeAlias(a)
+    SimplePrimitiveTypeAlias(a: Number2)
         {
         a = "thisShouldNotAssign"
         }
@@ -65,3 +65,26 @@ class()
 TypeError: Conflicting inferred types for variable 56197b2885cc4e00846e891faa982fca
 existing: SuTypes.Number, got: SuTypes.String
 ```
+
+# Type inference and type error
+```
+class()
+    {
+    SimpleInferenceErrors(x: Number)
+        {
+        num = x + 123
+        if Number?(x) and x > 100
+            {
+            // CODE
+            }
+        else
+            {
+            num() // ERROR
+            }
+        }
+    }
+```
+```
+TypeError: Type mismatch, expected function, got SuTypes.Number
+```
+

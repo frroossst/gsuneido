@@ -6,9 +6,9 @@
     - [x] Type aliases
         - [ ] Throwing error still shows primitive type rather than the type it is aliased to
     - [ ] Function Return type
+    - [ ] Structural types
     - [ ] Unions
     - [ ] Intersections
-    - [ ] Structural types
 
 - [ ] DSL Parser for user defined types
 - [ ] Runtime type guards for inference

@@ -64,7 +64,7 @@ class KVStore:
             # if not check_type_equal_or_subtype(value.inferred, curr_val.inferred):
             if curr_val.inferred == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any)):
                 # if current is Any then it should be overwritable
-                pass
+                self.db[var_id] = value
             elif not (curr_val.inferred <= value.inferred):
                 raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {curr_val.inferred}, got: {value.inferred}") 
             else:

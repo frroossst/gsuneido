@@ -88,7 +88,12 @@ def infer_generic(stmt, store, graph, attributes) -> TypeRepr:
             return TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any))
         case "If":
             return infer_if(stmt, store, graph, attributes)
-        case "Call" | "Compound":
+        case "Compound":
+            return infer_generic(stmt["Args"][0], store, graph, attributes)
+        case "Call":
+            if store.get(stmt["Args"][0]["ID"]) is not None:
+                if store.get(stmt["Args"][0]["ID"]).inferred != TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Function)):
+                    raise TypeError(f"Type mismatch, expected function, got {store.get(stmt['Args'][0]['ID']).inferred}")
             return infer_generic(stmt["Args"][0], store, graph, attributes)
         case "Return":
             return infer_generic(stmt["Args"][0], store, graph, attributes)
@@ -382,6 +387,8 @@ def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
         if dbg is not None:
             dbg.set_func(k)
+        if k == "originalTestFunc":
+            pass
         for x, i in enumerate(v["Body"]):
             if dbg is not None:
                 dbg.set_line(x + 1)
@@ -401,6 +408,7 @@ def process_methods(methods, store, graph, attributes, dbg=None):
 
 
 def main():
+    global debug_info
     debug_info = DebugInfo()
 
     p = argparse.ArgumentParser("Type Inference")

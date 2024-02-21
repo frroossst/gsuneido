@@ -254,10 +254,12 @@ func getNodeType(node ast.Node) []Node_t {
 		return []Node_t{{Tag: "Constant", Type_t: n.Val.Type().String(), Value: n.Val.String(), ID: id}}
 	case *ast.Call:
 		var value string
+		id := getUUID()
 		// TODO: handle parsing Object() calls
 		switch v := n.Fn.(type) {
 		case *ast.Ident:
 			value = v.Name
+			id = ScopedUUIDGen.GetScopedUUID(value)
 		case *ast.Mem:
 			// remove double quoted strings from the following
 			noqute := v.M.String()[1 : len(v.M.String())-1]
@@ -282,7 +284,7 @@ func getNodeType(node ast.Node) []Node_t {
 			return []Node_t{{Tag: "Object", Type_t: "Object", Value: "nil", Args: obj, ID: id}}
 		}
 		return []Node_t{{Tag: "Call", Type_t: "Operator", Value: "nil",
-			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, Args: params, ID: id}}, ID: getUUID()}}
+			Args: []Node_t{{Tag: "Identifier", Type_t: "Callable", Value: value, Args: params, ID: id}}, ID: id}}
 	case *ast.Mem:
 		noqute := n.M.String()[1 : len(n.M.String())-1]
 		return []Node_t{{Tag: "Member", Type_t: "Member", Value: noqute, ID: id}}
