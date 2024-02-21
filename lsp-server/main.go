@@ -41,7 +41,8 @@ func main() {
 				}
 			else 
 				{
-				num()
+				// num = 13
+				// num()
 				}
 			num2 = x + 1
 			.qux()
@@ -52,7 +53,7 @@ func main() {
 		SetMsg(msg) { .msg = msg }
 		AddBreak() { return x + 123 }
 		ParenthesisTest(x, y, z) { return (x + y) * z }
-		simpleTypeAlias(a) { a = "thisShouldNotAssign" }
+		// simpleTypeAlias(a) { a = "thisShouldNotAssign" }
 		}`
 
 	/*

@@ -89,11 +89,14 @@ def infer_generic(stmt, store, graph, attributes) -> TypeRepr:
         case "If":
             return infer_if(stmt, store, graph, attributes)
         case "Compound":
+            # ! possible useless expression error?
+            if len(stmt["Args"]) == 0:
+                return None
             return infer_generic(stmt["Args"][0], store, graph, attributes)
         case "Call":
             if store.get(stmt["Args"][0]["ID"]) is not None:
                 if store.get(stmt["Args"][0]["ID"]).inferred != TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Function)):
-                    raise TypeError(f"Type mismatch, expected function, got {store.get(stmt['Args'][0]['ID']).inferred}")
+                    raise TypeError(f"{store.get(stmt['Args'][0]['ID']).value} is not callable, it is of type {store.get(stmt['Args'][0]['ID']).inferred} instead")
             return infer_generic(stmt["Args"][0], store, graph, attributes)
         case "Return":
             return infer_generic(stmt["Args"][0], store, graph, attributes)
@@ -106,7 +109,7 @@ def infer_generic(stmt, store, graph, attributes) -> TypeRepr:
         case _:
             raise NotImplementedError(f"missed case {stmt['Tag']}")
 
-def infer_unary(stmt, store, graph, attributes) -> SuTypes:
+def infer_unary(stmt, store, graph, attributes) -> TypeRepr:
     args = stmt["Args"]
     value = stmt["Value"]
 
@@ -130,7 +133,7 @@ def infer_unary(stmt, store, graph, attributes) -> SuTypes:
     return valid_t
 
 
-def infer_binary(stmt, store, graph, attributes) -> SuTypes:
+def infer_binary(stmt, store, graph, attributes) -> TypeRepr:
     args = stmt["Args"]
     lhs = args[0]
     rhs = args[1::][0]
