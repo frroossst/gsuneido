@@ -176,6 +176,12 @@ class TypeRepr:
             if set(s) <= set([SuTypes.Any, SuTypes.Unknown]) or set(o) <= set([SuTypes.Any, SuTypes.Unknown]):
                 return True
 
+        # OBJECT
+        if self.definition["form"] == "Object":
+            # check if all keys of self are in other and vice-versa
+            if not all(k in other.definition["meaning"] for k in self.definition["meaning"]):
+                return False
+
         # UNION
         if self.definition["form"] == "Union":
             return self.in_union(other)
@@ -195,14 +201,18 @@ class TypeRepr:
         if not isinstance(other, TypeRepr):
             raise ValueError(f"Cannot compare SuTypes with {other}")
         
-        self.solve_definition()
-        other.solve_definition()
-
+        # ANY CATCH
         s = self.definition.get("meaning")
         o = other.definition.get("meaning")
         if len(s) == 1 or len(o) == 1:
             if set(s) <= set([SuTypes.Any, SuTypes.Unknown]) or set(o) <= set([SuTypes.Any, SuTypes.Unknown]):
                 return True
+
+        # OBJECT
+        if self.definition["form"] == "Object":
+            # check if self keys are a subset of other
+            if not all(k in other.definition["meaning"] for k in self.definition["meaning"]):
+                return False
 
         return set(self.definition.get("meaning", None)) < set(other.definition.get("meaning", None))
 
@@ -257,6 +267,10 @@ class TypeRepr:
 
     def define_alias(self):
         pass
+
+    def define_object(self):
+        struct = self.definition["meaning"]
+        self.solved_t = struct
 
     def define_primitive(self):
         if len(self.definition["meaning"]) != 1:
@@ -324,4 +338,20 @@ if __name__ == "__main__":
 
     a = TypeRepr({"form": "Union", "name": "Currency", "meaning": ["USD", "CAD", "GBP"]})
     assert a.in_union("USD")
+
+    a = TypeRepr({"form": "Object", "name": "User", "meaning": {"name": SuTypes.String, "age": SuTypes.Number}})
+    b = TypeRepr({"form": "Object", "name": "User", "meaning": {"name": SuTypes.String, "age": SuTypes.Number}})
+    assert a == b
+
+    a = TypeRepr({"form": "Object", "name": "User", "meaning": {"name": SuTypes.String, "age": SuTypes.Number}})
+    b = TypeRepr({"form": "Object", "name": "Admin", "meaning": {"name": SuTypes.String, "age": SuTypes.Number, "role": SuTypes.String}})
+    assert a != b
+
+    a = TypeRepr({"form": "Object", "name": "User", "meaning": {"name": SuTypes.String, "age": SuTypes.Number}})
+    b = TypeRepr({"form": "Object", "name": "Admin", "meaning": {"name": SuTypes.String, "age": SuTypes.Number, "role": SuTypes.String}})
+    assert a < b
+
+    a = TypeRepr({"form": "Object", "name": "User", "meaning": {"name": SuTypes.String, "age": SuTypes.Number}})
+    b = TypeRepr({"form": "Object", "name": "Admin", "meaning": {"name": SuTypes.String, "age": SuTypes.Number, "role": SuTypes.String}})
+    assert not a > b
 

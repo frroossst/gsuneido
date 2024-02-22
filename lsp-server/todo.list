@@ -6,6 +6,7 @@
     - [x] Type aliases
         - [ ] Throwing error still shows primitive type rather than the type it is aliased to
     - [ ] Function Return type
+    - [ ] Funciton parameter types on call
     - [ ] Structural types
     - [ ] Unions
     - [ ] Intersections
@@ -13,3 +14,7 @@
 - [ ] DSL Parser for user defined types
 - [ ] Runtime type guards for inference
 - [ ] Insert asserts and logger to verify the correctness of the inference 
+
+
+# Misc
+- [ ] Handle empty else case error in type_inference.py
