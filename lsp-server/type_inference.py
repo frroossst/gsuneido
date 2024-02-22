@@ -10,12 +10,6 @@ from sutypes import SuTypes, TypeRepr
 from type_parser import get_test_custom_type_bindings, get_test_custom_type_values, get_test_parameter_type_values
 from utils import DebugInfo
 
-def check_type_equivalence(lhs, rhs) -> bool:
-    if lhs == SuTypes.Any or rhs == SuTypes.Any:
-        return True
-    if lhs == SuTypes.Unknown or rhs == SuTypes.Unknown:
-        raise TypeError("Unknown type in type equivalence check")
-    return lhs == rhs
 
 def load_data_body() -> dict:
 
@@ -163,11 +157,6 @@ def infer_binary(stmt, store, graph, attributes) -> TypeRepr:
     graph.add_node(rhs_n)
     graph.add_edge(lhs_n.value, rhs_n.value)
 
-    # v = StoreValue(stmt["Value"], stmt["Type_t"], lhs_t)
-    # store.set(lhs["ID"], v)
-    # v = StoreValue(stmt["Value"], stmt["Type_t"], rhs_t)
-    # store.set(rhs["ID"], v)
-
     if lhs_t != rhs_t:
         raise TypeError(f"Conflicting inferred types for variable {lhs['ID']}\nexisting: {lhs_t}, \ngot: {rhs_t}")
     elif lhs_t == TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Any)):
@@ -239,27 +228,30 @@ def infer_nary(stmt, store, graph, attributes) -> TypeRepr:
 def infer_if(stmt, store, graph, attributes):
     cond = stmt["Args"][0]
     cond_t = infer_generic(cond, store, graph, attributes)
-    v = StoreValue(
-        cond["Value"], 
-        TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(cond["Type_t"]))),
-        cond_t)
-    store.set(cond["ID"], v)
+    if cond_t is not None:
+        v = StoreValue(
+            cond["Value"], 
+            TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(cond["Type_t"]))),
+            cond_t)
+        store.set(cond["ID"], v)
 
     then = stmt["Args"][1]
     then_t = infer_generic(then, store, graph, attributes)
-    v = StoreValue(
-        then["Value"], 
-        TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(then["Type_t"]))), 
-        then_t)
-    store.set(then["ID"], v)
+    if then_t is not None:
+        v = StoreValue(
+            then["Value"], 
+            TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(then["Type_t"]))), 
+            then_t)
+        store.set(then["ID"], v)
 
     if len(stmt["Args"]) == 3:
         else_t = infer_generic(stmt["Args"][2], store, graph, attributes)
-        v = StoreValue(
-            stmt["Args"][2]["Value"], 
-            TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(stmt["Args"][2]["Type_t"]))), 
-            else_t)
-        store.set(stmt["Args"][2]["ID"], v)
+        if else_t is not None:
+            v = StoreValue(
+                stmt["Args"][2]["Value"], 
+                TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(stmt["Args"][2]["Type_t"]))), 
+                else_t)
+            store.set(stmt["Args"][2]["ID"], v)
 
     return None
 

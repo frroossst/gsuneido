@@ -41,7 +41,6 @@ func main() {
 				}
 			else 
 				{
-				// num = 13
 				// num()
 				}
 			num2 = x + 1
