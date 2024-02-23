@@ -305,8 +305,10 @@ def parse_class(clss):
 
     return members
 
-def process_parameters(methods, param_t, store, graph, attributes):
+def process_parameters(methods, typedef, bindings, param_t, store, graph, attributes, dbg=None):
     for k, v in methods.items():
+        if dbg is not None:
+            dbg.set_func(k)
         if v["Parameters"] != []:
             if param_t.get(k) is None:
                 continue
@@ -323,18 +325,30 @@ def process_parameters(methods, param_t, store, graph, attributes):
                     graph.add_node(n)
 
                     primitive_type_node = graph.find_node(tr.get_name())
+                    if primitive_type_node is None:
+                        # check for custom type or if aliased
+                        var = k + '_' + p["Value"]
+                        if (b := bindings.get(var, None)) is not None:
+                            primitive_type_node = graph.find_node(b)
+
                     graph.add_edge(n.value, primitive_type_node.value)
             
-def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
+def process_custom_types(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=None):
     for fn, body in methods.items():
+        if dbg is not None:
+            dbg.set_func(fn)
         # get all keys and values in bindings that begin with k_
         b = {k: v for k, v in bindings.items() if k.startswith(f"{fn}_")}
         if b != {}:
+            addedQ = False
             for var, var_t in b.items():
                 for i in body["Body"]:
                     var = var.removeprefix(fn + "_")
                     id_found = lookup_variable(var, i[0])
-                    if id_found is not None:
+                    if (id_found is not None) or ((not addedQ) and (var == list(param_t.get(fn).keys())[0])):
+                        if id_found is None:
+                            id_found = [x["ID"] for x in methods.get(fn).get("Parameters") if x["Value"] == var][0]
+
                         unknown_type = TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Unknown))
                         inf_t = TypeRepr(typedefs[var_t])
                         v = StoreValue(var, unknown_type, inf_t)
@@ -348,6 +362,8 @@ def process_custom_types(methods, typedefs, bindings, store, graph, attributes):
 
                         primitive_type_node = graph.find_node(var_t)
                         graph.add_edge(n.value, primitive_type_node.value)
+
+                        addedQ = True
 
 # like infer_generic, but no inference, just matches the string of the variable passed in and return the ID
 def lookup_variable(var, stmt):
@@ -382,8 +398,6 @@ def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
         if dbg is not None:
             dbg.set_func(k)
-        if k == "originalTestFunc":
-            pass
         for x, i in enumerate(v["Body"]):
             if dbg is not None:
                 dbg.set_line(x + 1)
@@ -431,8 +445,8 @@ def main():
     bindings = get_test_custom_type_bindings()
 
     try:
-        process_custom_types(methods, typedefs, bindings, store, graph, attributes)
-        process_parameters(methods, param_t, store, graph, attributes)
+        process_custom_types(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=debug_info)
+        process_parameters(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=debug_info) 
         process_methods(methods, store, graph, attributes, dbg=debug_info)
         propogate_infer(store, graph, attributes, check=False)
     except Exception as e:

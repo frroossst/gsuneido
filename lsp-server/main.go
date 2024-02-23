@@ -28,6 +28,10 @@ func main() {
 			nu = "usd"
 			ou = "other"
 			}
+		GetUserAuth(usr)
+			{
+			return false
+			}
 		Get() { return Object(99, 68, ans: Hello(1, 2), numx: .x, strmsg: .msg) }
 		Hello(x, y) { return x + y }
 		pvt_foo() { return .x }

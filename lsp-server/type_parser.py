@@ -73,6 +73,7 @@ def get_test_parameter_type_values():
         # "IncorrectNumberOfParamsTyped":  {"x": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }, 
         #                       "z": { "form": "Primitive", "name": "Number", "meaning": [SuTypes.Number] }},
         "simpleTypeAlias": {"a": { "form": "Alias", "name": "Number2", "meaning": [SuTypes.Number] }},
+        "GetUserAuth": {"usr": { "form": "Object", "meaning": {"name": SuTypes.String, "age": SuTypes.Number} }},
     }
 
 def get_test_custom_type_bindings():
@@ -81,6 +82,7 @@ def get_test_custom_type_bindings():
         "currencyTypeAlias_nu": "Currency",
         "currencyTypeAlias_ou": "Currency",
         "simpleTypeAlias_a": "Number2",
+        "GetUserAuth_usr": "User",
     }
 
 def get_test_custom_type_values():
