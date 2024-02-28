@@ -142,10 +142,10 @@ class TypeRepr:
         self.solve_definition()
 
     def __repr__(self):
-        return f"TypeRepr(name={self.name}, definition={self.definition})"
+        return f"TypeRepr(name={self.name}, meaning={self.definition})"
 
     def __str__(self):
-        return f"TypeRepr(name={self.name}, definition={self.definition})"
+        return f"TypeRepr(name={self.name}, meaning={self.definition})"
 
     def is_(self, other):
         """

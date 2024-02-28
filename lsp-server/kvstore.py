@@ -1,3 +1,6 @@
+import json
+
+
 from sutypes import SuTypes, TypeRepr
 
 
@@ -96,16 +99,16 @@ class KVStore:
 
         for k, v in json_data.items():
             value = v.get("value")
-            actual = TypeRepr.from_json(v.get("actual"))
-            actual_meaning = [ SuTypes.from_str(x) for x in actual["meaning"] ]
-            actual["meaning"] = actual_meaning
-            inferred = TypeRepr.from_json(v.get("inferred"))
-            inferred_meaning = [ SuTypes.from_str(x) for x in inferred["meaning"] ]
-            inferred["meaning"] = inferred_meaning
+            actual, inferred = json.loads(v.get("actual")), json.loads(v.get("inferred"))
+            actual_meaning = json.loads(actual["definition"])
+            inferred_meaning = json.loads(inferred["definition"])
+            actual_meaning["name"] = actual["name"]
+            inferred_meaning["name"] = inferred["name"]
+            actual, inferred = TypeRepr(actual_meaning), TypeRepr(inferred_meaning)
             store_value = StoreValue(
                 value,
-                TypeRepr(actual),
-                TypeRepr(inferred),
+                actual,
+                inferred,
                 )
             kv_instance.set(k, store_value)
 

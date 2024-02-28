@@ -305,7 +305,7 @@ def parse_class(clss):
 
     return members
 
-def process_parameters(methods, typedef, bindings, param_t, store, graph, attributes, dbg=None):
+def process_parameters(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=None):
     for k, v in methods.items():
         if dbg is not None:
             dbg.set_func(k)
