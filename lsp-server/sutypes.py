@@ -81,6 +81,10 @@ class SuTypes(Enum):
             case _:
                 raise ValueError(f"Unknown type {t} converting to string")
 
+    @staticmethod
+    def get_member_string():
+        return ["Unknown", "String", "Number", "Boolean", "Any", "NotApplicable", "Never", "Function", "Object", "Date", "InBuiltOperator", "Union", "Intersect"]
+
 
 class SuTypesEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -138,6 +142,11 @@ class TypeRepr:
         else:
             self.name = name
 
+        for i in definition["meaning"]:
+            if isinstance(i, str) and i in SuTypes.get_member_string():
+                definition["meaning"] = [SuTypes.from_str(i)]
+                
+
         self.definition = definition
         self.solve_definition()
 
@@ -189,7 +198,6 @@ class TypeRepr:
         # PRIMITIVE
         if not isinstance(other, TypeRepr):
             raise ValueError(f"Cannot compare SuTypes with {other}")
-
 
         # ? can there be a case where the types are unequal but the definitions are the same or vice-versa?
         return set(self.definition.get("meaning", None)) == set(other.definition.get("meaning", None))

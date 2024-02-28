@@ -63,7 +63,7 @@ def main():
     # propogate_infer(store, graph, attributes, check=True)
 
     # check if a path exists between two primitive types
-    primitive_types = Graph.get_primitive_type_nodes()
+    primitive_types = Graph().get_basal_types()
     for i in primitive_types:
         for j in primitive_types:
             if i.value == j.value:
