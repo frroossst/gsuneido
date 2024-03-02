@@ -145,7 +145,10 @@ class TypeRepr:
         for i in definition["meaning"]:
             if isinstance(i, str) and i in SuTypes.get_member_string():
                 definition["meaning"] = [SuTypes.from_str(i)]
-                
+
+        self.literals = None
+        if definition.get("value") is not None:
+            self.literals = definition["value"]
 
         self.definition = definition
         self.solve_definition()
@@ -236,6 +239,9 @@ class TypeRepr:
     def get_equivalent_primitive_type(self):
         return self.solved_t
 
+    def is_literal(self):
+        return self.literals is not None
+
     def to_json(self):
         return json.dumps(self, cls=TypeReprEncoder)
     
@@ -264,14 +270,40 @@ class TypeRepr:
 
     def define_union(self):
         self.solved_t = []
+        self.literals = []
         for i in self.definition["meaning"]:
-            pass
+            if isinstance(i, str):
+                self.solved_t.append(SuTypes.String)
+                self.literals.append(i)
+            elif isinstance(i, int):
+                self.solved_t.append(SuTypes.Number)
+                self.literals.append(i)
+            elif isinstance(i, bool):
+                self.solved_t.append(SuTypes.Boolean)
+                self.literals.append(i)
+            elif isinstance(i, dict):
+                self.solved_t.append(SuTypes.Object)
+                self.literals.append(i)
+            else:
+                raise NotImplementedError(f"Union type {i} not implemented for solving")
+
+        self.literals = list(set(self.literals))
 
     def in_union(self, literal):
-        return True
-        # if self.definition["form"] != "Union":
-        #     raise ValueError(f"Type should be a Union, got {self.definition['form']}")
-        # return literal in self.definition["meaning"]
+        if (isinstance(literal, TypeRepr)):
+            # check if literal has the member literal
+            if literal.is_literal():
+                return set(literal.literals) <= set(self.literals)
+
+            if set(self.solved_t) <= set(literal.solved_t):
+                return True
+            else:
+                return False
+
+        if literal in self.literals:
+            return True
+
+        return False
 
     def define_alias(self):
         pass
@@ -283,7 +315,7 @@ class TypeRepr:
     def define_primitive(self):
         if len(self.definition["meaning"]) != 1:
             raise ValueError(f"Primitive type should have only one meaning, got {self.definition['meaning']}")
-        self.solved_t = SuTypes.from_str(self.definition["meaning"][0])
+        self.solved_t = [SuTypes.from_str(self.definition["meaning"][0])]
 
     @staticmethod
     def construct_definition_from_primitive(t: SuTypes):
@@ -362,4 +394,13 @@ if __name__ == "__main__":
     a = TypeRepr({"form": "Object", "name": "User", "meaning": {"name": SuTypes.String, "age": SuTypes.Number}})
     b = TypeRepr({"form": "Object", "name": "Admin", "meaning": {"name": SuTypes.String, "age": SuTypes.Number, "role": SuTypes.String}})
     assert not a > b
+
+    a = TypeRepr({"form": "Union", "name": "Currency", "meaning": ["USD", "CAD", "GBP"]})
+    b = TypeRepr({"form": "Primitive", "name": "Number", "meaning": [SuTypes.Number]})
+    assert a != b
+
+    a = TypeRepr({"form": "Union", "name": "Currency", "meaning": ["USD", "CAD", "GBP"]})
+    b = TypeRepr({"form": "Primitive", "name": "String", "meaning": [SuTypes.String], "value": ["USD"]})
+    assert a == b
+
 

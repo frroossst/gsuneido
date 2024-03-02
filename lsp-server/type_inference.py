@@ -398,6 +398,8 @@ def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
         if dbg is not None:
             dbg.set_func(k)
+        if k == "currencyTypeAlias":
+            pass
         for x, i in enumerate(v["Body"]):
             if dbg is not None:
                 dbg.set_line(x + 1)
