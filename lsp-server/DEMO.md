@@ -36,7 +36,7 @@ type IncorrectParam >>= fn(x: Number) -> None
 ```
 class()
     {
-    IncorrectParam(x: Number)
+    IncorrectParam(x: Number) // this annotation only exists in the LSP as an in-line hint not actually in the code
         {
         x = "IAmAString"
         }
