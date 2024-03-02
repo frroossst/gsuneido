@@ -59,10 +59,11 @@ class Graph:
         if not isinstance(ty, Node):
             raise ValueError("ty must be of type Node")
 
-        if ty not in self.primitive_type_nodes:
-            self.nodes.append(ty)
+        existsq = self.find_node(ty.value)
+        if existsq is None:
+            self.add_node(ty)
+            self.primitive_type_nodes.append(ty)
 
-        self.add_node(ty)
 
     def get_nodes(self):
         return self.nodes

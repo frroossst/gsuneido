@@ -173,9 +173,9 @@ def infer_binary(stmt, store, graph, attributes) -> TypeRepr:
             )
         )
         return lhs_t
-    else:
-        return None
-    
+
+    return None
+
 
 def infer_nary(stmt, store, graph, attributes) -> TypeRepr:
     value = stmt["Value"]

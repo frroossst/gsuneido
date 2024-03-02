@@ -88,3 +88,21 @@ class()
 TypeError: Type mismatch, expected function, got SuTypes.Number
 ```
 
+# Runtime Guards
+```
+class()
+    {
+    SimpleRuntimeGuard(x: String)
+        {
+        if Number?(x)
+            {
+            num = x + 123
+            }
+        }
+    }
+```
+```
+TypeError: Conflicting inferred types. expected: SuTypes.String, got: SuTypes.Number
+```
+
+
