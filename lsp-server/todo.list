@@ -8,7 +8,7 @@
     - [ ] Structural types
     - [ ] Function Return type
     - [ ] Funciton parameter types on call
-    - [ ] Unions
+    - [x] Unions
     - [ ] Intersections
 
 - [ ] DSL Parser for user defined types

@@ -25,12 +25,17 @@ func main() {
 		currencyTypeAlias()
 			{
 			u = "USD"
-			nu = "usd"
-			ou = "other"
+			// nu = "usd"
+			// ou = "other"
 			}
 		GetUserAuth(usr)
 			{
 			return false
+			}
+		GetUserAuthCall()
+			{
+			x = Object(name: "John", age: 25)
+			GetUserAuth(x)
 			}
 		Get() { return Object(99, 68, ans: Hello(1, 2), numx: .x, strmsg: .msg) }
 		Hello(x, y) { return x + y }

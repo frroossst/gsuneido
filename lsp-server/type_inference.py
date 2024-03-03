@@ -278,24 +278,39 @@ def infer_attribute(stmt, store, graph, attributes) -> TypeRepr:
     return valid_t
 
 def infer_object(stmt, store, graph, attributes):
+    obj_def = {}
 
     for i in stmt:
         t = infer_generic(i["Args"][0], store, graph, attributes)
         v = StoreValue(i["Args"][0]["Value"], TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(i["Args"][0]["Type_t"]))), t)
         store.set(i["Args"][0]["ID"], v)
+        # construct obj def struct for TypeRepr
+        obj_def[i["Value"]] = t
         n = Node(i["Args"][0]["ID"])
         graph.add_node(n)
         graph.add_edge(n.value, graph.find_node(t.get_name()).value)
 
-    return TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.Object))
+    return TypeRepr({"form": "Object", "meaning": obj_def})
 
-def propogate_infer(store, graph, attributes, check=False):
+def propogate_infer(store, graph, typedefs, attributes, check=False):
     primitives = graph.get_basal_types()
 
     # dfs through each primitive and assign the same sutype to connecting nodes
-    for p in primitives:
+    for x, p in enumerate(primitives):
+        if x == 10:
+            pass
         p = graph.find_node(p.value)
-        p.propogate_type(store, new_type=TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(p.value))), check=check)
+        
+        type_value = None
+        if p.value in graph.get_primitive_type_string():
+            type_value = TypeRepr(TypeRepr.construct_definition_from_primitive(SuTypes.from_str(p.value)))
+        elif typedefs.get(p.value) is not None:
+            type_value = TypeRepr(typedefs[p.value])
+        
+        if type_value is None:
+            raise ValueError(f"Type not found for {p.value}")
+
+        p.propogate_type(store, new_type=type_value, check=check)
 
 def parse_class(clss):
     members = {}
@@ -398,7 +413,7 @@ def process_methods(methods, store, graph, attributes, dbg=None):
     for k, v in methods.items():
         if dbg is not None:
             dbg.set_func(k)
-        if k == "currencyTypeAlias":
+        if k == "GetUserAuthCall":
             pass
         for x, i in enumerate(v["Body"]):
             if dbg is not None:
@@ -414,6 +429,10 @@ def process_methods(methods, store, graph, attributes, dbg=None):
             store.set(i[0]["ID"], v)
             n = Node(i[0]["ID"])
             graph.add_node(n)
+
+            if graph.find_node(valid_t.get_name()) is None:
+                graph.add_node(Node(valid_t.get_name()))
+
             graph.add_edge(n.value, graph.find_node(valid_t.get_name()).value)
 
 
@@ -446,16 +465,16 @@ def main():
     typedefs = get_test_custom_type_values()
     bindings = get_test_custom_type_bindings()
 
-    try:
-        process_custom_types(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=debug_info)
-        process_parameters(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=debug_info) 
-        process_methods(methods, store, graph, attributes, dbg=debug_info)
-        propogate_infer(store, graph, attributes, check=False)
-    except Exception as e:
-        if not args.t:
-            print(f"Exception: {e}")
-        else:
-            debug_info.trigger(e)
+    # try:
+    process_custom_types(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=debug_info)
+    process_parameters(methods, typedefs, bindings, param_t, store, graph, attributes, dbg=debug_info) 
+    process_methods(methods, store, graph, attributes, dbg=debug_info)
+    propogate_infer(store, graph, typedefs, attributes, check=False)
+    # except Exception as e:
+    #     if not args.t:
+    #         print(f"Exception: {e}")
+    #     else:
+    #         debug_info.trigger(e)
 
     # graph.visualise()
     

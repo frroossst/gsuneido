@@ -81,6 +81,10 @@ class KVStore:
             return
 
         if not (val.inferred <= value.inferred):
+            v = val.value.replace("\"", "").replace("\'", "")
+            if v is not None and v in value.inferred.literals:
+                self.set(var_id, value)
+                return
             raise TypeError(f"Conflicting inferred types for variable {var_id}\nexisting: {val.inferred}, \ngot: {value.inferred}")
 
         if val.actual == value.inferred:

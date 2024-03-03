@@ -251,6 +251,8 @@ class Node:
         else:
             new_type = self.sutype
 
+        if self.value == '0522ea9ed76c4277a38cbe518a1af134':
+            pass
         if self.value not in Graph.get_primitive_type_string():
             store.set_on_type_equivalence(self.value, StoreValue(self.value, self.sutype, new_type), check=check)
 

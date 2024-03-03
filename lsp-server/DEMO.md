@@ -105,4 +105,48 @@ class()
 TypeError: Conflicting inferred types. expected: SuTypes.String, got: SuTypes.Number
 ```
 
+# String literal unions
+```
+type Currency >>= "USD" | "CAD" | "GBP"
+```
+
+```
+class()
+    {
+	currencyTypeAlias()
+			{
+			u: Currency = "USD"
+			nu: Currency = "usd" // ERROR: not a literal match
+			ou: Currency = "other" // ERROR: not a literal match
+			}
+    }
+```
+```
+TypeError: Conflicting inferred types for variable, existing SuTypes.String, got SuTypes.String ("usd")
+```
+
+# Structural Types
+```
+type User >>= #(name: String, age: Number)
+type GetUserAuth >>= fn(usr: User)
+```
+
+```
+class()
+    {
+    GetUserAuth(usr)
+        {
+        return true
+        }
+    }
+
+GetUserAuth(Object(name: "Jane", age: "28"))
+```
+```
+TypeError: Type structures do not match, expected (name: <SuTypes.String>, age: <SuTypes.Number>)
+got: (name: <SuTypes.String>, age: <SuTypes.String>)
+```
+
+
+
 
