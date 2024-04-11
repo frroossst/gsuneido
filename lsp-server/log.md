@@ -148,6 +148,6 @@ Implemented stricter equality checking
 - [ ] Implement return types
 - [ ] Implement type checking for function calls
 - [ ] Implement stricter runtime type guards
-- [ ] Implement DSL parser for type annotations`
+- [ ] Implement DSL parser for type annotations
 - [ ] Implement assertions and loggers for verification of type system
 

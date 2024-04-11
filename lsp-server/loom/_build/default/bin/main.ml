@@ -1,18 +1,23 @@
-let () = print_endline "Hello, World!"
+(* Make sure you have installed Yojson package.
+   You can install it via opam: `opam install yojson` *)
 
-let json_output =
-  `Assoc
-    [
-      ("id", `String "398eb027");
-      ("name", `String "John Doe");
-      ( "pages",
-        `Assoc
-          [ ("id", `Int 1); ("title", `String "The Art of Flipping Coins") ] );
-    ]
+(* Import the Yojson library *)
+open Yojson.Basic.Util
 
-let main () =
-  let oc = stdout in
-  Yojson.Basic.pretty_to_channel oc json_output;
-  output_string oc "\n"
+(* Define a JSON string *)
+let json_str = "{\"name\":\"John\",\"age\":30,\"city\":\"New York\"}"
 
-let () = main ()
+(* Parse the JSON string into a Yojson value *)
+let json_value = Yojson.Basic.from_string json_str
+
+(* Access fields from the JSON value *)
+let name = json_value |> member "name" |> to_string
+let age = json_value |> member "age" |> to_int
+let city = json_value |> member "city" |> to_string
+
+(* Print the extracted values *)
+let () =
+  print_endline ("Name: " ^ name);
+  print_endline ("Age: " ^ string_of_int age);
+  print_endline ("City: " ^ city)
+
