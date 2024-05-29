@@ -1,54 +1,5 @@
-[loom]2024/05/29 15:26:49 main.go:16: Hey, I started!
-[loom]2024/05/29 15:26:49 main.go:39: Got a message with method:  initialize
-[loom]2024/05/29 15:26:49 main.go:49: connected to Neovim 0.10.0-dev+g27fb62988
-[loom]2024/05/29 15:26:49 main.go:53: Sent initialize response
-[loom]2024/05/29 15:26:49 main.go:39: Got a message with method:  initialized
-[loom]2024/05/29 15:26:49 main.go:115: [unhandled]:  initialized
-[loom]2024/05/29 15:26:49 main.go:39: Got a message with method:  textDocument/didOpen
-[loom]2024/05/29 15:26:49 main.go:64: Opened document: file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:26:49 main.go:65: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. In hendrerit gravida
-rutrum quisque non. Cras sed felis eget velit aliquet sagittis id. Consequat id
-porta nibh venenatis cras sed. Mi sit amet mauris commodo quis imperdiet massa
-tincidunt nunc.
-
-[loom]2024/05/29 15:26:49 main.go:39: Got a message with method:  textDocument/diagnostic
-[loom]2024/05/29 15:26:49 main.go:103: Got diagnostics request for file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:26:49 main.go:112: Sent diagnostics response
-[loom]2024/05/29 15:29:39 main.go:39: Got a message with method:  textDocument/didChange
-[loom]2024/05/29 15:29:39 main.go:74: Changed document: file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:29:39 main.go:75: 
-asdfasd
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. In hendrerit gravida
-rutrum quisque non. Cras sed felis eget velit aliquet sagittis id. Consequat id
-porta nibh venenatis cras sed. Mi sit amet mauris commodo quis imperdiet massa
-tincidunt nunc.
-
-[loom]2024/05/29 15:29:39 main.go:39: Got a message with method:  textDocument/diagnostic
-[loom]2024/05/29 15:29:39 main.go:103: Got diagnostics request for file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:29:39 main.go:112: Sent diagnostics response
-[loom]2024/05/29 15:29:42 main.go:39: Got a message with method:  textDocument/didChange
-[loom]2024/05/29 15:29:42 main.go:74: Changed document: file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:29:42 main.go:75: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. In hendrerit gravida
-rutrum quisque non. Cras sed felis eget velit aliquet sagittis id. Consequat id
-porta nibh venenatis cras sed. Mi sit amet mauris commodo quis imperdiet massa
-tincidunt nunc.
-
-[loom]2024/05/29 15:29:42 main.go:39: Got a message with method:  textDocument/didChange
-[loom]2024/05/29 15:29:42 main.go:74: Changed document: file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:29:42 main.go:75: Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-eiusmod tempor incididunt ut labore et dolore magna aliqua. In hendrerit gravida
-rutrum quisque non. Cras sed felis eget velit aliquet sagittis id. Consequat id
-porta nibh venenatis cras sed. Mi sit amet mauris commodo quis imperdiet massa
-tincidunt nunc.
-
-[loom]2024/05/29 15:29:42 main.go:39: Got a message with method:  textDocument/diagnostic
-[loom]2024/05/29 15:29:42 main.go:103: Got diagnostics request for file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:29:42 main.go:112: Sent diagnostics response
-[loom]2024/05/29 15:29:42 main.go:39: Got a message with method:  textDocument/diagnostic
-[loom]2024/05/29 15:29:42 main.go:103: Got diagnostics request for file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/hello.su
-[loom]2024/05/29 15:29:42 main.go:112: Sent diagnostics response
-[loom]2024/05/29 15:29:45 main.go:39: Got a message with method:  shutdown
-[loom]2024/05/29 15:29:45 main.go:115: [unhandled]:  shutdown
+[loom]2024/05/29 17:41:34 main.go:18: Hey, I started!
+[loom]2024/05/29 17:41:34 main.go:48: connected to Neovim 0.10.0-dev+g27fb62988
+[loom]2024/05/29 17:41:34 main.go:52: Sent initialize response
+[loom]2024/05/29 17:41:34 main.go:142: [unhandled]:  initialized
+[loom]2024/05/29 17:41:50 main.go:142: [unhandled]:  shutdown

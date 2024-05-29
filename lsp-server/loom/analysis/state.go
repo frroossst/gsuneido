@@ -1,12 +1,14 @@
 package analysis
 
 type State struct {
-	Documents map[string]string
+	Documents      map[string]string
+	DidChangeCount int
 }
 
 func NewState() State {
 	return State{
-		Documents: map[string]string{},
+		Documents:      map[string]string{},
+		DidChangeCount: 0,
 	}
 }
 

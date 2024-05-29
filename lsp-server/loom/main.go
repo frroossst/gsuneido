@@ -9,6 +9,8 @@ import (
 	"loom/lsp"
 	"loom/rpc"
 	"os"
+
+	"time"
 )
 
 func main() {
@@ -30,14 +32,11 @@ func main() {
 			logger.Printf("Got an error: %s", err)
 			continue
 		}
-
 		handleMessage(logger, writer, state, method, contents)
 	}
 }
 
 func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, method string, content []byte) {
-	logger.Println("Got a message with method: ", method)
-
 	switch method {
 	case "initialize":
 		var request lsp.InitializeRequest
@@ -74,6 +73,9 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 		logger.Printf("Changed document: %s", request.Params.TextDocument.URI)
 		logger.Println(request.Params.ContentChanges[0].Text)
 
+		state.DidChangeCount += 1
+		logger.Printf("Change count: %d", state.DidChangeCount)
+
 		for _, change := range request.Params.ContentChanges {
 			state.UpdateDocument(request.Params.TextDocument.URI, change.Text)
 		}
@@ -87,10 +89,18 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 
 		logger.Printf("Got inlay hint request for %s at %d (%d)", request.Params.TextDocumentURI, request.Params.Range.Start.Line, request.Params.Range.Start.Character)
 
-		pos := lsp.Position{Line: 0, Character: 0}
-		label := "Hello, world!"
+		// sleep for a bit
+		time.Sleep(2 * time.Second)
 
-		msg := lsp.NewInlayHintResult(request.ID, pos, label)
+		pos := lsp.Position{Line: 4, Character: 9}
+		label := ": String"
+		ih_member := lsp.NewInlayHint(pos, label)
+
+		inlay_hints := []lsp.InlayHint{
+			ih_member,
+		}
+
+		msg := lsp.NewInlayHintResult(request.ID, inlay_hints)
 		writeResponseMessage(writer, msg)
 		logger.Println("Sent inlay hint response")
 
@@ -102,8 +112,25 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 		}
 		logger.Printf("Got diagnostics request for %s", request.Params.TextDocument.URI)
 
-		diag0 := lsp.NewDiagnostic(lsp.Range{Start: lsp.Position{Line: 2, Character: 0}, End: lsp.Position{Line: 2, Character: 5}}, "This is a diagnostic")
-		report := lsp.NewDocumentDiagnosticReport([]lsp.Diagnostic{diag0})
+		// sleep for a bit
+		time.Sleep(2 * time.Second)
+
+		diag0 := lsp.NewDiagnostic(lsp.Range{
+			Start: lsp.Position{Line: 4, Character: 12},
+			End:   lsp.Position{Line: 4, Character: 19}},
+			"<<< Defined here first with type String")
+
+		diag1 := lsp.NewDiagnostic(lsp.Range{
+			Start: lsp.Position{Line: 5, Character: 12},
+			End:   lsp.Position{Line: 5, Character: 15},
+		},
+			"Reassigned with incompatible type Number")
+
+		all_diags := []lsp.Diagnostic{
+			diag0, diag1,
+		}
+
+		report := lsp.NewDocumentDiagnosticReport(all_diags)
 
 		var reply lsp.DocumentDiagnosticResponse
 		reply = lsp.NewDocumentDiagnosticReportResponse(request.ID, report)

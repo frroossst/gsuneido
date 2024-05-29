@@ -51,6 +51,7 @@ func NewInitializeResponse(id int) InitializeResponse {
 		Result: InitializeResponseResult{
 			Capabilities: ServerCapabilities{
 				TextDocumentSync:  1, // Full sync
+				InlayHintProvider: true,
 				DiagnosticProvider: DiagnosticOptions{
 					InterFileDependencies: false,
 					WorkspaceDiagnostics:  true,

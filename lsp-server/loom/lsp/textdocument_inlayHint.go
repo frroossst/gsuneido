@@ -30,17 +30,20 @@ type InlayHintResponse struct {
 	Result []InlayHint `json:"result"`
 }
 
-func NewInlayHintResult(id int, position Position, label string) InlayHintResponse {
+func NewInlayHint(position Position, lable string) InlayHint {
+	return InlayHint{
+		Position: position,
+		Label:    lable,
+	}
+
+}
+
+func NewInlayHintResult(id int, inlayHints []InlayHint) InlayHintResponse {
 	return InlayHintResponse{
 		Response: Response{
 			RPC: "2.0",
 			ID: &id,
 		},
-		Result: []InlayHint{
-			{
-				Position: position,
-				Label:    label,
-			},
-		},
+		Result: inlayHints,
 	}
 }
