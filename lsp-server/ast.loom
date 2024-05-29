@@ -1,0 +1,15 @@
+class {
+IsOdd: Function(num
+	If(Binary(Is Binary(Mod num 2) 0) Return(false)
+else Return(true)))
+Compose_f: Function(f
+	Return(f))
+Compose_g: Function(g
+	Return(g))
+Compose_x: Function(f,g,x
+	Return(Call(f Call(g x))))
+Double: Function(x
+	Return(Nary(Mul x 2)))
+Increment: Function(x
+	Return(Nary(Add x 1)))
+}

@@ -1,8 +1,0 @@
-lib: [
-  "_build/install/default/lib/loom/META"
-  "_build/install/default/lib/loom/dune-package"
-  "_build/install/default/lib/loom/opam"
-]
-bin: [
-  "_build/install/default/bin/loom"
-]

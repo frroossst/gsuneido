@@ -1,4 +1,4 @@
-.PHONY: *
+PHONY: *
 
 help:
 	@echo "Please use 'make <target>' where <target> is one of"

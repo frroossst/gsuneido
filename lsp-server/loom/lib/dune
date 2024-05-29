@@ -1,3 +1,0 @@
-(library
- (name loom)
- (libraries yojson))

@@ -64,11 +64,11 @@ func (u *UUIDGen) SetFuncName(fn string) {
 }
 
 func (u *UUIDGen) GetScopedUUID(vr string) string {
-	if u.store[u.func_name + "_" + vr] != "" {
-		return u.store[u.func_name + "_" +vr]
+	if u.store[u.func_name+"_"+vr] != "" {
+		return u.store[u.func_name+"_"+vr]
 	} else {
-		u.store[u.func_name + "_" + vr] = getUUID()
-		return u.store[u.func_name + "_" + vr]
+		u.store[u.func_name+"_"+vr] = getUUID()
+		return u.store[u.func_name+"_"+vr]
 	}
 }
 
@@ -121,6 +121,8 @@ type Class_t struct {
 	Methods map[string][]Function_t
 	// the Attributes of the class
 	Attributes map[string][]Node_t
+	// Range mapped to functions
+	RangeFunc map[string]int32
 }
 
 func (p *Parser) TypeClass() Class_t {
@@ -582,13 +584,14 @@ func (p *Parser) typeClass() Class_t {
 	// construct kv store where key is string and value is Node_t
 	kv_store_methods := map[string][]Function_t{}
 	kv_store_attrbts := map[string][]Node_t{}
+	range_src_func := map[string]int32{}
 
 	// parse class members
 	for p.Token != tok.RCurly {
 		// parse member name
 		member_name := p.Text
-
 		isFunc := true
+		pos0 := p.Pos
 
 		// check by looking ahead if member is a function
 		if p.Lxr.AheadSkip(0).Token == tok.Colon {
@@ -603,12 +606,14 @@ func (p *Parser) typeClass() Class_t {
 			func_node := Function_t{Node_t: Node_t{Tag: "Function", Type_t: "Function", Value: ""}, Name: func_name, ID: getUUID(), Parameters: func_type.Parameters, Body: func_type.Body}
 
 			kv_store_methods[func_name] = []Function_t{func_node}
+			range_src_func[func_name] = pos0
 
 		} else {
 			// parse member type
 			member_type := p.typeConst()
 			// kv_store[member_name] = member_type[0]
 			kv_store_attrbts[member_name] = []Node_t{member_type[0]}
+			range_src_func[member_name] = pos0
 		}
 
 	}
@@ -619,7 +624,7 @@ func (p *Parser) typeClass() Class_t {
 		p.className = "anonymous"
 	}
 
-	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, ID: getUUID(), Methods: kv_store_methods, Attributes: kv_store_attrbts}
+	return Class_t{Node_t: Node_t{Tag: "Class", Type_t: "Class", Value: "nil"}, Name: p.name, Base: baseName, ID: getUUID(), Methods: kv_store_methods, Attributes: kv_store_attrbts, RangeFunc: range_src_func}
 }
 
 // classNum is used to generate names for anonymous classes

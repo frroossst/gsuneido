@@ -1,0 +1,24 @@
+[loom]2024/05/29 02:30:53 main.go:16: Hey, I started!
+[loom]2024/05/29 02:30:53 main.go:41: Got a message with method:  initialize
+[loom]2024/05/29 02:30:53 main.go:51: connected to Neovim 0.10.0-dev+g27fb62988
+[loom]2024/05/29 02:30:53 main.go:56: Sent initialize response
+[loom]2024/05/29 02:30:53 main.go:41: Got a message with method:  initialized
+[loom]2024/05/29 02:30:53 main.go:41: Got a message with method:  textDocument/didOpen
+[loom]2024/05/29 02:30:53 main.go:65: Opened document: file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/demo_0.md
+[loom]2024/05/29 02:30:53 main.go:66: hello world!
+asdf asdfdsf
+
+asdasdf
+
+
+a
+asd
+
+ let x =ddsdff
+
+[loom]2024/05/29 02:30:53 main.go:41: Got a message with method:  textDocument/inlayHint
+[loom]2024/05/29 02:30:53 main.go:91: Got inlay hint request for  at 0 (0)
+[loom]2024/05/29 02:30:53 main.go:99: Sent inlay hint response
+[loom]2024/05/29 02:30:53 main.go:41: Got a message with method:  textDocument/diagnostic
+[loom]2024/05/29 02:30:53 main.go:108: Got diagnostics request for file:///home/home/Desktop/Projects/gsuneido/lsp-server/loom/demo_0.md
+[loom]2024/05/29 02:30:53 main.go:136: Sent diagnostics response

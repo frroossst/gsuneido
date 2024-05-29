@@ -84,6 +84,40 @@ func main() {
 			}
 	*/
 
+	src = `class {
+        IsOdd(num) {
+            if (num % 2 is 0) {
+                return false
+            }
+            else {
+                return true
+            }
+        }
+		Compose_f(f) 
+	        {
+	        return f
+	        }
+	    Compose_g(g) 
+	        {
+	        return g
+	        }
+		
+	    Compose_x(f, g, x) 
+	        {
+	        return f(g(x))
+	        }
+	    Double(x) 
+	        {
+	        return x * 2
+	        }
+		
+	    Increment(x) 
+	        {
+	        return x + 1
+	        }
+		}
+	`
+
 	fmt.Println("src:", src)
 	fmt.Println()
 	fmt.Println("compiled:", compile.AstParser(src).Const())
@@ -134,6 +168,25 @@ func main() {
 	defer fobj.Close()
 
 	_, err = fobj.WriteString(string(jsonData))
+	if err != nil {
+		panic(err)
+	}
+
+	if _, err := os.Stat("ast.loom"); err == nil {
+		err = os.Remove("ast.loom")
+		if err != nil {
+			panic(err)
+		}
+	}
+	// write json data to file
+	fobj2, err := os.OpenFile("ast.loom", os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		panic(err)
+	}
+	defer fobj2.Close()
+
+	astSrc := compile.AstParser(src).Const()
+	_, err = fobj2.WriteString(astSrc.String())
 	if err != nil {
 		panic(err)
 	}
