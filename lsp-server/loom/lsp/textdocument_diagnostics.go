@@ -9,45 +9,45 @@ type DocumentDiagnosticParams struct {
 	TextDocument TextDocumentIdentifier `json:"textDocument"`
 }
 
-type RelatedFullDocumentDiagnosticReport struct {
-	RelatedDocuments map[string]FullDocumentDiagnosticReport `json:"relatedDocuments"`
-}
-
-func NewDiagnosticResponseHandler() *RelatedFullDocumentDiagnosticReport {
-	return &RelatedFullDocumentDiagnosticReport{
-		RelatedDocuments: make(map[string]FullDocumentDiagnosticReport),
-	}
-}
-
-func (r *RelatedFullDocumentDiagnosticReport) AddDocument(uri string, report FullDocumentDiagnosticReport) {
-	r.RelatedDocuments[uri] = report
-}
-
-type DiagnosticResponse struct {
+type DocumentDiagnosticReport = RelatedFullDocumentDiagnosticReport
+type RelatedFullDocumentDiagnosticReport = FullDocumentDiagnosticReport
+type DocumentDiagnosticResponse struct {
 	Response
-	Result RelatedFullDocumentDiagnosticReport `json:"result"`
+	Result DocumentDiagnosticReport `json:"result"`
 }
 
-func NewDiagnosticResponse(id int, fullReport RelatedFullDocumentDiagnosticReport) DiagnosticResponse {
-	return DiagnosticResponse{
+func NewDocumentDiagnosticReportResponse(id int, report RelatedFullDocumentDiagnosticReport) DocumentDiagnosticResponse {
+	return DocumentDiagnosticResponse{
 		Response: Response{
 			RPC: "2.0",
 			ID:  &id,
 		},
-		Result: fullReport,
+		Result: report,
 	}
 }
 
-type FullDocumentDiagnosticReport struct {
-	Kind  DocumentDiagnosticKind `json:"kind"`
-	Items []Diagnostic           `json:"items"`
+func NewDocumentDiagnosticReport(diogs []Diagnostic) RelatedFullDocumentDiagnosticReport {
+	return RelatedFullDocumentDiagnosticReport{
+		Kind: "full",
+		Items: diogs,
+	}
+
 }
 
-type DocumentDiagnosticKind string // "full"
+func NewDiagnostic(range_ Range, message string) Diagnostic {
+	return Diagnostic{
+		Range:   range_,
+		Message: message,
+	}
+}
+
+type DocumentDiagnosticReportKind string // "full"
+type FullDocumentDiagnosticReport struct {
+	Kind DocumentDiagnosticReportKind `json:"kind"`
+	Items []Diagnostic                `json:"items"`
+}
 
 type Diagnostic struct {
-	Range   Range  `json:"range"`
-	Message string `json:"message"`
+	Range    Range  `json:"range"`
+	Message  string `json:"message"`
 }
-
-

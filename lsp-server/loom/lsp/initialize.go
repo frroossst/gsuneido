@@ -29,7 +29,7 @@ type ServerCapabilities struct {
 
 	InlayHintProvider bool `json:"inlayHintProvider"`
 
-	DiagnosticsProvider DiagnosticOptions `json:"diagnosticProvider"`
+	DiagnosticProvider DiagnosticOptions `json:"diagnosticProvider"`
 }
 
 type DiagnosticOptions struct {
@@ -51,8 +51,7 @@ func NewInitializeResponse(id int) InitializeResponse {
 		Result: InitializeResponseResult{
 			Capabilities: ServerCapabilities{
 				TextDocumentSync:  1, // Full sync
-				InlayHintProvider: true,
-				DiagnosticsProvider: DiagnosticOptions{
+				DiagnosticProvider: DiagnosticOptions{
 					InterFileDependencies: false,
 					WorkspaceDiagnostics:  true,
 				},

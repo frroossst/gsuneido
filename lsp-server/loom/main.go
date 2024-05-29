@@ -32,8 +32,6 @@ func main() {
 		}
 
 		handleMessage(logger, writer, state, method, contents)
-		_ = contents
-
 	}
 }
 
@@ -52,7 +50,6 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 
 		msg := lsp.NewInitializeResponse(request.ID)
 		writeResponseMessage(writer, msg)
-
 		logger.Println("Sent initialize response")
 
 	case "textDocument/didOpen":
@@ -62,10 +59,10 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 			return
 		}
 
+		state.OpenDocument(request.Params.TextDocument.URI, request.Params.TextDocument.Text)
+
 		logger.Printf("Opened document: %s", request.Params.TextDocument.URI)
 		logger.Println(request.Params.TextDocument.Text)
-
-		state.OpenDocument(request.Params.TextDocument.URI, request.Params.TextDocument.Text)
 
 	case "textDocument/didChange":
 		var request lsp.TextDocumentDidChangeNotification
@@ -95,45 +92,27 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 
 		msg := lsp.NewInlayHintResult(request.ID, pos, label)
 		writeResponseMessage(writer, msg)
-
 		logger.Println("Sent inlay hint response")
 
 	case "textDocument/diagnostic":
 		var request lsp.DocumentDiagnosticRequest
 		if err := json.Unmarshal(content, &request); err != nil {
-			logger.Println("Got an error for diagnostics request: ", err)
+			logger.Println("Got an error for publishDiagnostics request: ", err)
 			return
 		}
-
 		logger.Printf("Got diagnostics request for %s", request.Params.TextDocument.URI)
 
-		var report lsp.FullDocumentDiagnosticReport
-		report = lsp.FullDocumentDiagnosticReport{
-			Kind: "full",
-			Items: []lsp.Diagnostic{
-				{
-					Range: lsp.Range{
-						Start: lsp.Position{
-							Line:      1,
-							Character: 1,
-						},
-						End: lsp.Position{
-							Line:      1,
-							Character: 6,
-						},
-					},
-					Message: "This is a diagnostic message",
-				},
-			},
-		}
+		diag0 := lsp.NewDiagnostic(lsp.Range{Start: lsp.Position{Line: 2, Character: 0}, End: lsp.Position{Line: 2, Character: 5}}, "This is a diagnostic")
+		report := lsp.NewDocumentDiagnosticReport([]lsp.Diagnostic{diag0})
 
-		reportHandle := lsp.NewDiagnosticResponseHandler()
-		reportHandle.AddDocument(request.Params.TextDocument.URI, report)
+		var reply lsp.DocumentDiagnosticResponse
+		reply = lsp.NewDocumentDiagnosticReportResponse(request.ID, report)
 
-		msg := lsp.NewDiagnosticResponse(request.ID, *reportHandle)
-		writeResponseMessage(writer, msg)
-
+		writeResponseMessage(writer, reply)
 		logger.Println("Sent diagnostics response")
+
+	default:
+		logger.Println("[unhandled]: ", method)
 	}
 }
 
