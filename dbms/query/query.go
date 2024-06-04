@@ -88,7 +88,8 @@ type Query interface {
 	SingleTable() bool
 
 	// Indexes returns all the indexes.
-	// Unlike Keys, Indexes are physical i.e. fast access paths
+	// Unlike Keys, Indexes are physical i.e. fast access paths.
+	// Where returns []string{} not nil for singleton. (slc.Empty)
 	Indexes() [][]string
 
 	// Keys returns sets of fields that are unique keys.
@@ -111,6 +112,8 @@ type Query interface {
 	// rowSize returns the average number of bytes per row
 	rowSize() int
 
+	// Rewind resets the query so Get Next gets first, or Prev gets last
+	// It does *not* clear any Select.
 	Rewind()
 
 	Get(th *Thread, dir Dir) Row
@@ -162,7 +165,13 @@ type Query interface {
 	// fastSingle returns whether it's a fast singleton.
 	// This is mostly equivalent to whether it has an empty key().
 	// Join, Intersect, and Union return false because it depends on strategy.
+	// It is used by optimize (below)
 	fastSingle() bool
+
+	// Simple is simple, alternate execution method for testing.
+	// It should normally be used after just parsing,
+	// without transform or optimize.
+	Simple(th *Thread) []Row
 }
 
 // queryBase is embedded by almost all Query types
@@ -328,20 +337,27 @@ const impossible = Cost(math.MaxInt / 64) // allow for adding impossible's
 // Optimize determines the best (lowest estimated cost) query execution approach
 func Optimize(q Query, mode Mode, index []string, frac float64) (
 	fixcost, varcost Cost) {
-	if len(index) == 0 {
-		index = nil
-	}
+	fixcost, varcost, _ = optimize(q, mode, index, frac)
+	return fixcost, varcost
+}
+
+// optimize is used by Optimize and LookupCost
+func optimize(q Query, mode Mode, index []string, frac float64) (
+	fixcost, varcost Cost, approach any) {
 	assert.That(!math.IsNaN(frac) && !math.IsInf(frac, 0))
-	if fastSingle(q, index) {
+
+	// short circuit on empty index
+	// Note: this condition should match SetApproach
+	if len(index) == 0 || fastSingle(q, index) || allFixed(q.Fixed(), index) {
 		index = nil
 	}
-	if fixcost, varcost, _ := q.cacheGet(index, frac); varcost >= 0 {
-		return fixcost, varcost
+	if fixcost, varcost, app := q.cacheGet(index, frac); varcost >= 0 {
+		return fixcost, varcost, app
 	}
 	fixcost, varcost, app := optTempIndex(q, mode, index, frac)
-	assert.That(fixcost >= 0 && varcost >= 0)
+	assert.Msg("negative cost").That(fixcost >= 0 && varcost >= 0)
 	q.cacheAdd(index, frac, fixcost, varcost, app)
-	return fixcost, varcost
+	return fixcost, varcost, app
 }
 
 func fastSingle(q Query, index []string) bool {
@@ -442,15 +458,11 @@ func min3(fixcost1, varcost1 Cost, app1 any, fixcost2, varcost2 Cost, app2 any,
 
 func LookupCost(q Query, mode Mode, index []string, nrows int) (
 	Cost, Cost) {
-	if fastSingle(q, index) {
-		index = nil
-	}
-	fixcost, varcost := Optimize(q, mode, index, 0)
+	fixcost, varcost, approach := optimize(q, mode, index, 0)
 	if fixcost+varcost >= impossible {
 		return impossible, impossible
 	}
 	var lookupCost Cost
-	_, _, approach := q.cacheGet(index, 0)
 	if _, ok := approach.(*tempIndex); ok {
 		if q.SingleTable() {
 			lookupCost = 200 // ???
@@ -471,12 +483,16 @@ func LookupCost(q Query, mode Mode, index []string, nrows int) (
 // SetApproach finalizes the chosen approach.
 // It also adds temp indexes where required.
 func SetApproach(q Query, index []string, frac float64, tran QueryTran) Query {
-	if fastSingle(q, index) {
+	// short circuit on empty index
+	// Note: this condition should match Optimize
+	if len(index) == 0 || fastSingle(q, index) || allFixed(q.Fixed(), index) {
 		index = nil
 	}
 	fixcost, varcost, approach := q.cacheGet(index, frac)
-	assert.That(fixcost >= 0)
-	assert.That(varcost >= 0)
+	if fixcost == -1 {
+		panic("SetApproach: not found in cache")
+	}
+	assert.Msg("negative cost").That(fixcost >= 0 && varcost >= 0)
 	if app, ok := approach.(*tempIndex); ok {
 		q.cacheSetCost(1, app.srcfixcost, app.srcvarcost)
 		q.setApproach(nil, 1, app.approach, tran)
@@ -582,39 +598,6 @@ func (q2 *Query2) Source2() Query {
 	return q2.source2
 }
 
-func (q2 *Query2) selectByCols(cols, vals []string) ([]string, []string) {
-	columns1 := q2.source1.Columns()
-	columns2 := q2.source2.Columns()
-	var cols1, vals1, cols2, vals2 []string
-	var done1, done2 bool
-	if set.Subset(columns1, cols) {
-		cols1, vals1, done1 = cols, vals, true
-	}
-	if set.Subset(columns2, cols) {
-		cols2, vals2, done2 = cols, vals, true
-	}
-	for i, col := range cols {
-		used := false
-		if slices.Contains(columns1, col) {
-			used = true
-			if !done1 {
-				cols1 = append(cols1, col)
-				vals1 = append(vals1, vals[i])
-			}
-		}
-		if slices.Contains(columns2, col) {
-			used = true
-			if !done2 {
-				cols2 = append(cols2, col)
-				vals2 = append(vals2, vals[i])
-			}
-		}
-		assert.That(used)
-	}
-	q2.source1.Select(cols1, vals1)
-	return slices.Clip(cols2), slices.Clip(vals2)
-}
-
 //-------------------------------------------------------------------
 
 // paren is a helper for Query String methods
@@ -694,7 +677,7 @@ func bestGrouped(source Query, mode Mode, index []string, frac float64, cols []s
 func countUnfixed(cols []string, fixed []Fixed) int {
 	nunfixed := 0
 	for _, col := range cols {
-		if !isFixed(fixed, col) {
+		if !isSingleFixed(fixed, col) {
 			nunfixed++
 		}
 	}
@@ -709,7 +692,7 @@ func grouped(index []string, cols []string, nColsUnfixed int, fixed []Fixed) boo
 	}
 	n := 0
 	for _, col := range index {
-		if isFixed(fixed, col) {
+		if isSingleFixed(fixed, col) {
 			continue
 		}
 		if !slices.Contains(cols, col) {
@@ -725,6 +708,7 @@ func grouped(index []string, cols []string, nColsUnfixed int, fixed []Fixed) boo
 
 // ordered returns whether an index supplies an order
 // taking fixed into consideration.
+// It is used by Where and Sort.
 func ordered(index []string, order []string, fixed []Fixed) bool {
 	i := 0
 	o := 0
@@ -734,15 +718,15 @@ func ordered(index []string, order []string, fixed []Fixed) bool {
 		if index[i] == order[o] {
 			o++
 			i++
-		} else if isFixed(fixed, index[i]) {
+		} else if isSingleFixed(fixed, index[i]) {
 			i++
-		} else if isFixed(fixed, order[o]) {
+		} else if isSingleFixed(fixed, order[o]) {
 			o++
 		} else {
 			return false
 		}
 	}
-	for o < on && isFixed(fixed, order[o]) {
+	for o < on && isSingleFixed(fixed, order[o]) {
 		o++
 	}
 	return o >= on

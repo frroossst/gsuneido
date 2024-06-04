@@ -6,12 +6,14 @@ package tests
 import (
 	"fmt"
 	"hash/crc64"
+	"strings"
 	"testing"
 
 	"github.com/apmckinlay/gsuneido/compile"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19"
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
+	"github.com/apmckinlay/gsuneido/db19/stor"
 	. "github.com/apmckinlay/gsuneido/dbms/query"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/exit"
@@ -27,7 +29,7 @@ func TestQuery(t *testing.T) {
 	}
 	// Global.TestDef("Rule_c",
 	// 	compile.Constant("function() { return .b }"))
-	db, err := db19.OpenDatabaseRead("../suneido.db")
+	db, err := db19.OpenDb("../suneido.db", stor.Read, true)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -35,7 +37,10 @@ func TestQuery(t *testing.T) {
 		return nil
 	}
 	tran := db.NewReadTran()
-	s := `(((cus join ivc) join (((bln extend c1 = ik)) where bk is "82")) union ((cus join (ivc union ivc)) join bln)) sort b2,c4,i4`
+	s := `bln join by(ik,b2) ((ivc where ik is "") leftjoin by(ck) (cus extend b2 = c1))`
+	fmt.Println("----------------")
+	fmt.Println(Format(tran, s))
+	fmt.Println("----------------")
 	q := ParseQuery(s, tran, nil)
 	// trace.QueryOpt.Set()
 	// trace.JoinOpt.Set()
@@ -44,6 +49,7 @@ func TestQuery(t *testing.T) {
 
 	fmt.Println("----------------")
 	fmt.Println(Strategy(q))
+	fmt.Println("----------------")
 	th := &Thread{}
 	n := 0
 	hdr := q.Header()
@@ -54,6 +60,7 @@ func TestQuery(t *testing.T) {
 		if row == nil {
 			break
 		}
+		// fmt.Println(row2str(hdr, row))
 		hash := hashRow(hdr, fields, row)
 		if _, ok := hashes[hash]; ok {
 			panic("duplicate hash")
@@ -63,6 +70,22 @@ func TestQuery(t *testing.T) {
 	}
 	fmt.Println(n, "rows")
 	exit.RunFuncs()
+}
+
+func row2str(hdr *Header, row Row) string {
+	if row == nil {
+		return "nil"
+	}
+	var sb strings.Builder
+	sep := ""
+	for _, col := range hdr.Columns {
+		val := row.GetVal(hdr, col, nil, nil)
+		if val != EmptyStr {
+			fmt.Fprint(&sb, sep, col, "=", AsStr(val))
+			sep = " "
+		}
+	}
+	return sb.String()
 }
 
 func hashRow(hdr *Header, fields []string, row Row) uint64 {
@@ -95,7 +118,7 @@ func TestQuery2(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
-	db, err := db19.OpenDatabaseRead("../suneido.db")
+	db, err := db19.OpenDb("../suneido.db", stor.Read, true)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -122,7 +145,7 @@ func TestQuery2(t *testing.T) {
 }
 
 func BenchmarkProject_Old(b *testing.B) {
-	db, err := db19.OpenDatabaseRead("../suneido.db")
+	db, err := db19.OpenDb("../suneido.db", stor.Read, true)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -150,7 +173,7 @@ func BenchmarkProject_Old(b *testing.B) {
 }
 
 func BenchmarkProject_Hmap(b *testing.B) {
-	db, err := db19.OpenDatabaseRead("../suneido.db")
+	db, err := db19.OpenDb("../suneido.db", stor.Read, true)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -226,4 +249,25 @@ func TestHeader_Union(t *testing.T) {
 	assert.This(row2.GetVal(hdr, "one", th, nil)).Is(IntVal(11))
 	assert.This(row2.GetVal(hdr, "two", th, nil)).Is(IntVal(22))
 	assert.This(row2.GetVal(hdr, "three", th, nil)).Is(IntVal(33))
+}
+
+func TestSimple(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+	MakeSuTran = func(qt QueryTran) *SuTran {
+		return nil
+	}
+	s := `(((cus extend r0 union cus) join ivc) join aln) union (((ivc where ik is '7' project ik,i2,i3,ck leftjoin cus) union (cus join (ivc where ik is '7'))) join (aln where ik is '7'))`
+	db, err := db19.OpenDb("../suneido.db", stor.Read, true)
+	if err != nil {
+		panic(err.Error())
+	}
+	tran := db.NewReadTran()
+	fmt.Println("----------------")
+	fmt.Println(Format(tran, s))
+	fmt.Println("----------------")
+	q := ParseQuery(s, tran, nil)
+	th := &Thread{}
+	q.Simple(th)
 }

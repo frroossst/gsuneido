@@ -5,6 +5,7 @@ package query
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
@@ -31,6 +32,7 @@ type Summarize struct {
 	rewound  bool
 	unique   bool
 	hint     sumHint
+	th       *Thread
 }
 
 type summarizeApproach struct {
@@ -199,7 +201,7 @@ func (*Summarize) Output(*Thread, Record) {
 func (su *Summarize) Transform() Query {
 	src := su.source.Transform()
 	if _, ok := src.(*Nothing); ok {
-		return NewNothing(su.Columns())
+		return NewNothing(su)
 	}
 	if p, ok := src.(*Project); ok && p.unique {
 		// remove project-copy
@@ -262,10 +264,10 @@ func (su *Summarize) idxCost(mode Mode) (Cost, Cost, any) {
 }
 
 func (su *Summarize) mapCost(mode Mode, index []string, _ float64) (Cost, Cost, any) {
-	//FIXME technically, map should only be allowed in ReadMode
+	// WARNING technically, map should only be allowed in ReadMode
 	nrows, _ := su.Nrows()
 	if index != nil || su.hint == sumLarge ||
-		(nrows > mapLimit && su.hint != sumSmall) {
+		(nrows > mapThreshold && su.hint != sumSmall) {
 		return impossible, impossible, nil
 	}
 	fixcost, varcost := Optimize(su.source, mode, nil, 1)
@@ -381,9 +383,11 @@ type mapPair struct {
 }
 
 func (t *sumMapT) getMap(th *Thread, su *Summarize, dir Dir) Row {
+	su.th = th
+	defer func() { su.th = nil }()
 	if su.rewound {
 		assert.That(!su.wholeRow)
-		t.mapList = su.buildMap(th)
+		t.mapList = su.buildMap()
 		if dir == Next {
 			t.mapPos = -1
 		} else { // Prev
@@ -411,32 +415,35 @@ func (t *sumMapT) getMap(th *Thread, su *Summarize, dir Dir) Row {
 	return Row{DbRec{Record: rb.Build()}}
 }
 
-func (su *Summarize) buildMap(th *Thread) []mapPair {
+func (su *Summarize) buildMap() []mapPair {
 	hdr := su.source.Header()
 	hfn := func(k rowHash) uint32 { return k.hash }
 	eqfn := func(x, y rowHash) bool {
 		return x.hash == y.hash &&
-			equalCols(x.row, y.row, hdr, su.by, th, su.st)
+			equalCols(x.row, y.row, hdr, su.by, su.th, su.st)
 	}
 	sumMap := hmap.NewHmapFuncs[rowHash, []sumOp](hfn, eqfn)
 	warned := false
 	for {
-		row := su.source.Get(th, Next)
+		row := su.source.Get(su.th, Next)
 		if row == nil {
 			break
 		}
-		rh := rowHash{hash: hashCols(row, hdr, su.by, th, su.st), row: row}
+		rh := rowHash{hash: hashCols(row, hdr, su.by, su.th, su.st), row: row}
 		sums := sumMap.Get(rh)
 		if sums == nil {
 			sums = su.newSums()
 			sumMap.Put(rh, sums)
-			if !warned && sumMap.Size() > mapLimit {
+			if !warned && sumMap.Size() > mapWarn {
 				// log inside loop in case we run out of memory
 				warned = true
-				Warning("summarize-map large >", mapLimit)
+				Warning("summarize-map large >", mapWarn)
 			}
 		}
-		su.addToSums(sums, row, th, su.st)
+		su.addToSums(sums, row, su.th, su.st)
+	}
+	if sumMap.Size() > 2*mapWarn {
+		log.Println("summarize-map large =", sumMap.Size())
 	}
 	i := 0
 	list := make([]mapPair, sumMap.Size())
@@ -552,6 +559,10 @@ func (su *Summarize) seqRow(th *Thread, curRow Row, sums []sumOp) Row {
 func (su *Summarize) Select(cols, vals []string) {
 	su.source.Select(cols, vals)
 	su.rewound = true
+}
+
+func (*Summarize) Simple(*Thread) []Row {
+	panic("Simple not implemented for summarize")
 }
 
 // operations -------------------------------------------------------

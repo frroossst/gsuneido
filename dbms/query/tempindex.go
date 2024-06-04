@@ -4,6 +4,7 @@
 package query
 
 import (
+	"log"
 	"slices"
 
 	. "github.com/apmckinlay/gsuneido/core"
@@ -37,6 +38,9 @@ const derivedWarn = 8_000_000 // ??? // derivedWarn is also used by Project
 
 func NewTempIndex(src Query, order []string, tran QueryTran) *TempIndex {
 	order = withoutFixed(order, src.Fixed())
+	if len(order) == 0 {
+		log.Println("ERROR empty TempIndex")
+	}
 	ti := TempIndex{order: order, tran: tran, selOrg: selMin, selEnd: selMax}
 	ti.source = src
 	ti.header = src.Header().Dup() // dup because sortlist is concurrent
@@ -45,6 +49,7 @@ func NewTempIndex(src Query, order []string, tran QueryTran) *TempIndex {
 	ti.setNrows(src.Nrows())
 	ti.rowSiz.Set(src.rowSize())
 	ti.singleTbl.Set(src.SingleTable())
+	ti.fast1.Set(src.fastSingle())
 	return &ti
 }
 
@@ -66,6 +71,10 @@ func (ti *TempIndex) Transform() Query {
 
 func (*TempIndex) setApproach([]string, float64, any, QueryTran) {
 	assert.ShouldNotReachHere()
+}
+
+func (*TempIndex) Simple(*Thread) []Row {
+	panic(assert.ShouldNotReachHere())
 }
 
 // execution --------------------------------------------------------
@@ -221,14 +230,6 @@ type singleIter struct {
 }
 
 func (ti *TempIndex) single() rowIter {
-	// sortlist uses a goroutine
-	// so UIThread must be false
-	// so interp doesn't call Interrupt
-	// leading to "illegal UI call from background thread"
-	defer func(prev bool) {
-		ti.th.UIThread = prev
-	}(ti.th.UIThread)
-	ti.th.UIThread = false
 	var th2 Thread // separate thread because sortlist runs in the background
 	b := sortlist.NewSorting(
 		func(x DbRec) bool { return x == DbRec{} },
@@ -248,9 +249,9 @@ func (ti *TempIndex) single() rowIter {
 		}
 	}
 	if nrows > 2*tempindexWarn {
-		Warning("temp index large =", nrows)
+		log.Println("temp index large =", nrows)
 	}
-	// lt must be consistent with singleLess
+	// NOTE: the closure captures ti not ti.th
 	lt := func(rec DbRec, key []string) bool {
 		return ti.less2(ti.th, Row{rec}, key)
 	}
@@ -321,14 +322,6 @@ type multiIter struct {
 }
 
 func (ti *TempIndex) multi() rowIter {
-	// sortlist uses a goroutine
-	// so UIThread must be false
-	// so interp doesn't call Interrupt
-	// leading to "illegal UI call from background thread"
-	defer func(prev bool) {
-		ti.th.UIThread = prev
-	}(ti.th.UIThread)
-	ti.th.UIThread = false
 	var th2 Thread // separate thread because sortlist runs in the background
 	b := sortlist.NewSorting(
 		func(row Row) bool { return row == nil },
@@ -358,12 +351,13 @@ func (ti *TempIndex) multi() rowIter {
 		b.Add(row)
 	}
 	if nrows > 2*tempindexWarn {
-		Warning("temp index large =", nrows)
+		log.Println("temp index large =", nrows)
 	}
 	if derived > 2*derivedWarn {
-		Warning("temp index derived large =",
+		log.Println("temp index derived large =",
 			derived, "average", derived/nrows)
 	}
+	// NOTE: the closure captures ti not ti.th
 	lt := func(row Row, key []string) bool {
 		return ti.less2(ti.th, row, key)
 	}

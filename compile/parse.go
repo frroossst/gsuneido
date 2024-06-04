@@ -28,10 +28,6 @@ func AstParser(src string) *Parser {
 	return newParser(NewLexer(src), &astAspects{})
 }
 
-func GogenParser(src string) *Parser {
-	return newParser(NewLexer(src), &gogenAspects{})
-}
-
 func QueryParser(src string) *Parser {
 	return newParser(NewQueryLexer(src), &actionAspects{})
 }
@@ -128,6 +124,9 @@ type funcInfo struct {
 
 	// hasBlocks is whether the function has any blocks
 	hasBlocks bool
+
+	// inTry is used to give an error for nested try
+	inTry bool
 }
 
 // disqualified is a special value for final
@@ -164,7 +163,8 @@ func (p *ParserBase) MustMatch(token tok.Token) {
 	}
 }
 
-// Next advances to the Next token, setting p.Item
+// Next skips whitespace and comments to advance to the next token.
+// It sets p.Item (Text, Pos, Token), p.EndPos, and p.newline.
 func (p *ParserBase) Next() {
 	p.newline = false
 	p.Item = p.Lxr.Next()
@@ -180,7 +180,7 @@ func (p *ParserBase) Next() {
 		p.Item = p.Lxr.Next()
 	}
 	if p.EqToIs && p.Token == tok.Eq {
-		p.Token = tok.Is
+		p.Token = tok.Is // for queries
 	}
 }
 

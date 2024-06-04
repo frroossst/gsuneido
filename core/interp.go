@@ -8,9 +8,8 @@ import (
 	op "github.com/apmckinlay/gsuneido/core/opcodes"
 )
 
-// RunOnGoSide is injected
-var RunOnGoSide = func() {}
-var Interrupt = func() bool { return false }
+var RunOnGoSide func()    // injected
+var Interrupt func() bool // injected
 
 var BlockBreak = BuiltinSuExcept("block:break")
 var BlockContinue = BuiltinSuExcept("block:continue")
@@ -164,25 +163,23 @@ loop:
 		// fmt.Println("stack:", t.sp, t.stack[max(0, t.sp-3):t.sp])
 		// _, da := Disasm1(fr.fn, fr.ip)
 		// fmt.Printf("%d: %d: %s\n", t.fp, fr.ip, da)
-		if th.UIThread {
-			if th.OpCount == 0 {
-				RunOnGoSide()
-				if Interrupt() {
-					panic("interrupt")
+		if wingui { // const so should be compiled away
+			if th == MainThread {
+				if th.OpCount == 0 {
+					th.OpCount = 1009 // reset counter
+					RunOnGoSide()
+					if Interrupt() {
+						panic("interrupt")
+					}
 				}
-				th.OpCount = 1009 // otherwise it won't trigger again
+				th.OpCount--
 			}
-			th.OpCount--
 		}
 		oc = op.Opcode(code[fr.ip])
 		fr.ip++
 		switch oc {
 		case op.Pop:
 			th.Pop()
-		case op.Dup:
-			th.Push(th.Top())
-		case op.Swap:
-			th.Swap()
 		case op.This:
 			if fr.this == nil {
 				panic("uninitialized: this")
@@ -432,6 +429,12 @@ loop:
 			} else {
 				fr.ip += 2
 			}
+		case op.JumpLt:
+			if OpLt(th.stack[th.sp-1], th.stack[th.sp-2]) == True {
+				jump()
+			} else {
+				fr.ip += 2
+			}
 		case op.Iter:
 			th.stack[th.sp-1] = OpIter(th.stack[th.sp-1])
 		case op.ForIn:
@@ -532,8 +535,7 @@ loop:
 						for i, p := range instance.parents {
 							if p.Base == super {
 								c := instance.parents[i+1]
-								f = c.lookup(th, string(methstr),
-									instance.parents[i+1:])
+								f = c.lookup(th, methstr, instance.parents[i+1:])
 								super = 0
 								goto done
 							}
@@ -543,7 +545,7 @@ loop:
 					ob = Global.Get(th, super)
 					super = 0
 				}
-				f = ob.Lookup(th, string(methstr))
+				f = ob.Lookup(th, methstr)
 			done:
 				if f != nil {
 					// fmt.Println(strings.Repeat("   ", t.fp+1), f)

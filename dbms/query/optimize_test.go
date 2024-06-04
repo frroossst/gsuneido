@@ -39,6 +39,10 @@ func TestOptimize(t *testing.T) {
 		"table^(a) TEMPINDEX(c)")
 	test("hist where date is 5",
 		"hist^(date) WHERE date is 5") // not WHERE*1
+	test("comp where a=1 sort c, a, b",
+		"comp^(a,b,c) WHERE a is 1 TEMPINDEX(c,b)")
+	test("comp where a=1 and b=2 and c=3 sort c, a, b",
+		"comp^(a,b,c) WHERE*1 a is 1 and b is 2 and c is 3")
 
 	test("supplier",
 		"supplier^(supplier)")
@@ -54,6 +58,8 @@ func TestOptimize(t *testing.T) {
 		"supplier^(supplier) WHERE*1 supplier is 3 and city is 5")
 	test("supplier where String?(city)",
 		"supplier^(city) WHERE String?(city)")
+	test("supplier where false",
+		"NOTHING(supplier)")
 
 	test("supplier where Func(name)",
 		"supplier^(supplier) WHERE Func(name)")
@@ -158,6 +164,8 @@ func TestOptimize(t *testing.T) {
 		"customer^(id) TIMES inven^(item)")
 	test("inven times customer sort id",
 		"customer^(id) TIMES inven^(item)")
+	test("inven times (customer where false)",
+		"NOTHING")
 
 	test("hist join customer",
 		"hist^(date) JOIN n:1 by(id) customer^(id)")

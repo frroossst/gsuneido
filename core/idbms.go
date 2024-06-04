@@ -31,10 +31,6 @@ type IDbms interface {
 	DisableTrigger(table string)
 	EnableTrigger(table string)
 
-	// Dump dumps a table or the entire database like -dump
-	// It returns "" or an error message.
-	Dump(table string) string
-
 	// Exec is used by the new style ServerEval(...)
 	Exec(th *Thread, args Value) Value
 
@@ -43,7 +39,7 @@ type IDbms interface {
 
 	// Get returns a single record, for Query1 (dir = One),
 	// QueryFirst (dir = Next), or QueryLast (dir = Prev)
-	Get(th *Thread, query string, dir Dir, sv *Sviews) (Row, *Header, string)
+	Get(th *Thread, query string, dir Dir) (Row, *Header, string)
 
 	// Info returns an object containing database information
 	Info() Value
@@ -59,10 +55,6 @@ type IDbms interface {
 
 	// Libraries returns a list of the libraries currently in use
 	Libraries() []string
-
-	// Load loads a table like -load
-	// It returns the number of records loaded.
-	Load(table string) int
 
 	// Log writes to the server's error.log
 	Log(string)
@@ -115,23 +107,19 @@ type ITran interface {
 	// It returns "" on success, otherwise the conflict.
 	Complete() string
 
-	Conflict() string
-
-	Ended() bool
-
 	// Delete deletes a record
 	Delete(th *Thread, table string, off uint64)
 
 	// Get returns a single record, for Query1 (dir = One),
 	// QueryFirst (dir = Next), or QueryLast (dir = Prev)
-	Get(th *Thread, query string, dir Dir, sv *Sviews) (Row, *Header, string)
+	Get(th *Thread, query string, dir Dir) (Row, *Header, string)
 
 	// Query starts a query
 	Query(query string, sv *Sviews) IQuery
 
 	// Action executes an insert, update, or delete
 	// and returns the number of records processed
-	Action(th *Thread, action string, sv *Sviews) int
+	Action(th *Thread, action string) int
 
 	// Update modifies a record
 	Update(th *Thread, table string, off uint64, rec Record) uint64
@@ -146,6 +134,8 @@ type ITran interface {
 	// and returns the date-time for the transaction,
 	// with the date-times as unix milli
 	Asof(int64) int64
+
+	Num() int
 }
 
 type Dir byte

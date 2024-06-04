@@ -26,6 +26,7 @@ const Ncb2s = C.ncb2s
 const Ncb3s = C.ncb3s
 const Ncb4s = C.ncb4s
 
+// uiThreadId is used to detect calls from other threads (not allowed)
 var uiThreadId uint32
 
 func Init() {
@@ -38,7 +39,7 @@ func Run() {
 	C.args[0] = C.msg_result
 	C.signalAndWait() // return from C.thread interact
 	interact()
-	log.Fatalln("!!! should not reach here !!!")
+	log.Fatalln("FATAL should not reach here")
 }
 
 func CThreadId() uintptr {

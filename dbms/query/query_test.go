@@ -15,6 +15,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/generic/slc"
 )
 
 func TestKeys(t *testing.T) {
@@ -23,11 +24,11 @@ func TestKeys(t *testing.T) {
 		q := ParseQuery(query, testTran{}, nil)
 		assert.T(t).This(idxsToS(q.Keys())).Is(expected)
 	}
-	test("tables", "table, tablename")
+	test("tables", "table")
 	test("columns", "table+column")
 	test("columns rename column to col", "table+col")
-	test("tables extend x=1,b=2", "table, tablename")
-	test("tables intersect tables", "table, tablename")
+	test("tables extend x=1,b=2", "table")
+	test("tables intersect tables", "table")
 	test("abc intersect bcd", "b, c")
 	test("hist project item, cost", "item+cost")
 	test("hist2 project date, item", "date")
@@ -46,7 +47,7 @@ func TestForeignKeys(*testing.T) {
 	act := func(act string) {
 		ut := db.NewUpdateTran()
 		defer ut.Commit()
-		n := DoAction(nil, ut, act, nil)
+		n := DoAction(nil, ut, act)
 		assert.This(n).Is(1)
 	}
 
@@ -210,7 +211,7 @@ func TestQueryBug(*testing.T) {
 	act := func(act string) {
 		ut := db.NewUpdateTran()
 		defer ut.Commit()
-		n := DoAction(nil, ut, act, nil)
+		n := DoAction(nil, ut, act)
 		assert.This(n).Is(1)
 	}
 	doAdmin(db, "create tmp (a,b) key(a)")
@@ -243,7 +244,7 @@ func TestDuplicateKey(*testing.T) {
 	act := func(act string) {
 		ut := db.NewUpdateTran()
 		defer ut.Commit()
-		n := DoAction(nil, ut, act, nil)
+		n := DoAction(nil, ut, act)
 		assert.This(n).Is(1)
 	}
 	doAdmin(db, "create tmp (k,u,i) key(k) index unique(u) index(i)")
@@ -267,7 +268,7 @@ func TestWhereSelectBug(t *testing.T) {
 	act := func(act string) {
 		ut := db.NewUpdateTran()
 		defer ut.Commit()
-		n := DoAction(nil, ut, act, nil)
+		n := DoAction(nil, ut, act)
 		assert.This(n).Is(1)
 	}
 	doAdmin(db, "create t2 (d) key (d)")
@@ -303,7 +304,7 @@ func TestJoinBug(t *testing.T) {
 	act := func(act string) {
 		ut := db.NewUpdateTran()
 		defer ut.Commit()
-		n := DoAction(nil, ut, act, nil)
+		n := DoAction(nil, ut, act)
 		assert.This(n).Is(1)
 	}
 	doAdmin(db, "create t1 (a) key(a)")
@@ -322,7 +323,7 @@ func TestSelectOnSingleton(t *testing.T) {
 	act := func(act string) {
 		ut := db.NewUpdateTran()
 		defer ut.Commit()
-		n := DoAction(nil, ut, act, nil)
+		n := DoAction(nil, ut, act)
 		assert.This(n).Is(1)
 	}
 	doAdmin(db, "create t1 (a) key(a)")
@@ -342,7 +343,7 @@ func TestSingleton(t *testing.T) {
 	act := func(act string) {
 		ut := db.NewUpdateTran()
 		defer ut.Commit()
-		n := DoAction(nil, ut, act, nil)
+		n := DoAction(nil, ut, act)
 		assert.This(n).Is(1)
 	}
 	doAdmin(db, "create tmp (a,b) key(a) key(b)")
@@ -433,19 +434,22 @@ func TestJoin_splitSelect(t *testing.T) {
 	q2 := newTestQop([]string{"c", "d", "e"})
 	q1.indexes = [][]string{{"c"}}
 	q2.fixed = []Fixed{
-		{col: "c", values: []string{"1"}},
-		{col: "e", values: []string{"2", ""}},
+		{col: "c", values: fixvals("1")},
+		{col: "e", values: fixvals("2", "")},
 	}
-	jn := NewJoin(q1, q2, nil)
+	jn := NewJoin(q1, q2, nil, nil).(*Join)
 	assert.This(jn.by).Is([]string{"c"})
-	jn.saIndex = []string{"a"}
 
 	cols := []string{"a", "c"}
-	vals := []string{"9", "1"}
+	vals := fixvals("9", "1")
 	jn.Select(cols, vals)
-	assert.This(q1.sel).
-		Is(sel{cols: []string{"a"}, vals: []string{"9"}})
-	assert.That(!jn.conflict1 && !jn.conflict2)
+	assert.This(q1.sel).Is(sel{cols: cols, vals: vals})
+}
+
+func fixvals(strs ...string) []string {
+	return slc.MapFn(strs, func(s string) string {
+		return Pack(SuStr(s))
+	})
 }
 
 type TestQop struct {

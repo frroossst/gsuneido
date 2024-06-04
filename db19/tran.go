@@ -5,7 +5,6 @@ package db19
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -25,24 +24,10 @@ import (
 )
 
 type tran struct {
-	db     *Database
-	meta   *meta.Meta
-	status tranStatus
-	asof   int64
-	off    uint64
-}
-
-type tranStatus byte
-
-const (
-	active tranStatus = iota
-	completed
-	commitFailed
-	aborted
-)
-
-func (t *tran) GetSviews() *core.Sviews {
-	return &t.db.Sviews
+	db   *Database
+	meta *meta.Meta
+	asof int64
+	off  uint64
 }
 
 // GetInfo returns read-only Info for the table or nil if not found
@@ -96,10 +81,6 @@ func (t *tran) GetView(name string) string {
 	return t.db.GetView(name)
 }
 
-func (t *tran) Ended() bool {
-	return t.status != active
-}
-
 func (t *tran) GetStore() *stor.Stor {
 	return t.db.Store
 }
@@ -116,11 +97,15 @@ var nextReadTran atomic.Int32
 func (db *Database) NewReadTran() *ReadTran {
 	state := db.GetState()
 	return &ReadTran{tran: tran{db: db, meta: state.Meta},
-		num: int(nextReadTran.Add(1))}
+		num: int(nextReadTran.Add(2))} // even
 }
 
 func (t *ReadTran) String() string {
 	return "rt" + strconv.Itoa(t.num)
+}
+
+func (t *ReadTran) Num() int {
+	return t.num
 }
 
 func (t *ReadTran) GetIndex(table string, cols []string) *index.Overlay {
@@ -158,11 +143,7 @@ func (t *ReadTran) ColToFld(table, col string) int {
 func (t *ReadTran) RangeFrac(table string, iIndex int, org, end string) float64 {
 	info := t.meta.GetRoInfo(table)
 	idx := info.Indexes[iIndex]
-	f := float64(idx.RangeFrac(org, end))
-	if info.Nrows > 0 {
-		f = math.Max(f, 1/float64(info.Nrows))
-	}
-	return f
+	return idx.RangeFrac(org, end, info.Nrows)
 }
 
 // Lookup returns the DbRec for a key, or nil if not found
@@ -226,19 +207,10 @@ func (t *ReadTran) MakeLess(is *ixkey.Spec) func(x, y uint64) bool {
 }
 
 func (t *ReadTran) Complete() string {
-	if t.status == aborted {
-		return "can't Complete a transaction after failure or Abort"
-	}
-	t.status = completed
-	return ""
-}
-
-func (t *ReadTran) Conflict() string {
 	return ""
 }
 
 func (t *ReadTran) Abort() string {
-	t.status = aborted
 	return ""
 }
 
@@ -265,6 +237,10 @@ func (t *UpdateTran) String() string {
 	return t.ct.String()
 }
 
+func (t *UpdateTran) Num() int {
+	return t.ct.start
+}
+
 func (t *UpdateTran) ReadCount() int {
 	// read count is tracked by checker
 	// so it knows about range consolidation
@@ -277,20 +253,10 @@ func (t *UpdateTran) WriteCount() int {
 
 // Complete returns "" on success, otherwise an error
 func (t *UpdateTran) Complete() string {
-	if t.status == aborted || t.status == commitFailed {
-		return "can't Complete a transaction after failure or Abort"
-	}
-	if t.db.ck.Commit(t) {
-		t.status = completed
-	} else { // aborted
-		t.status = commitFailed
+	if !t.db.ck.Commit(t) {
 		return t.ct.failure.Load()
 	}
 	return ""
-}
-
-func (t *UpdateTran) Conflict() string {
-	return t.ct.failure.Load()
 }
 
 // Commit is used by tests. It panics on error.
@@ -308,13 +274,6 @@ func (t *UpdateTran) commit() int {
 
 // Abort returns "" if it succeeds or if the transaction was already aborted.
 func (t *UpdateTran) Abort() string {
-	switch t.status {
-	case aborted, commitFailed:
-		return ""
-	case completed:
-		return "already completed"
-	}
-	t.status = aborted
 	if !t.db.ck.Abort(t.ct, "aborted") {
 		return "abort failed"
 	}
@@ -347,7 +306,7 @@ func (t *UpdateTran) write() {
 
 func (t *UpdateTran) Output(th *core.Thread, table string, rec core.Record) {
 	if t.db.corrupted.Load() {
-		return
+		return // prevent appending to database
 	}
 	t.write()
 	ts := t.getSchema(table)
@@ -571,7 +530,7 @@ func (t *UpdateTran) Update(th *core.Thread, table string, oldoff uint64, newrec
 func (t *UpdateTran) update(th *core.Thread, table string, oldoff uint64, newrec core.Record,
 	block bool) uint64 {
 	if t.db.corrupted.Load() {
-		return oldoff
+		return oldoff // prevent appending to database
 	}
 	ts := t.getSchema(table)
 	newrec = newrec.Truncate(len(ts.Columns))

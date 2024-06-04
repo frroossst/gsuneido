@@ -143,6 +143,10 @@ func TestPropFold(t *testing.T) {
 	test("'hello' =~ 'lo'", "true")
 	test("s = 'hello'; s =~ 'lo'", "'hello'\ntrue")
 
+	// in => is
+	test("x in (1)", "Binary(Is x 1)")
+	test("x not in (1)", "Unary(Not Binary(Is x 1))")
+
 	// or => in
 	test("a is 1 or a is 2", "In(a [1 2])")
 	test("a is 1 or a is 2 or b is 3 or b is 4",
@@ -178,6 +182,33 @@ func TestPropFold(t *testing.T) {
 		"")
 	test("x=1; if (x > 1) F()",
 		"1")
+
+	// for
+	test(`f = 2; t = 8
+		for (i = f-1; i < t+1; ++i) T()`,
+		`2
+        8
+        For(Binary(Eq i 1); Binary(Lt i 9); Unary(Inc i)
+        Call(T))`)
+	test(`f = 2; t = 8
+		for i in f-1..t+1
+			T()`,
+		`2
+        8
+        ForIn(i 1 9
+		Call(T))`)
+	test(`t = 8
+		for i in ..t+1
+			T()`,
+		`8
+        ForIn(i 0 9
+		Call(T))`)
+	test(`n = 5
+		for ..n+1
+			T()`,
+		`5
+        ForIn(0 6
+        Call(T))`)
 
 	// commutative
 	test("a * 0 * b", "Nary(Mul a b 0)") // short circuit

@@ -98,7 +98,7 @@ func thread_List() Value {
 	threads.lock.Lock()
 	defer threads.lock.Unlock()
 	for _, t := range threads.list {
-		ob.Set(SuStr(t.Name), True)
+		ob.Add(SuStr(t.Name))
 	}
 	return ob
 }

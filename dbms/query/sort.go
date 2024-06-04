@@ -4,6 +4,9 @@
 package query
 
 import (
+	"slices"
+	"strings"
+
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
@@ -77,7 +80,7 @@ func (sort *Sort) optimize(mode Mode, index []string, frac float64) (Cost, Cost,
 	assert.That(index == nil)
 	src := sort.source
 	fixcost, varcost := Optimize(src, mode, sort.order, frac) // adds temp index if needed
-	best := bestOrdered(src, src.Indexes(), sort.order, mode, frac)
+	best := bestOrdered(src, sort.order, mode, frac, sort.fixed)
 	if fixcost+varcost < best.fixcost+best.varcost {
 		return fixcost, varcost, sortApproach{index: sort.order}
 	}
@@ -86,11 +89,9 @@ func (sort *Sort) optimize(mode Mode, index []string, frac float64) (Cost, Cost,
 
 // bestOrdered returns the best index that supplies the required order
 // taking fixed into consideration.
-func bestOrdered(q Query, indexes [][]string, order []string,
-	mode Mode, frac float64) bestIndex {
+func bestOrdered(q Query, order []string, mode Mode, frac float64, fixed []Fixed) bestIndex {
 	best := newBestIndex()
-	fixed := q.Fixed()
-	for _, ix := range indexes {
+	for _, ix := range q.Indexes() {
 		if ordered(ix, order, fixed) {
 			fixcost, varcost := Optimize(q, mode, ix, frac)
 			best.update(ix, fixcost, varcost)
@@ -119,4 +120,24 @@ func (sort *Sort) Get(th *Thread, dir Dir) Row {
 
 func (sort *Sort) Select(cols, vals []string) {
 	sort.source.Select(cols, vals)
+}
+
+func (sort *Sort) Simple(th *Thread) []Row {
+	rev := 1
+	if sort.reverse {
+        rev = -1
+    }
+	rows := sort.source.Simple(th)
+	cmp := func(xrow, yrow Row) int {
+		for _, col := range sort.order {
+			x := xrow.GetRawVal(sort.header, col, th, nil)
+			y := yrow.GetRawVal(sort.header, col, th, nil)
+			if c := strings.Compare(x, y); c!= 0 {
+				return c * rev
+			}
+		}
+		return 0
+	}
+	slices.SortFunc(rows, cmp)
+	return rows
 }

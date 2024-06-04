@@ -14,6 +14,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/meta"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/options"
+	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/cksum"
 )
 
@@ -41,14 +42,21 @@ func quickCheckTable(state *DbState, table string) {
 
 // full check -------------------------------------------------------
 
-// CheckDatabase checks the integrity of the database.
+// CheckDatabase is called by -check and -repair
 func CheckDatabase(dbfile string) (ec error) {
 	db, err := OpenDb(dbfile, stor.Read, false)
 	if err != nil {
 		return newErrCorrupt(err)
 	}
 	defer db.Close()
-	return db.Check()
+	defer func() {
+		if e := recover(); e != nil {
+			db.Corrupt()
+			ec = newErrCorrupt(e)
+		}
+	}()
+	runParallel(db.GetState(), checkTable)
+	return nil // may be overridden by defer/recover
 }
 
 // Check is called by the builtin Database.Check()
@@ -61,36 +69,46 @@ func (db *Database) Check() (ec error) {
 	}()
 	state := db.Persist()
 	runParallel(state, checkTable)
+
+	if state.Off != 0 {
+		state2 := ReadState(db.Store, state.Off)
+		assert.This(state.Meta.CksumData()).Is(state2.Meta.CksumData())
+	}
+
 	return nil // may be overridden by defer/recover
 }
 
 func (db *Database) MustCheck() {
 	if err := db.Check(); err != nil {
-        panic(err)
-    }
+		panic(err)
+	}
 }
 
 func checkTable(state *DbState, table string) {
 	info := state.Meta.GetRoInfo(table)
+	sc := state.Meta.GetRoSchema(table)
 	if info == nil {
-		panic("info missing")
+		panic("info missing for " + table)
 	}
-	count, size, sum := checkFirstIndex(state, info.Indexes[0])
+	count, size, sum := checkFirstIndex(state, table, sc.Indexes[0].Columns,
+		info.Indexes[0])
 	if count != info.Nrows {
-		panic(fmt.Sprintln("info.Nrows is ", info.Nrows, " index has ", count))
+		panic(fmt.Sprint(table, " ", sc.Indexes[0].Columns,
+			" count ", count, " should equal info ", info.Nrows))
 	}
 	if size != info.Size {
-		panic(fmt.Sprintln("info.Size is ", info.Size, " data has ", size))
+		panic(fmt.Sprint(table, " size ", size, " should equal info ", info.Size))
 	}
-	for i, ix := range info.Indexes[1:] {
-		CheckOtherIndex(ix, count, sum, i)
+	for i := 1; i < len(info.Indexes); i++ {
+		CheckOtherIndex(table, sc.Indexes[i].Columns, info.Indexes[i], count, sum)
 	}
 }
 
-func checkFirstIndex(state *DbState, ix *index.Overlay) (int, uint64, uint64) {
+func checkFirstIndex(state *DbState, table string, ixcols []string,
+	ix *index.Overlay) (int, uint64, uint64) {
 	defer func() {
 		if e := recover(); e != nil {
-			panic(fmt.Sprintln(0, e))
+			panic(fmt.Sprintln(table, ixcols, e))
 		}
 	}()
 	sum := uint64(0)
@@ -106,10 +124,10 @@ func checkFirstIndex(state *DbState, ix *index.Overlay) (int, uint64, uint64) {
 	return count, size, sum
 }
 
-func CheckOtherIndex(ix *index.Overlay, nrows int, sumPrev uint64, iIndex int) {
+func CheckOtherIndex(table string, ixcols []string, ix *index.Overlay, nrows int, sumPrev uint64) {
 	defer func() {
 		if e := recover(); e != nil {
-			panic(fmt.Sprintln(iIndex, e))
+			panic(fmt.Sprintln(table, ixcols, e))
 		}
 	}()
 	ix.CheckMerged()
@@ -118,7 +136,7 @@ func CheckOtherIndex(ix *index.Overlay, nrows int, sumPrev uint64, iIndex int) {
 		sum += off // addition so order doesn't matter
 	})
 	if count != nrows {
-		panic(fmt.Sprintln("info.Nrows is ", nrows, " index has ", count))
+		panic(fmt.Sprint("count ", count, " should equal info ", nrows))
 	}
 	if sum != sumPrev {
 		panic("checksum mismatch")
@@ -134,9 +152,6 @@ type ErrCorrupt struct {
 
 func (ec *ErrCorrupt) Error() string {
 	s := "database corrupt"
-	if ec.table != "" {
-		s += ": " + ec.table
-	}
 	if ec.err != nil {
 		s += ": " + fmt.Sprint(ec.err)
 	}

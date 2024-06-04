@@ -44,7 +44,8 @@ type unionStrategy int
 const (
 	// unionMerge is a merge of source and source2
 	unionMerge unionStrategy = iota + 2
-	// unionLookup is source not in source2, followed by source2 (unordered)
+	// unionLookup is source not in source2, followed by source2 (unordered).
+	// Also used for disjoint, but without lookups.
 	unionLookup
 )
 
@@ -107,6 +108,7 @@ func (*Union) fastSingle() bool {
 
 func (u *Union) getIndexes() [][]string {
 	// lookup can read via any index
+	// merge cannot but that will be handled by optimize
 	return set.UnionFn(u.source1.Indexes(), u.source2.Indexes(), slices.Equal)
 }
 
@@ -535,12 +537,16 @@ func removeNonexistentEmpty(srccols, cols, vals []string) ([]string, []string) {
 					newvals = append(newvals, vals[i])
 				}
 			}
+			if len(newcols) == 0 {
+				return nil, nil
+			}
 			return newcols, newvals
 		}
 	}
 	return cols, vals
 }
 
+// selConflict is also used by Table
 func selConflict(srcCols, cols, vals []string) bool {
 	for i, col := range cols {
 		if vals[i] != "" && !slices.Contains(srcCols, col) {
@@ -554,4 +560,28 @@ func (u *Union) Lookup(th *Thread, cols, vals []string) Row {
 	u.Select(cols, vals)
 	defer u.Select(nil, nil) // clear select
 	return u.Get(th, Next)
+}
+
+func (u *Union) Simple(th *Thread) []Row {
+	// rows1 + rows2 not in rows1
+	cols := u.Columns()
+	empty1 := make(Row, len(u.source1.Header().Fields))
+	empty2 := make(Row, len(u.source2.Header().Fields))
+	rows1 := u.source1.Simple(th)
+	rows2 := u.source2.Simple(th)
+	rows := rows1
+outer:
+	for _, row2 := range rows2 {
+		for _, row1 := range rows1 {
+			if EqualRows(u.source1.Header(), row1, u.source2.Header(), row2,
+				cols, th, nil) {
+				continue outer
+			}
+		}
+		rows = append(rows, JoinRows(empty1, row2))
+	}
+	for i := range rows[:len(rows1)] {
+		rows[i] = JoinRows(rows[i], empty2)
+	}
+	return rows
 }

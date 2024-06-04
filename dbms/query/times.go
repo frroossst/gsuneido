@@ -51,19 +51,18 @@ func (t *Times) getIndexes() [][]string {
 }
 
 func (t *Times) getFixed() []Fixed {
-	fixed, conflict := combineFixed(t.source1.Fixed(), t.source2.Fixed())
-	assert.That(!conflict) // because no common columns
-	return fixed
+	// no common columns so no overlap
+	return slc.With(t.source1.Fixed(), t.source2.Fixed()...)
 }
 
 func (t *Times) Transform() Query {
 	src1 := t.source1.Transform()
 	if _, ok := src1.(*Nothing); ok {
-		return NewNothing(t.Columns())
+		return NewNothing(t)
 	}
 	src2 := t.source2.Transform()
 	if _, ok := src2.(*Nothing); ok {
-		return NewNothing(t.Columns())
+		return NewNothing(t)
 	}
 	if src1 != t.source1 || src2 != t.source2 {
 		return NewTimes(src1, src2)
@@ -72,6 +71,7 @@ func (t *Times) Transform() Query {
 }
 
 func (t *Times) optimize(mode Mode, index []string, frac float64) (Cost, Cost, any) {
+	//TODO index could be split, first part on source1, second part on source2
 	opt := func(src1, src2 Query) (Cost, Cost) {
 		nrows1, _ := src1.Nrows()
 		fixcost1, varcost1 := Optimize(src1, mode, index, frac)
@@ -92,7 +92,6 @@ func (t *Times) setApproach(index []string, frac float64, approach any, tran Que
 		t.source1, t.source2 = t.source2, t.source1
 	}
 	t.source1 = SetApproach(t.source1, index, frac, tran)
-	t.saIndex = index
 	nrows1, _ := t.source1.Nrows()
 	t.source2 = SetApproach(t.source2, nil, frac*float64(nrows1), tran)
 	t.header = t.getHeader()
@@ -113,9 +112,6 @@ func (t *Times) Rewind() {
 }
 
 func (t *Times) Get(th *Thread, dir Dir) Row {
-	if t.conflict1 || t.conflict2 {
-		return nil
-	}
 	row2 := t.source2.Get(th, dir)
 	if t.rewound {
 		t.rewound = false
@@ -137,34 +133,31 @@ func (t *Times) Get(th *Thread, dir Dir) Row {
 
 func (t *Times) Select(cols, vals []string) {
 	t.Rewind()
-	if cols == nil { // clear
-		t.conflict1, t.conflict2 = false, false
-		t.source1.Select(nil, nil)
-		t.source2.Select(nil, nil)
-		return
+	t.select1(cols, vals)
+	if len(t.sel2cols) > 0 {
+		t.source2.Select(t.sel2cols, t.sel2vals)
 	}
-	if t.fastSingle() {
-		t.source2.Select(t.selectByCols(cols, vals))
-		return
-	}
-	sel1cols, sel1vals := t.splitSelect(cols, vals)
-	if t.conflict1 || t.conflict2 {
-		return
-	}
-	t.source1.Select(sel1cols, sel1vals)
 }
 
 func (t *Times) Lookup(th *Thread, cols, vals []string) Row {
-	if t.fastSingle() {
-		t.source2.Select(t.selectByCols(cols, vals))
-	} else {
-		sel1cols, sel1vals := t.splitSelect(cols, vals)
-		if t.conflict1 || t.conflict2 {
-			return nil
-		}
-		t.source1.Select(sel1cols, sel1vals)
+	// could use source1.Lookup like (Left)Join
+	// but Times isn't used much
+	t.select1(cols, vals)
+	if len(t.sel2cols) > 0 {
+		t.source2.Select(t.sel2cols, t.sel2vals)
 	}
-	row := t.Get(th, Next)
-	t.Select(nil, nil) // clear select
-	return row
+	return t.Get(th, Next)
+}
+
+func (t *Times) Simple(th *Thread) []Row {
+	rows1 := t.source1.Simple(th)
+	rows2 := t.source2.Simple(th)
+	assert.Msg("Times Simple too big").That(len(rows1)*len(rows2) < maxSimple)
+	rows := make([]Row, 0, len(rows1)*len(rows2))
+	for _, row1 := range rows1 {
+		for _, row2 := range rows2 {
+			rows = append(rows, JoinRows(row1, row2))
+		}
+	}
+	return rows
 }

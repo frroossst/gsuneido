@@ -160,8 +160,7 @@ func (r *Rename) Transform() Query {
 		src = r2.source
 	}
 	if _, ok := src.(*Nothing); ok {
-		tmp := Rename{from: from, to: to}
-		return NewNothing(tmp.renameFwd(src.Columns()))
+		return NewNothing(r)
 	}
 	if len(from) == 0 {
 		return src
@@ -194,4 +193,8 @@ func (r *Rename) Select(cols, vals []string) {
 
 func (r *Rename) Lookup(th *Thread, cols, vals []string) Row {
 	return r.source.Lookup(th, r.renameRev(cols), vals)
+}
+
+func (r *Rename) Simple(th *Thread) []Row {
+	return r.source.Simple(th)
 }

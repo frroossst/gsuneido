@@ -88,6 +88,10 @@ func (*schemaTable) fastSingle() bool {
 	return false
 }
 
+func (*schemaTable) Simple(*Thread) []Row {
+	panic("Simple not implemented for schema tables")
+}
+
 //-------------------------------------------------------------------
 
 type Tables struct {
@@ -105,10 +109,10 @@ func (ts *Tables) Transform() Query {
 }
 
 func (*Tables) Keys() [][]string {
-	return [][]string{{"table"}, {"tablename"}}
+	return [][]string{{"table"}}
 }
 
-var tablesFields = [][]string{{"table", "tablename", "nrows", "totalsize"}}
+var tablesFields = [][]string{{"table", "nrows", "totalsize"}}
 
 func (*Tables) Columns() []string {
 	return tablesFields[0]
@@ -161,7 +165,6 @@ func (ts *Tables) Get(_ *Thread, dir Dir) Row {
 func (*Tables) row(info *meta.Info) Row {
 	var rb RecordBuilder
 	rb.Add(SuStr(info.Table))
-	rb.Add(SuStr(info.Table)) // tablename
 	rb.Add(IntVal(info.Nrows))
 	rb.Add(Int64Val(int64(info.Size)))
 	rec := rb.Build()
@@ -231,7 +234,6 @@ func (tl *TablesLookup) Get(*Thread, Dir) Row {
 		case "tables", "columns", "indexes", "views":
 			var rb RecordBuilder
 			rb.Add(SuStr(tl.table))
-			rb.Add(SuStr(tl.table)) // tablename
 			rec := rb.Build()
 			return Row{DbRec{Record: rec}}
 		default:

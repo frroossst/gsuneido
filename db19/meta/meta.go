@@ -36,6 +36,15 @@ func (m *Meta) Cksum() uint32 {
 	return m.schema.Cksum() + m.info.Cksum()
 }
 
+func (m *Meta) CksumData() uint32 {
+	return m.schema.Hamt.Cksum() + m.info.Hamt.Cksum()
+}
+
+func (m *Meta) ResetClock() { // for testing only
+	m.schema.Clock = 0
+	m.info.Clock = 0
+}
+
 // Mutable returns a mutable copy of a Meta. Used by UpdateTran.
 func (m *Meta) Mutable() *Meta {
 	assert.That(m.difInfo == nil)
@@ -144,6 +153,21 @@ func (m *Meta) Put(ts *Schema, ti *Info) *Meta {
 	return &cp
 }
 
+// PutNew sets created so drop knows it doesn't need a tombstone
+func (m *Meta) PutNew(ts *Schema, ti *Info, ac *schema.Schema) *Meta {
+	if _, ok := m.schema.Get(ts.Table); !ok {
+		ts.created = m.schema.Clock
+	}
+	if _, ok := m.info.Get(ti.Table); !ok {
+		ti.created = m.info.Clock
+	}
+	mu := newMetaUpdate(m)
+	mu.putSchema(ts)
+	mu.putInfo(ti)
+	m.createFkeys(mu, &ts.Schema, ac)
+	return mu.freeze()
+}
+
 type metaUpdate struct {
 	meta   *Meta      // original
 	schema SchemaHamt // mutable
@@ -215,7 +239,11 @@ func (m *Meta) Ensure(a *schema.Schema, store *stor.Stor) ([]schema.Index, *Meta
 	if ti.Nrows == 0 {
 		newIdxs = nil
 	}
-	return newIdxs, m.PutNew(ts, ti, ac)
+	mu := newMetaUpdate(m)
+	mu.putSchema(ts)
+	mu.putInfo(ti)
+	m.createFkeys(mu, &ts.Schema, ac)
+	return newIdxs, mu.freeze()
 }
 
 func (m *Meta) RenameTable(from, to string) *Meta {
@@ -308,6 +336,7 @@ func (m *Meta) AlterRename(table string, from, to []string) *Meta {
 			panic("rename causes duplicate index: " + str.Join("(,)", cols))
 		}
 		ix.Columns = cols
+		ix.BestKey = replace(ix.BestKey, from, to)
 	}
 	// ixspecs are ok since they are field indexes, not names
 	mu := newMetaUpdate(m)
@@ -360,13 +389,6 @@ func (m *Meta) AlterCreate(ac *schema.Schema, store *stor.Stor) *Meta {
 	createColumns(ts, ac.Columns)
 	createDerived(ts, ac.Derived)
 	createIndexes(ts, ti, ac.Indexes, store)
-	return m.PutNew(ts, ti, ac)
-}
-
-// PutNew puts the schema & info and creates Fkeys
-func (m *Meta) PutNew(ts *Schema, ti *Info, ac *schema.Schema) *Meta {
-	ts.created = m.schema.Clock
-	ti.created = m.info.Clock
 	mu := newMetaUpdate(m)
 	mu.putSchema(ts)
 	mu.putInfo(ti)

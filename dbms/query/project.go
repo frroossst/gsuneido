@@ -33,6 +33,7 @@ type Project struct {
 	warned        bool
 	derivedWarned bool
 	derived       int
+	th            *Thread
 }
 
 type mapType = hmap.Hmap[rowHash, struct{}, hmap.Funcs[rowHash]]
@@ -134,7 +135,7 @@ func hasKey(cols []string, keys [][]string, fixed []Fixed) bool {
 outer:
 	for _, key := range keys {
 		for _, k := range key {
-			if !isFixed(fixed, k) && !slices.Contains(cols, k) {
+			if !isSingleFixed(fixed, k) && !slices.Contains(cols, k) {
 				continue outer
 			}
 		}
@@ -216,7 +217,7 @@ func (p *Project) getNrows() (int, int) {
 func (p *Project) Transform() Query {
 	src := p.source.Transform()
 	if _, ok := src.(*Nothing); ok {
-		return NewNothing(p.columns)
+		return NewNothing(p)
 	}
 	if set.Equal(p.columns, p.source.Columns()) {
 		// remove projects of all columns
@@ -252,12 +253,12 @@ func (p *Project) Transform() Query {
 	case *Join:
 		if set.Subset(p.columns, q.by) {
 			src1, src2 := p.splitOver(&q.Query2)
-			return NewJoin(src1, src2, q.by).Transform()
+			return q.With(src1, src2).Transform()
 		}
 	case *LeftJoin:
 		if set.Subset(p.columns, q.by) {
 			src1, src2 := p.splitOver(&q.Query2)
-			return NewLeftJoin(src1, src2, q.by).Transform()
+			return q.With(src1, src2).Transform()
 		}
 	case *Union:
 		if p.splitable(&q.Compatible) {
@@ -424,11 +425,15 @@ func (p *Project) optimize(mode Mode, index []string, frac float64) (Cost, Cost,
 		&projectApproach{strategy: projSeq, index: seq.index}
 }
 
-const mapLimit = 16384 // mapLimit is also used by Summarize
+// mapThreshold and mapWarn are used by Project and Summarize
+const (
+	mapThreshold = 10000 // used by optimize
+	mapWarn      = 20000
+)
 
 func (p *Project) mapCost(mode Mode, index []string, frac float64) (Cost, Cost) {
 	nrows, _ := p.Nrows()
-	if mode != ReadMode || nrows > mapLimit {
+	if mode != ReadMode || nrows > mapThreshold {
 		return impossible, impossible
 	}
 	// assume we're reading Next (normal)
@@ -520,13 +525,15 @@ type rowHash struct {
 }
 
 func (p *Project) getMap(th *Thread, dir Dir) Row {
+	p.th = th
+	defer func() { p.th = nil }()
 	if p.rewound {
 		p.rewound = false
 		if p.results == nil {
 			hfn := func(k rowHash) uint32 { return k.hash }
 			eqfn := func(x, y rowHash) bool {
 				return x.hash == y.hash &&
-					equalCols(x.row, y.row, p.source.Header(), p.columns, th, p.st)
+					equalCols(x.row, y.row, p.source.Header(), p.columns, p.th, p.st)
 			}
 			p.results = hmap.NewHmapFuncs[rowHash, struct{}](hfn, eqfn)
 		}
@@ -588,10 +595,11 @@ func (p *Project) addResult(th *Thread, row Row) (Row, bool) {
 	if existed {
 		return k.row, true
 	} else {
-		if !p.warned && p.results.Size() > mapLimit {
+		if !p.warned && p.results.Size() > mapWarn {
 			p.warned = true
-			Warning("project-map large >", mapLimit)
+			Warning("project-map large >", mapWarn)
 		}
+		p.derived += row.Derived()
 		if !p.derivedWarned && p.derived > derivedWarn {
 			p.derivedWarned = true
 			Warning("project-map derived large >",
@@ -631,4 +639,21 @@ func (p *Project) getLookupCost() Cost {
 		return srcCost
 	}
 	return 2 * srcCost // ??? (matches Nrows)
+}
+
+func (p *Project) Simple(th *Thread) []Row {
+	hdr := p.Header()
+	dst := 0
+	rows := p.source.Simple(th)
+outer:
+	for i := range rows {
+		for j := 0; j < i; j++ {
+			if hdr.EqualRows(rows[i], rows[j], th, nil) {
+				continue outer
+			}
+		}
+		rows[dst] = rows[i]
+		dst++
+	}
+	return rows[:dst]
 }

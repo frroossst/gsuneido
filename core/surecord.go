@@ -5,6 +5,7 @@ package core
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"sync/atomic"
 
@@ -217,7 +218,7 @@ func (r *SuRecord) ToContainer() (Container, bool) {
 }
 
 // SetConcurrent for SuRecord differs from SuObject.
-// Unlike SuObjct, SuRecord needs to lock when readonly
+// Unlike SuObject, SuRecord needs to lock when readonly
 // because it modifies dependents and hdr's cache etc.
 func (r *SuRecord) SetConcurrent() {
 	if !r.ob.concurrent {
@@ -735,14 +736,17 @@ const maxRule = 256
 var ruleRx = regex.Compile(`\A[_a-zA-Z0-9?!]+\Z`)
 
 func (r *SuRecord) catchRule(th *Thread, rule Value, key string) Value {
+	thNum := th.Num
 	th.rules.push(r, key)
 	defer func() {
+		assert.That(th.Num == thNum) // i.e. not reused
 		th.rules.pop()
 		if e := recover(); e != nil {
+			log.Println("ERROR in rule for", key, e)
 			WrapPanic(e, "rule for "+key)
 		}
 	}()
-	r.Unlock() // can't hold lock while calling observer
+	r.Unlock() // can't hold lock while calling rule
 	defer r.Lock()
 	return th.CallThis(rule, r)
 }

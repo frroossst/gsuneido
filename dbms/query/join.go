@@ -4,49 +4,52 @@
 package query
 
 import (
-	"log"
+	"fmt"
+	"strings"
 
 	"slices"
 
+	"github.com/apmckinlay/gsuneido/compile/ast"
+	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/core/trace"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
-	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
 )
 
 /*
 	joinLike
-		Times
+		Times - symmetric
 		joinBase
-			Join
-			LeftJoin
+			Join - symmetric
+			LeftJoin - asymmetric
 */
 
 // joinLike is common stuff for Join, LeftJoin, and Times
 type joinLike struct {
-	saIndex  []string
-	sel2cols []string
-	sel2vals []string
+	// sel2cols/vals are from an incoming Select and used by Get
+	sel2cols, sel2vals []string
 	Query2
-	conflict1 bool
-	conflict2 bool
 }
 
 // joinBase is common stuff for Join and LeftJoin
 type joinBase struct {
-	st     *SuTran
-	lookup *lookupInfo
-	by     []string
-	row1   Row
-	row2   Row // nil when we need a new row1
+	qt         QueryTran
+	st         *SuTran
+	lookup     *lookupInfo
+	by         []string
+	prevFixed1 []Fixed
+	prevFixed2 []Fixed
+	row1       Row
+	row2       Row // nil when we need a new row1
 	joinLike
 	joinType
 }
 
 type Join struct {
 	joinBase
+	conflict bool
 }
 
 type lookupInfo struct {
@@ -56,6 +59,7 @@ type lookupInfo struct {
 }
 
 type joinApproach struct {
+	index1  []string
 	index2  []string
 	frac2   float64
 	reverse bool
@@ -87,17 +91,30 @@ func (jt joinType) String() string {
 	}
 }
 
-func NewJoin(src1, src2 Query, by []string) *Join {
-	jn := &Join{joinBase: newJoinBase(src1, src2, by)}
+func NewJoin(src1, src2 Query, by []string, t QueryTran) Query {
+	return newJoin(src1, src2, by, t, nil, nil)
+}
+
+func newJoin(src1, src2 Query, by []string, t QueryTran,
+	prevFixed1, prevFixed2 []Fixed) *Join {
+	jn := &Join{joinBase: newJoinBase(src1, src2, by, t,
+		prevFixed1, prevFixed2)}
 	jn.keys = jn.getKeys()
 	jn.indexes = jn.getIndexes()
-	jn.fixed = jn.getFixed()
+	fixed, none := combineFixed(src1.Fixed(), src2.Fixed())
+	jn.conflict = none
+	jn.fixed = fixed
 	jn.setNrows(jn.getNrows())
 	jn.fast1.Set(src1.fastSingle() && src2.fastSingle())
 	return jn
 }
 
-func newJoinBase(src1, src2 Query, by []string) joinBase {
+func (jn *Join) With(src1, src2 Query) *Join {
+	return newJoin(src1, src2, jn.by, jn.qt, jn.prevFixed1, jn.prevFixed2)
+}
+
+func newJoinBase(src1, src2 Query, by []string, t QueryTran,
+	prevFixed1, prevFixed2 []Fixed) joinBase {
 	b := set.Intersect(src1.Columns(), src2.Columns())
 	if len(b) == 0 {
 		panic("join: common columns required")
@@ -107,7 +124,7 @@ func newJoinBase(src1, src2 Query, by []string) joinBase {
 	} else if !set.Equal(by, b) {
 		panic("join: by does not match common columns")
 	}
-	jb := joinBase{joinLike: newJoinLike(src1, src2)}
+	jb := joinBase{qt: t, st: MakeSuTran(t), joinLike: newJoinLike(src1, src2), prevFixed1: prevFixed1, prevFixed2: prevFixed2}
 	jb.by = by
 	k1 := hasKey(by, src1.Keys(), src1.Fixed())
 	k2 := hasKey(by, src2.Keys(), src2.Fixed())
@@ -121,6 +138,15 @@ func newJoinBase(src1, src2 Query, by []string) joinBase {
 		jb.joinType = n_n
 	}
 	return jb
+}
+
+func fixedToExpr(col string, values []string) ast.Expr {
+	es := make([]ast.Expr, len(values))
+	for i, v := range values {
+		es[i] = &ast.Constant{Val: Unpack(v)}
+	}
+	var folder ast.Folder
+	return folder.In(&ast.Ident{Name: col}, es)
 }
 
 func newJoinLike(src1, src2 Query) joinLike {
@@ -155,8 +181,9 @@ func (jb *joinBase) bystr() string {
 	return " " + str.Opt(jb.joinType.String(), " ") + "by" + str.Join("(,)", jb.by)
 }
 
-func (jb *joinBase) SetTran(t QueryTran) {
-	jb.st = MakeSuTran(t)
+func (jb *joinBase) SetTran(qt QueryTran) {
+	jb.qt = qt
+	jb.st = MakeSuTran(qt)
 }
 
 func (jl *joinLike) getHeader() *Header {
@@ -184,45 +211,62 @@ func (jn *Join) getKeys() [][]string {
 	}
 }
 
-func (jn *Join) getFixed() []Fixed {
-	fixed, none := combineFixed(jn.source1.Fixed(), jn.source2.Fixed())
-	if none {
-		jn.conflict1 = true
-	}
-	return fixed
-}
-
 func (jn *Join) Transform() Query {
-	cols := jn.Columns()
-	if jn.Fixed(); jn.conflict1 {
-		return NewNothing(cols)
+	if jn.conflict {
+		return NewNothing(jn)
 	}
 	src1 := jn.source1.Transform()
 	if _, ok := src1.(*Nothing); ok {
-		return NewNothing(cols)
+		return NewNothing(jn)
 	}
 	src2 := jn.source2.Transform()
 	if _, ok := src2.(*Nothing); ok {
-		return NewNothing(cols)
+		return NewNothing(jn)
+	}
+	fix1, fix2 := src1.Fixed(), src2.Fixed()
+	if !equalFixed(fix1, jn.prevFixed1) || !equalFixed(fix2, jn.prevFixed2) {
+		src1 = copyFixed(fix2, fix1, src1, jn.by, jn.qt)
+		src2 = copyFixed(fix1, fix2, src2, jn.by, jn.qt)
+		jn.prevFixed1, jn.prevFixed2 = fix1, fix2
 	}
 	if src1 != jn.source1 || src2 != jn.source2 {
-		return NewJoin(src1, src2, jn.by)
+		return jn.With(src1, src2).Transform()
 	}
 	return jn
+}
+
+// copyFixed adds a Where to `to` for fixed from `from` for common by columns.
+// It doesn't check if the where is conflicting, that should be handled by Where
+func copyFixed(fromFixed, toFixed []Fixed, to Query, by []string, t QueryTran) Query {
+	var exprs []ast.Expr
+	for _, col := range by {
+		if frf := getFixed(fromFixed, col); frf != nil {
+			if tof := getFixed(toFixed, col); !set.Equal(frf, tof) {
+				exprs = append(exprs, fixedToExpr(col, frf))
+			}
+		}
+	}
+	if len(exprs) == 0 {
+		return to
+	}
+	expr := &ast.Nary{Tok: tok.And, Exprs: exprs}
+	return NewWhere(to, expr, t)
 }
 
 var joinRev = 0 // tests can set to impossible to prevent reverse
 
 func (jn *Join) optimize(mode Mode, index []string, frac float64) (Cost, Cost, any) {
-	fwd := joinopt(jn.source1, jn.source2, jn.joinType, jn.Nrows,
-		mode, index, frac, jn.by)
-	rev := joinopt(jn.source2, jn.source1, jn.joinType.reverse(), jn.Nrows,
-		mode, index, frac, jn.by)
+	fwd := joinopt(jn.source1, jn.source2, jn.Nrows,
+		mode, index, frac, jn.by, jn.fixed)
+	rev := joinopt(jn.source2, jn.source1, jn.Nrows,
+		mode, index, frac, jn.by, jn.fixed)
 	rev.fixcost += outOfOrder + joinRev
 	if trace.JoinOpt.On() {
 		trace.JoinOpt.Println(mode, index, frac)
-		trace.Println("    fwd", fwd.index, "=", fwd.fixcost, fwd.varcost)
-		trace.Println("    rev", rev.index, "=", rev.fixcost, rev.varcost)
+		trace.Println("    fwd index1", fwd.index1, "index2", fwd.index2,
+			"=", fwd.fixcost, fwd.varcost)
+		trace.Println("    rev index1", rev.index1, "index2", rev.index2,
+			"=", rev.fixcost, rev.varcost)
 		trace.Println(strategy(jn, 1))
 	}
 	approach := &joinApproach{}
@@ -230,10 +274,11 @@ func (jn *Join) optimize(mode Mode, index []string, frac float64) (Cost, Cost, a
 		fwd = rev
 		approach.reverse = true
 	}
-	if fwd.index == nil {
+	if fwd.fixcost == impossible {
 		return impossible, impossible, nil
 	}
-	approach.index2 = fwd.index
+	approach.index1 = fwd.index1
+	approach.index2 = fwd.index2
 	approach.frac2 = fwd.frac2
 	return fwd.fixcost, fwd.varcost, approach
 }
@@ -248,20 +293,20 @@ func (jt joinType) reverse() joinType {
 	return jt
 }
 
-type bestJoin struct {
-	bestIndex
-	frac2 float64
+type joinCost struct {
+	index1  []string
+	index2  []string
+	frac2   float64
+	fixcost Cost
+	varcost Cost
 }
 
-func joinopt(src1, src2 Query, joinType joinType, nrows func() (int, int),
-	mode Mode, index []string, frac float64, by []string) bestJoin {
-	if slc.Empty(index) && !src1.fastSingle() {
-		return bestJoin{bestIndex: newBestIndex()} // impossible
-	}
+func joinopt(src1, src2 Query, nrows func() (int, int),
+	mode Mode, index []string, frac float64, by []string, fixed []Fixed) joinCost {
 	// always have to read all of source 1
-	fixcost1, varcost1 := Optimize(src1, mode, index, frac)
+	fixcost1, varcost1, index := optOrdered(src1, mode, index, frac, fixed)
 	if fixcost1+varcost1 >= impossible {
-		return bestJoin{bestIndex: newBestIndex()} // impossible
+		return joinCost{fixcost: impossible}
 	}
 	nrows1, _ := src1.Nrows()
 	nrows2, _ := src2.Nrows()
@@ -269,18 +314,32 @@ func joinopt(src1, src2 Query, joinType joinType, nrows func() (int, int),
 	frac2 := float64(read2) * frac / float64(max(1, nrows2))
 	best2 := bestGrouped(src2, mode, nil, frac2, by)
 	if best2.index == nil {
-		return bestJoin{bestIndex: newBestIndex()} // impossible
+		return joinCost{fixcost: impossible}
 	}
 	varcost2 := Cost(frac * float64(nrows1*src2.lookupCost()))
 	// trace.Println("joinopt", joinType, "frac", frac)
 	// trace.Println("   ", nrows1, joinType, nrows2, "=> read2", read2, "=> frac2", frac2)
 	// trace.Println("    best2", best2.index, "=", best2.fixcost, best2.varcost)
 	// trace.Println("    nrows1", nrows1, "lookups", nrows1 * src2.lookupCost())
-	return bestJoin{frac2: frac2, bestIndex: bestIndex{
-		index:   best2.index,
+	return joinCost{index1: index, index2: best2.index, frac2: frac2,
 		fixcost: fixcost1 + best2.fixcost,
 		varcost: varcost1 + varcost2 + best2.varcost,
-	}}
+	}
+}
+
+func optOrdered(q Query, mode Mode, index []string, frac float64, fixed []Fixed) (Cost, Cost, []string) {
+	//TODO singleton ?
+	//TODO all cols fixed ?
+	if len(index) > 0 && len(fixed) > 0 {
+		best := bestOrdered(q, index, mode, frac, fixed)
+		if best.index != nil {
+			// fmt.Println("best", best.index, "index", index, "indexes", q.Indexes(),
+			// 	"fixed", fixedStr(fixed))
+			index = best.index
+		}
+	}
+	fixcost, varcost := Optimize(q, mode, index, frac)
+	return fixcost, varcost, index
 }
 
 func (jn *Join) setApproach(index []string, frac float64, approach any, tran QueryTran) {
@@ -289,10 +348,9 @@ func (jn *Join) setApproach(index []string, frac float64, approach any, tran Que
 		jn.source1, jn.source2 = jn.source2, jn.source1
 		jn.joinType = jn.joinType.reverse()
 	}
-	jn.source1 = SetApproach(jn.source1, index, frac, tran)
+	jn.source1 = SetApproach(jn.source1, ap.index1, frac, tran)
 	jn.source2 = SetApproach(jn.source2, ap.index2, ap.frac2, tran)
 	jn.header = jn.getHeader()
-	jn.saIndex = index
 }
 
 func (jn *Join) getNrows() (int, int) {
@@ -337,25 +395,26 @@ func (jn *Join) pop(p1, p2 int) int {
 	}
 }
 
-// execution
+// execution --------------------------------------------------------
 
 func (jb *joinBase) Rewind() {
 	jb.source1.Rewind()
 	jb.source2.Rewind()
+	jb.rewind()
+}
+func (jb *joinBase) rewind() {
 	jb.row1 = nil
 	jb.row2 = nil
 }
 
 func (jn *Join) Get(th *Thread, dir Dir) Row {
-	if jn.conflict1 || jn.conflict2 {
-		return nil
-	}
 	for {
 		if jn.row2 == nil && !jn.nextRow1(th, dir) {
 			return nil
 		}
 		jn.row2 = jn.source2.Get(th, dir)
 		if jn.row2 != nil {
+			// assert.That(jn.equalBy(th, jn.st, jn.row1, jn.row2))
 			return JoinRows(jn.row1, jn.row2)
 		}
 	}
@@ -366,13 +425,15 @@ func (jn *Join) nextRow1(th *Thread, dir Dir) bool {
 	if jn.row1 == nil {
 		return false
 	}
+	// fmt.Println("Join row1", jn.row1)
+	// assert.That(set.Disjoint(jn.by, jn.sel2cols))
 	sel2cols := append(jn.sel2cols, jn.by...)
-	sel2vals := append(jn.sel2vals, jn.projectRow(th, jn.row1)...)
+	sel2vals := append(jn.sel2vals, jn.projectRow1(th, jn.row1)...)
 	jn.source2.Select(sel2cols, sel2vals)
 	return true
 }
 
-func (jb *joinBase) projectRow(th *Thread, row Row) []string {
+func (jb *joinBase) projectRow1(th *Thread, row Row) []string {
 	key := make([]string, len(jb.by))
 	for i, col := range jb.by {
 		key[i] = row.GetRawVal(jb.source1.Header(), col, th, jb.st)
@@ -380,81 +441,98 @@ func (jb *joinBase) projectRow(th *Thread, row Row) []string {
 	return key
 }
 
+func (jb *joinBase) projectRow2(th *Thread, row Row) []string {
+	key := make([]string, len(jb.by))
+	for i, col := range jb.by {
+		key[i] = row.GetRawVal(jb.source2.Header(), col, th, jb.st)
+	}
+	return key
+}
+
+func rowstr(hdr *Header, row Row) string {
+	if row == nil {
+		return "nil"
+	}
+	var sb strings.Builder
+	sep := ""
+	for _, col := range hdr.Columns {
+		val := row.GetVal(hdr, col, nil, nil)
+		if val != EmptyStr {
+			fmt.Fprint(&sb, sep, col, "=", AsStr(val))
+			sep = " "
+		}
+	}
+	return sb.String()
+}
+
 func (jn *Join) Select(cols, vals []string) {
 	// fmt.Println(jn.stringOp(), "Select", cols, unpack(vals))
-	jn.select2(cols, vals, jn.fastSingle())
+	jn.rewind()
+	jn.select1(cols, vals)
 }
 
-func (jb *joinBase) select2(cols, vals []string, fastSingle bool) {
-	jb.Rewind()
+// select1 splits the select, calls source1 Select, and sets sel2cols/vals.
+// It is used by Join, LeftJoin, and Times.
+func (jl *joinLike) select1(cols, vals []string) {
 	if cols == nil { // clear
-		jb.conflict1, jb.conflict2 = false, false
-		jb.source1.Select(nil, nil)
-		jb.sel2cols, jb.sel2vals = nil, nil
+		jl.source1.Select(nil, nil)
+		jl.source2.Select(nil, nil)
+		jl.sel2cols, jl.sel2vals = nil, nil
 		return
 	}
-	if fastSingle {
-		jb.sel2cols, jb.sel2vals = jb.selectByCols(cols, vals)
-		return
-	}
-	sel1cols, sel1vals := jb.splitSelect(cols, vals)
-	if jb.conflict1 { // not conflict2 because of LeftJoin
-		return
-	}
-	jb.source1.Select(sel1cols, sel1vals)
-}
-
-func (jn *Join) Lookup(th *Thread, cols, vals []string) Row {
-	defer jn.Select(nil, nil) // clear select
-	if jn.fastSingle() {
-		jn.sel2cols, jn.sel2vals = jn.selectByCols(cols, vals)
-		return jn.Get(th, Next)
-	}
-	sel1cols, sel1vals := jn.splitSelect(cols, vals)
-	if jn.conflict1 || jn.conflict2 {
-		return nil
-	}
-	if jn.lookupFallback(sel1cols) {
-		jn.Select(cols, vals)
-		return jn.Get(th, Next)
-	}
-	jn.row1 = jn.source1.Lookup(th, sel1cols, sel1vals)
-	if jn.row1 == nil {
-		return nil
-	}
-	jn.source2.Select(jn.by, jn.projectRow(th, jn.row1))
-	row2 := jn.source2.Get(th, Next)
-	if row2 == nil {
-		return nil
-	}
-	return JoinRows(jn.row1, row2)
+	sel1cols, sel1vals, sel2cols, sel2vals := jl.splitSelect(cols, vals)
+	jl.source1.Select(sel1cols, sel1vals)
+	jl.sel2cols, jl.sel2vals = sel2cols, sel2vals
 }
 
 func (jl *joinLike) splitSelect(cols, vals []string) (
-	sel1cols, sel1vals []string) {
-	fixed1 := jl.source1.Fixed()
-	fixed2 := jl.source2.Fixed()
-	jl.conflict1, jl.conflict2 = false, false
+	sel1cols, sel1vals, sel2cols, sel2vals []string) {
+	columns1 := jl.source1.Columns()
+	columns2 := jl.source2.Columns()
 	for i, col := range cols {
-		if slices.Contains(jl.saIndex, col) {
+		if slices.Contains(columns1, col) { // includes common
 			sel1cols = append(sel1cols, col)
 			sel1vals = append(sel1vals, vals[i])
-			continue
-		}
-		fixVals1 := getFixed(fixed1, col)
-		if len(fixVals1) == 1 && fixVals1[0] != vals[i] {
-			jl.conflict1 = true
-		}
-		fixVals2 := getFixed(fixed2, col)
-		if len(fixVals2) == 1 && fixVals2[0] != vals[i] {
-			jl.conflict2 = true
+		} else if slices.Contains(columns2, col) {
+			sel2cols = append(sel2cols, col)
+			sel2vals = append(sel2vals, vals[i])
 		}
 	}
 	return
 }
 
+func (jn *Join) Lookup(th *Thread, cols, vals []string) Row {
+	// fmt.Println(jn.stringOp(), "Lookup", cols, unpack(vals))
+	defer jn.Select(nil, nil)
+	sel1cols, sel1vals, sel2cols, sel2vals := jn.splitSelect(cols, vals)
+	if jn.lookupFallback(sel1cols) {
+		// log.Println("INFO Join Lookup fallback to Select & Get")
+		jn.rewind()
+		jn.source1.Select(sel1cols, sel1vals)
+		jn.sel2cols, jn.sel2vals = sel2cols, sel2vals
+		x := jn.Get(th, Next)
+		// if x != nil { // verify unique
+		// 	assert.That(jn.Get(th, Next) == nil)
+		// }
+		return x
+	}
+	row1 := jn.source1.Lookup(th, sel1cols, sel1vals)
+	if row1 == nil {
+		return nil
+	}
+	sel2cols = append(sel2cols, jn.by...)
+	sel2vals = append(sel2vals, jn.projectRow1(th, row1)...)
+	jn.source2.Select(sel2cols, sel2vals)
+	row2 := jn.source2.Get(th, Next)
+	if row2 == nil {
+		return nil
+	}
+	// assert.That(jn.equalBy(th, jn.st, row1, row2))
+	return JoinRows(row1, row2)
+}
+
 func (jb *joinBase) lookupFallback(sel1cols []string) bool {
-	if jb.lookup == nil {
+	if jb.lookup == nil { // memoize
 		jb.lookup = &lookupInfo{
 			keys1:  jb.source1.Keys(),
 			fixed1: jb.source1.Fixed(),
@@ -466,11 +544,37 @@ func (jb *joinBase) lookupFallback(sel1cols []string) bool {
 		// that we want to do lookups with the index
 		if !jb.lookup.fallback {
 			jb.lookup.fallback = true
-			log.Println("INFO query join lookup fallback to slower select")
+			// log.Println("INFO query", which, "Lookup fallback to Select & Get")
+			// fmt.Println("sel1cols", sel1cols, "keys1", jb.lookup.keys1, "fixed1", jb.lookup.fixed1)
 		}
 		return true
 	}
 	return false
+}
+
+func (jn *Join) Simple(th *Thread) []Row {
+	st := MakeSuTran(jn.qt)
+	rows1 := jn.source1.Simple(th)
+	rows2 := jn.source2.Simple(th)
+	rows := make([]Row, 0, len(rows1))
+	for _, row1 := range rows1 {
+		for _, row2 := range rows2 {
+			if jn.equalBy(th, st, row1, row2) {
+				rows = append(rows, JoinRows(row1, row2))
+			}
+		}
+	}
+	return rows
+}
+
+func (jb *joinBase) equalBy(th *Thread, st *SuTran, row1, row2 Row) bool {
+	for _, f := range jb.by {
+		if row1.GetRawVal(jb.source1.Header(), f, th, st) !=
+			row2.GetRawVal(jb.source2.Header(), f, th, st) {
+			return false
+		}
+	}
+	return true
 }
 
 // LeftJoin ---------------------------------------------------------
@@ -478,11 +582,16 @@ func (jb *joinBase) lookupFallback(sel1cols []string) bool {
 type LeftJoin struct {
 	empty2 Row
 	joinBase
-	row1out bool
 }
 
-func NewLeftJoin(src1, src2 Query, by []string) *LeftJoin {
-	lj := &LeftJoin{joinBase: newJoinBase(src1, src2, by)}
+func NewLeftJoin(src1, src2 Query, by []string, t QueryTran) *LeftJoin {
+	return newLeftJoin(src1, src2, by, t, nil, nil)
+}
+
+func newLeftJoin(src1, src2 Query, by []string, t QueryTran,
+	prevFixed1, prevFixed2 []Fixed) *LeftJoin {
+	lj := &LeftJoin{joinBase: newJoinBase(src1, src2, by, t,
+		prevFixed1, prevFixed2)}
 	lj.keys = lj.getKeys()
 	lj.indexes = lj.source1.Indexes()
 	lj.fixed = lj.getFixed()
@@ -490,6 +599,10 @@ func NewLeftJoin(src1, src2 Query, by []string) *LeftJoin {
 	lj.fast1.Set(src1.fastSingle() &&
 		(lj.joinType == one_one || lj.joinType == n_one || src2.fastSingle()))
 	return lj
+}
+
+func (lj *LeftJoin) With(src1, src2 Query) *LeftJoin {
+	return newLeftJoin(src1, src2, lj.by, lj.qt, lj.prevFixed1, lj.prevFixed2)
 }
 
 func (lj *LeftJoin) String() string {
@@ -543,35 +656,52 @@ func (lj *LeftJoin) getFixed() []Fixed {
 func (lj *LeftJoin) Transform() Query {
 	src1 := lj.source1.Transform()
 	if _, ok := src1.(*Nothing); ok {
-		return NewNothing(lj.Columns())
+		return NewNothing(lj)
 	}
 	src2 := lj.source2.Transform()
 	_, src2Nothing := src2.(*Nothing)
-	_, none := combineFixed(src1.Fixed(), src2.Fixed())
-	if none || src2Nothing {
+	fix1, fix2 := src1.Fixed(), src2.Fixed()
+	if src2Nothing || fixedConflict(fix1, fix2) {
 		// remove useless left join
 		return keepCols(src1, src2, lj.Header())
 	}
+	if !equalFixed(fix1, lj.prevFixed1) || !equalFixed(fix2, lj.prevFixed2) {
+		// for leftjoin, we can only apply fixed from src1 to src2
+		// can't do the reverse because src2 is "optional"
+		src2 = copyFixed(fix1, fix2, src2, lj.by, lj.qt)
+		lj.prevFixed1, lj.prevFixed2 = fix1, fix2
+	}
 	if src1 != lj.source1 || src2 != lj.source2 {
-		return NewLeftJoin(src1, src2, lj.by)
+		return lj.With(src1, src2).Transform()
 	}
 	return lj
 }
 
+func fixedConflict(fixed1, fixed2 []Fixed) bool {
+	for _, f2 := range fixed2 {
+		if src1vals := getFixed(fixed1, f2.col); src1vals != nil {
+			// field is in both
+			if set.Disjoint(src1vals, f2.values) {
+				return true // can't match anything
+			}
+		}
+	}
+	return false
+}
+
 func (lj *LeftJoin) optimize(mode Mode, index []string, frac float64) (Cost, Cost, any) {
-	best := joinopt(lj.source1, lj.source2, lj.joinType, lj.Nrows,
-		mode, index, frac, lj.by)
-	return best.fixcost, best.varcost,
-		&joinApproach{index2: best.index, frac2: best.frac2}
+	jc := joinopt(lj.source1, lj.source2, lj.Nrows,
+		mode, index, frac, lj.by, lj.fixed)
+	return jc.fixcost, jc.varcost,
+		&joinApproach{index1: jc.index1, index2: jc.index2, frac2: jc.frac2}
 }
 
 func (lj *LeftJoin) setApproach(index []string, frac float64, approach any, tran QueryTran) {
 	ap := approach.(*joinApproach)
-	lj.source1 = SetApproach(lj.source1, index, frac, tran)
+	lj.source1 = SetApproach(lj.source1, ap.index1, frac, tran)
 	lj.source2 = SetApproach(lj.source2, ap.index2, ap.frac2, tran)
 	lj.empty2 = make(Row, len(lj.source2.Header().Fields))
 	lj.header = lj.getHeader()
-	lj.saIndex = index
 }
 
 func (lj *LeftJoin) getNrows() (int, int) {
@@ -613,86 +743,97 @@ func (lj *LeftJoin) pop(n1, n2 int) int {
 
 // execution
 
-func (lj *LeftJoin) Get(th *Thread, dir Dir) Row {
-	if lj.conflict1 {
-		return nil
-	}
+func (lj *LeftJoin) Get(th *Thread, dir Dir) (r Row) {
+	row1out := true
 	for {
-		if lj.row2 == nil && !lj.nextRow1(th, dir) {
-			return nil
-		}
-		if lj.conflict2 {
-			return lj.filter(lj.row1, lj.empty2)
-		}
-		lj.row2 = lj.source2.Get(th, dir)
-		if lj.shouldOutput(lj.row2) {
-			if lj.row2 == nil {
-				return lj.filter(lj.row1, lj.empty2)
-			}
-			return lj.filter(lj.row1, lj.row2)
-		}
-	}
-}
-
-func (lj *LeftJoin) nextRow1(th *Thread, dir Dir) bool {
-	lj.row1out = false
-	lj.row1 = lj.source1.Get(th, dir)
-	if lj.row1 == nil {
-		return false
-	}
-	lj.source2.Select(lj.by, lj.projectRow(th, lj.row1))
-	return true
-}
-
-func (lj *LeftJoin) shouldOutput(row Row) bool {
-	if !lj.row1out {
-		lj.row1out = true
-		return true
-	}
-	return row != nil
-}
-
-func (lj *LeftJoin) filter(row1, row2 Row) Row {
-	if lj.fastSingle() {
-		for i, col := range lj.sel2cols {
-			if row2.GetRaw(lj.source2.Header(), col) != lj.sel2vals[i] {
+		if lj.row2 == nil {
+			lj.row1 = lj.source1.Get(th, dir)
+			if lj.row1 == nil {
 				return nil
 			}
+			lj.source2.Select(lj.by, lj.projectRow1(th, lj.row1))
+			row1out = false
+		}
+		lj.row2 = lj.source2.Get(th, dir)
+		// fmt.Println(lj.stringOp(), "row2", lj.row2)
+		if !row1out || lj.row2 != nil {
+			row1out = true // regardless of filter
+			row2 := lj.row2
+			if row2 == nil {
+				row2 = lj.empty2
+			} else {
+				// assert.That(lj.equalBy(th, lj.st, lj.row1, row2))
+			}
+			if lj.filter2(row2) {
+				return JoinRows(lj.row1, row2)
+			}
 		}
 	}
-	return JoinRows(row1, row2)
+}
+
+func (lj *LeftJoin) filter2(row2 Row) bool {
+	// fmt.Println(lj.stringOp(), "filter", lj.sel2cols, unpack(lj.sel2vals))
+	for i, col := range lj.sel2cols {
+		if row2.GetRaw(lj.source2.Header(), col) != lj.sel2vals[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (lj *LeftJoin) Select(cols, vals []string) {
 	// fmt.Println(lj.stringOp(), "Select", cols, unpack(vals))
-	lj.select2(cols, vals, lj.fastSingle())
+	lj.rewind()
+	lj.select1(cols, vals)
 }
 
 func (lj *LeftJoin) Lookup(th *Thread, cols, vals []string) Row {
-	defer lj.Select(nil, nil) // clear select
-	if lj.fastSingle() {
-		lj.sel2cols, lj.sel2vals = lj.selectByCols(cols, vals)
-		return lj.Get(th, Next)
-	}
-	sel1cols, sel1vals := lj.splitSelect(cols, vals)
-	if lj.conflict1 {
-		return nil
-	}
+	defer lj.Select(nil, nil)
+	sel1cols, sel1vals, sel2cols, sel2vals := lj.splitSelect(cols, vals)
+	lj.sel2cols, lj.sel2vals = sel2cols, sel2vals
 	if lj.lookupFallback(sel1cols) {
-		lj.Select(cols, vals)
-		return lj.Get(th, Next)
+		// log.Println("INFO LeftJoin Lookup fallback to Select & Get")
+		lj.rewind()
+		lj.source1.Select(sel1cols, sel1vals)
+		x := lj.Get(th, Next)
+		// if x != nil { // verify unique
+		// 	assert.That(lj.Get(th, Next) == nil)
+		// }
+		return x
 	}
 	row1 := lj.source1.Lookup(th, sel1cols, sel1vals)
 	if row1 == nil {
 		return nil
 	}
-	if lj.conflict2 {
-		return JoinRows(row1, lj.empty2)
-	}
-	lj.source2.Select(lj.by, lj.projectRow(th, row1))
+	lj.source2.Select(lj.by, lj.projectRow1(th, row1))
 	row2 := lj.source2.Get(th, Next)
 	if row2 == nil {
-		return JoinRows(row1, lj.empty2)
+		row2 = lj.empty2
+	} else {
+		// assert.That(lj.equalBy(th, lj.st, row1, row2))
+	}
+	if !lj.filter2(row2) {
+		return nil
 	}
 	return JoinRows(row1, row2)
+}
+
+func (lj *LeftJoin) Simple(th *Thread) []Row {
+	empty2 := make(Row, len(lj.source2.Header().Fields))
+	rows1 := lj.source1.Simple(th)
+	rows2 := lj.source2.Simple(th)
+	rows := make([]Row, 0, len(rows1))
+	for i1 := 0; i1 < len(rows1); i1++ {
+		row1out := false
+		for i2 := 0; i2 < len(rows2); i2++ {
+			if lj.equalBy(th, lj.st, rows1[i1], rows2[i2]) {
+				rows = append(rows, JoinRows(rows1[i1], rows2[i2]))
+				row1out = true
+			}
+		}
+		if !row1out {
+			rows = append(rows, JoinRows(rows1[i1], empty2))
+		}
+	}
+	return rows
 }

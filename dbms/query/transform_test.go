@@ -15,6 +15,7 @@ import (
 func TestTransform(t *testing.T) {
 	DefaultSingleQuotes = true
 	defer func() { DefaultSingleQuotes = false }()
+	MakeSuTran = func(qt QueryTran) *SuTran { return nil }
 	test := func(from, expected string) {
 		t.Helper()
 		if expected == "" {
@@ -79,7 +80,7 @@ func TestTransform(t *testing.T) {
 		"customer WHERE id is 5 and city is 6 and name is 7")
 	// leftjoin to join
 	test("(cus leftjoin task) where cnum is 1 where tnum is 2",
-		"cus where cnum is 1 join 1:1 by(cnum) (task where tnum is 2)")
+		"cus where cnum is 1 join 1:1 by(cnum) (task where cnum is 1 and tnum is 2)")
 	test("(cus leftjoin task) where tnum is 2 where cnum is 1",
 		"cus where cnum is 1 join 1:1 by(cnum) (task where tnum is 2 and cnum is 1)")
 
@@ -178,9 +179,9 @@ func TestTransform(t *testing.T) {
 	test("(tables leftjoin columns) where column is 123",
 		// 1:1 because of `column is 123`
 		"tables JOIN 1:1 by(table) (columns WHERE column is 123)")
+	// same due to folding
 	test("(tables leftjoin columns) where column in (123)",
-		// not 1:1 because `in (123)` isn't seen by Fixed()
-		"tables JOIN 1:n by(table) (columns WHERE column in (123))")
+		"tables JOIN 1:1 by(table) (columns WHERE column is 123)")
 	test("(tables leftjoin columns) where table isnt ''",
 		"tables WHERE table isnt '' LEFTJOIN 1:n by(table) columns")
 
@@ -208,4 +209,26 @@ func TestTransform(t *testing.T) {
 		"table summarize a, total b")
 	test("table project b, c summarize b, total c",
 		"table project b,c summarize b, total c")
+
+	test("trans where id is 1 join customer",
+		"trans where id is 1 join n:1 by(id) (customer where id is 1)")
+	test("trans join (customer where id is 1)",
+		"trans where id is 1 join n:1 by(id) (customer where id is 1)")
+	test("trans where id is 1 join (customer where id is 1)",
+		"trans where id is 1 join n:1 by(id) (customer where id is 1)")
+	test("trans where id is 1 join (customer where id is 2)",
+		"NOTHING")
+	test("(abc where b is 1) join (bcd where c is 2)",
+		"abc where b is 1 and c is 2 join 1:1 by(b,c) (bcd where c is 2 and b is 1)")
+
+	test("trans where id is 1 leftjoin customer",
+		"trans where id is 1 leftjoin n:1 by(id) (customer where id is 1)")
+	test("trans leftjoin (customer where id is 1)",
+		"trans leftjoin n:1 by(id) (customer where id is 1)")
+	test("trans where id is 1 leftjoin (customer where id is 1)",
+		"trans where id is 1 leftjoin n:1 by(id) (customer where id is 1)")
+	test("trans where id is 1 leftjoin (customer where id is 2)",
+		"trans where id is 1 extend name = '', city = ''")
+	test("(abc where b is 1) leftjoin (bcd where c is 2)",
+		"abc where b is 1 leftjoin 1:1 by(b,c) (bcd where c is 2 and b is 1)")
 }

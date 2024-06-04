@@ -58,7 +58,7 @@ func (m *Minus) Transform() Query {
 		return src1
 	}
 	if _, ok := src1.(*Nothing); ok {
-		return NewNothing(m.Columns())
+		return NewNothing(m)
 	}
 	src2 := m.source2.Transform()
 	if _, ok := src2.(*Nothing); ok {
@@ -75,7 +75,7 @@ func (m *Minus) optimize(mode Mode, index []string, frac float64) (Cost, Cost, a
 	// iterate source and lookup on source2
 	fixcost, varcost := Optimize(m.source1, mode, index, frac)
 	nrows1, _ := m.source1.Nrows()
-	best2 := bestKey2(m.source2, mode, int(float64(nrows1)*frac))
+	best2 := bestLookupKey(m.source2, mode, int(float64(nrows1)*frac))
 	return fixcost + best2.fixcost, varcost + best2.varcost,
 		&minusApproach{keyIndex: best2.index}
 }
@@ -106,3 +106,22 @@ func (m *Minus) Lookup(th *Thread, cols, vals []string) Row {
 }
 
 // COULD have a "merge" strategy (like Union)
+
+func (m *Minus) Simple(th *Thread) []Row {
+	cols := m.Columns()
+	rows1 := m.source1.Simple(th)
+	rows2 := m.source2.Simple(th)
+	dst := 0
+outer:
+	for _, row1 := range rows1 {
+		for _, row2 := range rows2 {
+			if EqualRows(m.source1.Header(), row1, m.source2.Header(), row2,
+				cols, th, nil) {
+				continue outer
+			}
+		}
+		rows1[dst] = row1
+		dst++
+	}
+	return rows1[:dst]
+}

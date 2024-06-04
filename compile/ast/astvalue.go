@@ -10,6 +10,7 @@ import (
 
 // this implements the Value interface for AST nodes
 // to expose them to the Suneido language
+// See also: astContainer
 
 // expressions ------------------------------------------------------
 
@@ -484,6 +485,8 @@ func (a *ForIn) Get(_ *Thread, m Value) Value {
 		return SuStr(a.Var.Name)
 	case SuStr("expr"):
 		return a.E.(Value)
+	case SuStr("expr2"):
+		return a.E2.(Value)
 	case SuStr("body"):
 		return a.Body.(Value)
 	}
@@ -552,6 +555,16 @@ func (a *Continue) Get(_ *Thread, m Value) Value {
 		return SuStr("Continue")
 	}
 	return stmtGet(a, m)
+}
+
+func (a *ExprPos) Get(t *Thread, m Value) Value {
+	switch m {
+	case SuStr("pos"):
+		return IntVal(int(a.Pos))
+	case SuStr("end"):
+		return IntVal(int(a.End))
+	}
+	return a.Expr.Get(t, m)
 }
 
 //-------------------------------------------------------------------

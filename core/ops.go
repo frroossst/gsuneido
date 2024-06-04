@@ -4,7 +4,6 @@
 package core
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -17,7 +16,6 @@ import (
 	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/dnum"
-	"github.com/apmckinlay/gsuneido/util/hacks"
 	"github.com/apmckinlay/gsuneido/util/regex"
 )
 
@@ -310,7 +308,7 @@ func ToSuExcept(th *Thread, e any) *SuExcept {
 			}
 			ss = SuStr(e.Error())
 		case string:
-			logStringError(th, "", e)
+			logStringError(th, e)
 			ss = SuStr(e)
 		default:
 			ss = SuStr(ToStr(e.(Value)))
@@ -339,11 +337,11 @@ func LogInternalError(th *Thread, from string, e any) {
 		dbg.PrintStack()
 		printSuStack(th, e)
 	} else if s, ok := e.(string); ok {
-		logStringError(th, from, s)
+		logStringError(th, s)
 	}
 }
 
-func logStringError(th *Thread, from string, e string) {
+func logStringError(th *Thread, e string) {
 	if strings.HasPrefix(e, "ASSERT FAILED") &&
 		!strings.HasSuffix(e, "(from server)") {
 		// assert has already logged error and Go call stack
@@ -391,12 +389,4 @@ func catchMatch(e, pat string) bool {
 		}
 	}
 	return false
-}
-
-func Unpack64(s string) Value {
-	data, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		panic("Unpack64 bad data")
-	}
-	return Unpack(hacks.BStoS(data))
 }

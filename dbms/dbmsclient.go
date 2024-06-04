@@ -76,9 +76,7 @@ func (ms *muxSession) Close() {
 func (ms *muxSession) Connections() Value {
 	ms.PutCmd(commands.Connections)
 	ms.Request()
-	ob := ms.GetVal().(*SuObject)
-	ob.SetReadOnly()
-	return ob
+	return ms.GetVal().(*SuObject)
 }
 
 func (ms *muxSession) Cursor(query string, _ *Sviews) ICursor {
@@ -101,12 +99,6 @@ func (ms *muxSession) EnableTrigger(string) {
 	assert.ShouldNotReachHere()
 }
 
-func (ms *muxSession) Dump(table string) string {
-	ms.PutCmd(commands.Dump).PutStr(table)
-	ms.Request()
-	return ms.GetStr()
-}
-
 func (ms *muxSession) Exec(_ *Thread, args Value) Value {
 	packed := PackValue(args) // do this first because it could panic
 	if trace.ClientServer.On() {
@@ -125,8 +117,7 @@ func (ms *muxSession) Final() int {
 	return ms.GetInt()
 }
 
-func (ms *muxSession) Get(_ *Thread, query string, dir Dir,
-	_ *Sviews) (Row, *Header, string) {
+func (ms *muxSession) Get(_ *Thread, query string, dir Dir) (Row, *Header, string) {
 	return ms.get(0, query, dir)
 }
 
@@ -151,12 +142,6 @@ func (ms *muxSession) Info() Value {
 
 func (ms *muxSession) Kill(sessionid string) int {
 	ms.PutCmd(commands.Kill).PutStr(sessionid)
-	ms.Request()
-	return ms.GetInt()
-}
-
-func (ms *muxSession) Load(table string) int {
-	ms.PutCmd(commands.Load).PutStr(table)
 	ms.Request()
 	return ms.GetInt()
 }
@@ -243,11 +228,7 @@ func (ms *muxSession) Transaction(update bool) ITran {
 func (ms *muxSession) Transactions() *SuObject {
 	ms.PutCmd(commands.Transactions)
 	ms.Request()
-	ob := &SuObject{}
-	for n := ms.GetInt(); n > 0; n-- {
-		ob.Add(IntVal(ms.GetInt()))
-	}
-	return ob
+	return ms.GetVal().(*SuObject)
 }
 
 func (ms *muxSession) Unuse(lib string) bool {
@@ -293,15 +274,12 @@ func (ms *muxSession) getRow(off int) Row {
 
 type muxTran struct {
 	*muxSession
-	conflict string
 	tn       int
-	ended    bool
 }
 
 var _ ITran = (*muxTran)(nil)
 
 func (tc *muxTran) Abort() string {
-	tc.ended = true
 	tc.PutCmd(commands.Abort).PutInt(tc.tn)
 	tc.Request()
 	return ""
@@ -314,22 +292,12 @@ func (tc *muxTran) Asof(asof int64) int64 {
 }
 
 func (tc *muxTran) Complete() string {
-	tc.ended = true
 	tc.PutCmd(commands.Commit).PutInt(tc.tn)
 	tc.Request()
 	if tc.GetBool() {
 		return ""
 	}
-	tc.conflict = tc.GetStr()
-	return tc.conflict
-}
-
-func (tc *muxTran) Conflict() string {
-	return tc.conflict
-}
-
-func (tc *muxTran) Ended() bool {
-	return tc.ended
+	return tc.GetStr()
 }
 
 func (tc *muxTran) Delete(_ *Thread, table string, off uint64) {
@@ -337,8 +305,7 @@ func (tc *muxTran) Delete(_ *Thread, table string, off uint64) {
 	tc.Request()
 }
 
-func (tc *muxTran) Get(_ *Thread, query string, dir Dir,
-	_ *Sviews) (Row, *Header, string) {
+func (tc *muxTran) Get(_ *Thread, query string, dir Dir) (Row, *Header, string) {
 	return tc.get(tc.tn, query, dir)
 }
 
@@ -355,7 +322,7 @@ func (tc *muxTran) ReadCount() int {
 	return tc.GetInt()
 }
 
-func (tc *muxTran) Action(_ *Thread, action string, _ *Sviews) int {
+func (tc *muxTran) Action(_ *Thread, action string) int {
 	tc.PutCmd(commands.Action).PutInt(tc.tn).PutStr(action)
 	tc.Request()
 	return tc.GetInt()
@@ -374,8 +341,16 @@ func (tc *muxTran) WriteCount() int {
 	return tc.GetInt()
 }
 
+func (tc *muxTran) Num() int {
+	return tc.tn
+}
+
 func (tc *muxTran) String() string {
-	return "Transaction" + strconv.Itoa(tc.tn)
+	pre := "rt"
+	if tc.tn % 2 == 1 {
+		pre = "ut"
+    }
+	return pre + strconv.Itoa(tc.tn)
 }
 
 // ------------------------------------------------------------------
@@ -388,6 +363,13 @@ type muxQueryCursor struct {
 	id   int
 	qc   qcType
 }
+
+type qcType byte
+
+const (
+	query  qcType = 'q'
+	cursor qcType = 'c'
+)
 
 func (qc *muxQueryCursor) Close() {
 	qc.PutCmd(commands.Close).PutInt(qc.id).PutByte(byte(qc.qc))

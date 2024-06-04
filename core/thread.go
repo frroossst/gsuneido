@@ -6,14 +6,18 @@ package core
 import (
 	"fmt"
 	"io"
+	"log"
+	"math"
+	rand "math/rand/v2"
 	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/core/trace"
+	"github.com/apmckinlay/gsuneido/options"
+	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/atomics"
 	"github.com/apmckinlay/gsuneido/util/generic/cache"
 	"github.com/apmckinlay/gsuneido/util/regex"
@@ -33,24 +37,18 @@ const maxStack = 1024
 const maxFrames = 256
 
 type Thread struct {
+	thread1
+	thread2
+}
+
+// thread1 is the reset-able part of Thread
+type thread1 struct {
 
 	// stack is the Value stack for arguments and expressions.
 	// The end of the slice is the top of the stack.
 	stack [maxStack]Value
 
-	// Session is the name of the database session for clients and standalone.
-	// Server tracks client session names separately.
-	// Needs atomic because we access MainThread from other threads.
-	session atomics.String
-
-	// dbms is the database (client or local) for this Thread
-	dbms IDbms
-
-	// Suneido is a per-thread SuneidoObject that overrides the global one.
-	// Needs atomic because sequence.go wrapIter may access from other threads.
-	Suneido atomic.Pointer[SuneidoObject]
-
-	// subThreadOf is used for sessions
+	// subThreadOf is used for sessions.
 	subThreadOf *Thread
 
 	// blockReturnFrame is the parent frame of the block that is returning
@@ -60,9 +58,6 @@ type Thread struct {
 	rxCache *cache.Cache[string, regex.Pattern]
 	// TrCache is per thread so no locking is required
 	trCache *cache.Cache[string, tr.Set]
-
-	// Name is the name of the thread (default is Thread-#)
-	Name string
 
 	Nonce string
 
@@ -92,19 +87,38 @@ type Thread struct {
 	// fpMax is the "high water" mark for fp
 	fpMax int
 
-	// Num is a unique number assigned to the thread
-	Num int32
-
-	// UIThread is only set for the main UI thread.
-	// It controls whether interp checks for UI requests from other threads.
-	UIThread bool
-
 	// InHandler is used to detect nested handler calls
 	InHandler bool
 
 	// ReturnThrow is set by op.ReturnThrow and used by op.Call*Discard
 	// and by some built-in functions.
 	ReturnThrow bool
+
+	// Sviews are the session view definitions for this thread
+	sv *Sviews
+
+	Rand *rand.Rand
+}
+
+// thread2 is the non-reset-able part of Thread
+type thread2 struct {
+	// Session is the name of the database session for clients and standalone.
+	// Server tracks client session names separately.
+	// Needs atomic because we access MainThread from other threads.
+	session atomics.String
+
+	// Suneido is a per-thread SuneidoObject that overrides the global one.
+	// Needs atomic because sequence.go wrapIter may access from other threads.
+	Suneido atomic.Pointer[SuneidoObject]
+
+	// dbms is the database (client or local) for this Thread
+	dbms IDbms
+
+	// Num is a unique number assigned to the thread
+	Num int32
+
+	// Name is the name of the thread (default is Thread-#)
+	Name string
 }
 
 var threadNum atomic.Int32
@@ -119,6 +133,7 @@ func NewThread(parent *Thread) *Thread {
 			suneido.SetConcurrent()
 			th.Suneido.Store(suneido)
 		}
+		th.sv = parent.sv
 	}
 	return th
 }
@@ -128,16 +143,25 @@ func setup(th *Thread) *Thread {
 	th.Name = "Thread-" + strconv.Itoa(int(th.Num))
 	mts := ""
 	if MainThread != nil {
-		mts = MainThread.Session()
+		mts = MainThread.session.Load()
 	}
 	th.session.Store(str.Opt(mts, ":") + th.Name)
 	return th
 }
 
-// Reset is equivalent to calling NewThread(nil)
+// Invalidate is used by workers to help detect use of thread after request
+func (th *Thread) Invalidate() {
+	th.session.Store("INVALID")
+	th.sp = math.MaxInt
+	th.fp = math.MaxInt
+}
+
+// Reset clears the thread except for Num, Name, session, and dbms.
+// It is used by the repl and by dbms server workers.
 func (th *Thread) Reset() {
-	*th = Thread{} // zero it
-	setup(th)
+	assert.That(len(th.rules.list) == 0)
+	th.thread1 = thread1{} // zero it
+	th.Name = str.BeforeFirst(th.Name, " ")
 }
 
 func (th *Thread) Session() string {
@@ -152,6 +176,10 @@ func (th *Thread) SetSession(s string) {
 		th = th.subThreadOf
 	}
 	th.session.Store(s)
+}
+
+func (th *Thread) SetSviews(sv *Sviews) {
+	th.sv = sv
 }
 
 // Push pushes a value onto the value stack
@@ -179,21 +207,22 @@ func (th *Thread) Swap() {
 	th.stack[th.sp-1], th.stack[th.sp-2] = th.stack[th.sp-2], th.stack[th.sp-1]
 }
 
-// GetState and RestoreState are used by callbacks_windows.go
+// Get/Check/RestoreState are used by callbacks_windows.go and updateui_wingui.go
 
-type state struct {
-	fp int
-	sp int
+type ThreadState struct {
+	fp          int
+	sp          int
+	returnThrow bool
 }
 
-func (th *Thread) GetState() state {
-	return state{fp: th.fp, sp: th.sp}
+func (th *Thread) GetState() ThreadState {
+	return ThreadState{fp: th.fp, sp: th.sp, returnThrow: th.ReturnThrow}
 }
 
-func (th *Thread) RestoreState(st any) {
-	s := st.(state)
-	th.fp = s.fp
-	th.sp = s.sp
+func (th *Thread) RestoreState(st ThreadState) {
+	th.fp = st.fp
+	th.sp = st.sp
+	th.ReturnThrow = st.returnThrow
 }
 
 // Callstack captures the call stack
@@ -299,7 +328,7 @@ func (th *Thread) Close() {
 }
 
 // SubThread is a NewThread with the same dbms as this thread.
-// This is used for the RunOnGoSide and SuneidoAPP threads.
+// This is used for SuneidoAPP threads.
 // We want a new thread for isolation e.g. for exceptions or dynamic variables
 // but we don't need the overhead of another dbms connection.
 // WARNING: This should only be used where it is guaranteed
@@ -316,6 +345,9 @@ func (th *Thread) Cat(x, y Value) Value {
 }
 
 func (th *Thread) SessionId(id string) string {
+	if id != "" && th == MainThread {
+		log.SetPrefix(id + " ")
+	}
 	if th.dbms == nil {
 		// don't create a connection just to get/set the session id
 		if id != "" {
@@ -351,6 +383,13 @@ func (th *Thread) TrSet(x Value) tr.Set {
 	return th.trCache.Get(ToStr(x))
 }
 
+func (th *Thread) Sviews() *Sviews {
+	if th == nil {
+		return nil
+	}
+	return th.sv
+}
+
 //-------------------------------------------------------------------
 
 var tsCount int
@@ -361,6 +400,7 @@ var tsLock sync.Mutex
 // Timestamp is a Thread method for convenience, so it has access to the dbms.
 // It is not "per thread".
 // This is the "client" version of Timestamp.
+// See also db19/timestamp.go
 func (th *Thread) Timestamp() PackableValue {
 	tsLock.Lock()
 	defer tsLock.Unlock()

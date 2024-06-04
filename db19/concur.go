@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/apmckinlay/gsuneido/db19/meta"
+	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/util/dbg"
 )
 
@@ -29,11 +30,11 @@ const chanBuffers = 4 // ???
 func StartConcur(db *Database, persistInterval time.Duration) {
 	mergeChan := make(chan todo, chanBuffers)
 	allDone := make(chan void)
-	go merger(db, mergeChan, persistInterval, allDone)
+	go merger(db, db.GetState(), mergeChan, persistInterval, allDone)
 	db.ck = StartCheckCo(db, mergeChan, allDone)
 }
 
-func merger(db *Database, mergeChan chan todo,
+func merger(db *Database, prevState *DbState, mergeChan chan todo,
 	persistInterval time.Duration, allDone chan void) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -46,7 +47,6 @@ func merger(db *Database, mergeChan chan todo,
 	// ep := &execPersistSingle{}
 	merges := &mergeList{}
 	ticker := time.NewTicker(persistInterval)
-	prevState := db.GetState()
 loop:
 	for {
 		select {
@@ -84,6 +84,10 @@ loop:
 	close(em.jobChan)
 	if db.GetState() != prevState ||
 		prevState.Off != db.Store.Size()-uint64(stateLen) {
+		if options.Action == "server" {
+			log.Println("persist starting")
+			defer log.Println("persist finished")
+		}
 		db.persist(ep)
 	}
 	close(allDone)

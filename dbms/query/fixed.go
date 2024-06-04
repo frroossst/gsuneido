@@ -5,6 +5,7 @@ package query
 
 import (
 	"slices"
+	"strings"
 
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
@@ -23,6 +24,8 @@ func NewFixed(col string, val Value) Fixed {
 }
 
 func fixedStr(fixed []Fixed) string {
+	slices.SortFunc(fixed,
+		func(x, y Fixed) int { return strings.Compare(x.col, y.col) })
 	s := "["
 	sep := ""
 	for _, fxd := range fixed {
@@ -42,11 +45,12 @@ func (f *Fixed) String() string {
 	return s + ")"
 }
 
-// combineFixed is used by Where and Join.
+// combineFixed is used by Where, Join, and Intersect.
 // The result is all the ones from fixed1 that are not in fixed2,
 // plus the ones from fixed2 that are not in fixed1,
 // plus the intersection of values of ones that are in both.
 // If an intersection is empty, that is a conflict (none).
+// e.g. a: 1, b: 2|3 COMBINE b: 3|4, c: 5 => a: 1, b: 3, c: 5
 func combineFixed(fixed1, fixed2 []Fixed) (result []Fixed, none bool) {
 	if len(fixed1) == 0 {
 		return fixed2, false
@@ -57,15 +61,15 @@ func combineFixed(fixed1, fixed2 []Fixed) (result []Fixed, none bool) {
 	result = make([]Fixed, 0, len(fixed1)+len(fixed2))
 	// add fixed1 that are not in fixed2
 	for _, sf := range fixed1 {
-		if getFixed(fixed2, sf.col) == nil {
+		if !isFixed(fixed2, sf.col) {
 			result = append(result, sf)
 		}
 	}
 	// process fixed2
 	for _, f2 := range fixed2 {
-		if srcvals := getFixed(fixed1, f2.col); srcvals != nil {
+		if src1vals := getFixed(fixed1, f2.col); src1vals != nil {
 			// field is in both
-			vals := set.Intersect(srcvals, f2.values)
+			vals := set.Intersect(src1vals, f2.values)
 			if len(vals) == 0 {
 				return nil, true // can't match anything
 			}
@@ -78,32 +82,19 @@ func combineFixed(fixed1, fixed2 []Fixed) (result []Fixed, none bool) {
 	return result, false
 }
 
-// FixedIntersect is used by Intersect.
-// It returns none = true if there are both fixed1 and fixed2,
-// but nothing in common.
-func FixedIntersect(fixed1, fixed2 []Fixed) (result []Fixed, none bool) {
-	if len(fixed1) == 0 || len(fixed2) == 0 {
-		return nil, false
-	}
-	result = make([]Fixed, len(fixed1))
-	for i, f1 := range fixed1 {
-		if vals2 := getFixed(fixed2, f1.col); vals2 != nil {
-			vals := set.Intersect(f1.values, vals2)
-			if len(vals) == 0 {
-				return nil, true // can't match anything
-			}
-			result[i] = Fixed{col: f1.col, values: vals}
-		} else {
-			result[i] = f1
+// isSingleFixed returns true if col is fixed with a single value
+func isSingleFixed(fixed []Fixed, col string) bool {
+	for _, f := range fixed {
+		if col == f.col && f.single() {
+			return true
 		}
 	}
-	return result, false
+	return false
 }
 
-// isFixed returns true if col is fixed with a single value
 func isFixed(fixed []Fixed, col string) bool {
 	for _, f := range fixed {
-		if col == f.col && len(f.values) == 1 {
+		if col == f.col {
 			return true
 		}
 	}
@@ -120,9 +111,23 @@ func getFixed(fixed []Fixed, col string) []string {
 	return nil
 }
 
+// findFixed returns the Fixed for a column, or nil if not found
+func findFixed(fixed []Fixed, col string) *Fixed {
+	for i := range fixed {
+		if col == fixed[i].col {
+			return &fixed[i]
+		}
+	}
+	return nil
+}
+
+func (f *Fixed) single() bool {
+	return len(f.values) == 1
+}
+
 func withoutFixed(cols []string, fixed []Fixed) []string {
 	return slc.WithoutFn(cols,
-		func(col string) bool { return isFixed(fixed, col) })
+		func(col string) bool { return isSingleFixed(fixed, col) })
 }
 
 func withoutFixed2(cols [][]string, fixed []Fixed) [][]string {
@@ -136,13 +141,19 @@ func fixedWith(fixed Fixed, val string) Fixed {
 }
 
 func selectFixed(cols, vals []string, fixed []Fixed) (satisfied, conflict bool) {
+	// fixed 1,2,3 val 5 => conflict
+	// fixed 2 val 2 => satisfied
+	// fixed 1,2,3 val 2 => not conflict, not satisfied
+	if len(fixed) == 0 {
+		return false, false
+	}
 	satisfied = true
 	for i, col := range cols {
-		if fv := getFixed(fixed, col); len(fv) == 1 {
-			if fv[0] != vals[i] {
-				return false, true // conflict
-			}
-		} else {
+		fv := getFixed(fixed, col)
+		if fv != nil && !slices.Contains(fv, vals[i]) {
+			return false, true // conflict
+		}
+		if fv == nil || len(fv) > 1 {
 			satisfied = false
 		}
 	}
@@ -152,4 +163,19 @@ func selectFixed(cols, vals []string, fixed []Fixed) (satisfied, conflict bool) 
 func conflictFixed(cols, vals []string, fixed []Fixed) bool {
 	_, conflict := selectFixed(cols, vals, fixed)
 	return conflict
+}
+
+func allFixed(fixed []Fixed, cols []string) bool {
+	for _, col := range cols {
+		if !isSingleFixed(fixed, col) {
+			return false
+		}
+	}
+	return true
+}
+
+func equalFixed(fixed1, fixed2 []Fixed) bool {
+	return slices.EqualFunc(fixed1, fixed2, func(x, y Fixed) bool {
+		return x.col == y.col && slices.Equal(x.values, y.values)
+	})
 }

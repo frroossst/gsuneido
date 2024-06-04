@@ -21,6 +21,7 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/apmckinlay/gsuneido/compile/lexer"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
@@ -104,8 +105,8 @@ func (en *exprNodeT) Echo() string {
 type Ident struct {
 	exprNodeT
 	Name     string
-	Pos      int32
-	Implicit bool // for implicit Record, Object, this
+	Pos      int32 // for check errors
+	Implicit bool  // for implicit Record, Object, this
 }
 
 func (a *Ident) String() string {
@@ -192,7 +193,11 @@ func (a *Unary) Echo() string {
 		tok.Sub: "-",
 		tok.Not: "not ",
 	}
-	return op[a.Tok] + a.E.Echo()
+	e := a.E.Echo()
+	if strings.Contains(e, " ") {
+		e = "(" + e + ")"
+	}
+	return op[a.Tok] + e
 }
 
 func (a *Unary) Children(fn func(Node) Node) {
@@ -778,17 +783,28 @@ func (a *Forever) Children(fn func(Node) Node) {
 
 type ForIn struct {
 	E    Expr
+	E2   Expr // used by for-range
 	Body Statement
-	Var  Ident
+	Var  Ident // optional with for-range
 	stmtNodeT
 }
 
 func (a *ForIn) String() string {
-	return "ForIn(" + a.Var.Name + " " + a.E.String() + "\n" + a.Body.String() + ")"
+	s := "ForIn("
+	if a.Var.Name != "" {
+		s += a.Var.Name + " "
+	}
+	s += a.E.String()
+	if a.E2 != nil {
+		s += " " + a.E2.String()
+	}
+	s += "\n" + a.Body.String() + ")"
+	return s
 }
 
 func (a *ForIn) Children(fn func(Node) Node) {
 	childExpr(fn, &a.E)
+	childExpr(fn, &a.E2)
 	childStmt(fn, &a.Body)
 }
 
@@ -955,4 +971,11 @@ func (a *Switch) Children(fn func(Node) Node) {
 	for i := range a.Default {
 		childStmt(fn, &a.Default[i])
 	}
+}
+
+type ExprPos struct {
+	SuAstNode
+	Expr
+	Pos int32
+	End int32
 }

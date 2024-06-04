@@ -6,7 +6,7 @@ package db19
 import (
 	"log"
 	"math"
-	"math/rand"
+	rand "math/rand/v2"
 	"strconv"
 
 	"github.com/apmckinlay/gsuneido/util/assert"
@@ -120,7 +120,8 @@ func NewCheck(db *Database) *Check {
 		cmtdTran:  make(map[int]*CkTran),
 		bytable:   make(map[string]map[int]*actions),
 		oldest:    math.MaxInt,
-		exclusive: make(map[string]int)}
+		exclusive: make(map[string]int),
+		seq:       1} // odd
 }
 
 func (ck *Check) Run(fn func() error) error {
@@ -152,7 +153,7 @@ func (ck *Check) count() int {
 }
 
 func (ck *Check) next() int {
-	ck.seq++
+	ck.seq += 2 // odd
 	return ck.seq
 }
 
@@ -462,7 +463,7 @@ func (ck *Check) abort1of(t1, t2 *CkTran, act1, act2, table string) bool {
 		traceln(t2, "readConflict =", t2.readConflict)
 		return false // t1 not aborted
 	}
-	if t2.ended() || checkerAbortT1 || rand.Intn(2) == 1 {
+	if t2.ended() || checkerAbortT1 || rand.IntN(2) == 1 {
 		ck.abort(t1.start, act1+" in this transaction conflicted with "+
 			act2+" in another transaction ("+table+")")
 		return true
@@ -513,6 +514,11 @@ func (ck *Check) Commit(ut *UpdateTran) bool {
 }
 
 func (ck *Check) commit(ut *UpdateTran) []string {
+	tw := []string{} // not nil
+	if ck.db.Corrupted() {
+		ck.Abort(ut.ct, "database is locked")
+		return tw // not nil/failure
+	}
 	tn := ut.ct.start
 	traceln("commit", tn)
 	t, ok := ck.actvTran[tn]
@@ -525,7 +531,6 @@ func (ck *Check) commit(ut *UpdateTran) []string {
 	}
 	// move transaction from active to committed
 	delete(ck.actvTran, tn)
-	tw := []string{} // not nil
 	if ut.ct.hasUpdates {
 		assert.That(ut.ct.readConflict == "")
 		ck.cmtdTran[tn] = t
@@ -613,7 +618,7 @@ func (ck *Check) tick() {
 }
 
 func (ck *Check) Stop() { // to satisfy Checker interface
-	ck.db.persist(&execPersistSingle{}) // for tests
+	ck.db.PersistSync() // for tests
 }
 
 func traceln(...any) {
@@ -622,7 +627,7 @@ func traceln(...any) {
 
 // Transactions returns a list of the active update transactions
 func (ck *Check) Transactions() []int {
-	trans := make([]int, 0, 4)
+	trans := make([]int, 0, len(ck.actvTran))
 	for _, t := range ck.actvTran {
 		// assert.That(!t.ended())
 		trans = append(trans, t.start)

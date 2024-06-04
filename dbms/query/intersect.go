@@ -65,7 +65,8 @@ func (it *Intersect) getIndexes() [][]string {
 }
 
 func (it *Intersect) getFixed() []Fixed {
-	fixed, none := FixedIntersect(it.source1.Fixed(), it.source2.Fixed())
+	// same as Join
+	fixed, none := combineFixed(it.source1.Fixed(), it.source2.Fixed())
 	if none {
 		it.conflict = true
 	}
@@ -84,20 +85,19 @@ func (it *Intersect) getNrows() (int, int) {
 }
 
 func (it *Intersect) Transform() Query {
-	cols := it.Columns()
 	if it.disjoint != "" {
-		return NewNothing(cols)
+		return NewNothing(it)
 	}
 	if it.Fixed(); it.conflict {
-		return NewNothing(cols)
+		return NewNothing(it)
 	}
 	src1 := it.source1.Transform()
 	if _, ok := src1.(*Nothing); ok {
-		return NewNothing(cols)
+		return NewNothing(it)
 	}
 	src2 := it.source2.Transform()
 	if _, ok := src2.(*Nothing); ok {
-		return NewNothing(cols)
+		return NewNothing(it)
 	}
 	if src1 != it.source1 || src2 != it.source2 {
 		return NewIntersect(src1, src2)
@@ -121,7 +121,7 @@ func (*Intersect) cost(src1, src2 Query, mode Mode, index []string, frac float64
 	// iterate source and lookup on source2
 	fixcost1, varcost1 := Optimize(src1, mode, index, frac)
 	nrows1, _ := src1.Nrows()
-	best2 := bestKey2(src2, mode, int(float64(nrows1)*frac))
+	best2 := bestLookupKey(src2, mode, int(float64(nrows1)*frac))
 	return fixcost1 + best2.fixcost, varcost1 + best2.varcost, best2.index
 }
 
@@ -155,3 +155,21 @@ func (it *Intersect) Lookup(th *Thread, cols, vals []string) Row {
 }
 
 // COULD have a "merge" strategy (like Union)
+
+func (it *Intersect) Simple(th *Thread) []Row {
+	cols := it.Columns()
+	rows1 := it.source1.Simple(th)
+	rows2 := it.source2.Simple(th)
+	dst := 0
+	for _, row1 := range rows1 {
+		for _, row2 := range rows2 {
+			if EqualRows(it.source1.Header(), row1, it.source2.Header(), row2,
+				cols, th, nil) {
+				rows1[dst] = row1
+				dst++
+				break
+			}
+		}
+	}
+	return rows1[:dst]
+}

@@ -18,7 +18,8 @@ type Extend struct {
 	ctx      ast.Context
 	cols     []string
 	exprs    []ast.Expr
-	exprCols []string
+	exprCols []string // columns used in exprs
+	physical []string // cols with exprs
 	selCols  []string
 	selVals  []string
 	Query1
@@ -41,6 +42,7 @@ func NewExtend(src Query, cols []string, exprs []ast.Expr) *Extend {
 		}
 	}
 	e.exprCols = exprCols
+	e.physical = e.getPhysical()
 	e.header = e.getHeader()
 	e.keys = src.Keys()
 	e.indexes = src.Indexes()
@@ -64,6 +66,29 @@ func (e *Extend) checkDependencies() {
 		}
 		avail = append(avail, e.cols[i])
 	}
+}
+
+func (e *Extend) getPhysical() []string {
+	if !e.hasExprs {
+		return nil
+	}
+	physical := make([]string, 0, len(e.cols))
+	for i, col := range e.cols {
+		if e.exprs[i] != nil {
+			physical = append(physical, col)
+		}
+	}
+	return physical
+}
+
+func (e *Extend) getHeader() *Header {
+	srchdr := e.source.Header()
+	cols := append(srchdr.Columns, e.cols...)
+	flds := srchdr.Fields
+	if e.physical != nil {
+		flds = append(flds, e.physical)
+	}
+	return NewHeader(flds, cols)
 }
 
 func (e *Extend) SetTran(t QueryTran) {
@@ -109,7 +134,7 @@ func (e *Extend) Transform() Query {
 		exprs = append(e2.exprs, exprs...)
 	}
 	if _, ok := src.(*Nothing); ok {
-		return NewNothing(e.Columns())
+		return NewNothing(e)
 	}
 	if src != e.source {
 		return NewExtend(src, cols, exprs)
@@ -153,8 +178,13 @@ func (e *Extend) Fixed() []Fixed {
 		e.fixed = append([]Fixed{}, e.source.Fixed()...) // non-nil copy
 		for i := 0; i < len(e.cols); i++ {
 			if expr := e.exprs[i]; expr != nil {
-				if c, ok := expr.(*ast.Constant); ok {
-					e.fixed = append(e.fixed, NewFixed(e.cols[i], c.Val))
+				switch expr := expr.(type) {
+				case *ast.Constant: // col = <Constant>
+					e.fixed = append(e.fixed, NewFixed(e.cols[i], expr.Val))
+				case *ast.Ident: // col = <Ident>
+					if v := getFixed(e.fixed, expr.Name); v != nil {
+						e.fixed = append(e.fixed, Fixed{col: e.cols[i], values: v})
+					}
 				}
 			}
 		}
@@ -180,34 +210,26 @@ func (e *Extend) setApproach(index []string, frac float64, _ any, tran QueryTran
 
 // execution --------------------------------------------------------
 
-func (e *Extend) getHeader() *Header {
-	hdr := e.source.Header()
-	cols := append(hdr.Columns, e.cols...)
-	flds := hdr.Fields
-	if e.hasExprs {
-		physical := make([]string, 0, len(cols))
-		for i, col := range e.cols {
-			if e.exprs[i] != nil {
-				physical = append(physical, col)
-			}
-		}
-		flds = append(hdr.Fields, physical)
-	}
-	return NewHeader(flds, cols)
-}
-
 func (e *Extend) Get(th *Thread, dir Dir) Row {
 	if e.conflict {
 		return nil
 	}
-	row := e.source.Get(th, dir)
-	return e.extendRow(th, row)
+	for {
+		row := e.source.Get(th, dir)
+		if row == nil {
+			return nil
+		}
+		if !e.hasExprs {
+			return row
+		}
+		rec := e.extendRow(th, row)
+		if e.filter(rec) {
+			return append(row, DbRec{Record: rec})
+		}
+	}
 }
 
-func (e *Extend) extendRow(th *Thread, row Row) Row {
-	if row == nil || !e.hasExprs {
-		return row // eof
-	}
+func (e *Extend) extendRow(th *Thread, row Row) Record {
 	e.ctx.Th = th
 	defer func() { e.ctx.Th = nil }()
 	if e.ctx.Tran == nil {
@@ -222,16 +244,19 @@ func (e *Extend) extendRow(th *Thread, row Row) Row {
 			rb.Add(val.(Packable))
 		}
 	}
-	rec := rb.Trim().Build()
-	// filter for select/lookup
+	return rb.Trim().Build()
+}
+
+func (e *Extend) filter(rec Record) bool {
 	for i, col := range e.selCols {
-		j := slices.Index(e.cols, col)
+		j := slices.Index(e.physical, col)
+		assert.That(j != -1)
 		x := rec.GetRaw(j)
 		if x != e.selVals[i] {
-			return nil
+			return false
 		}
 	}
-	return append(row, DbRec{Record: rec})
+	return true
 }
 
 func (e *Extend) Select(cols, vals []string) {
@@ -261,7 +286,17 @@ func (e *Extend) Lookup(th *Thread, cols, vals []string) Row {
 	}()
 	srccols, srcvals := e.splitSelect(cols, vals)
 	row := e.source.Lookup(th, srccols, srcvals)
-	return e.extendRow(th, row)
+	if row == nil {
+		return nil
+	}
+	if !e.hasExprs {
+		return row
+	}
+	rec := e.extendRow(th, row)
+	if !e.filter(rec) {
+		return nil
+	}
+	return append(row, DbRec{Record: rec})
 }
 
 func (e *Extend) splitSelect(cols, vals []string) ([]string, []string) {
@@ -277,4 +312,16 @@ func (e *Extend) splitSelect(cols, vals []string) ([]string, []string) {
 	}
 	e.selCols, e.selVals = ecols, evals
 	return srccols, srcvals
+}
+
+func (e *Extend) Simple(th *Thread) []Row {
+	e.header = e.getHeader()
+	e.ctx.Hdr = e.header
+	rows := e.source.Simple(th)
+	if e.hasExprs {
+		for i, row := range rows {
+			rows[i] = append(row, DbRec{Record: e.extendRow(th, row)})
+		}
+	}
+	return rows
 }

@@ -4,6 +4,7 @@
 package query
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/apmckinlay/gsuneido/util/assert"
@@ -35,4 +36,68 @@ func TestJoin_nrows(t *testing.T) {
 
 	test(2, 100, 200, 2000, 40)
 	test(2, 100, 10, 2000, 10)
+}
+
+func TestJoin_SelectFixedBug(t *testing.T) {
+	// Without handleFixed this test should give:
+	// 		ASSERT FAILED: msg:  selEnd no data
+	db := heapDb()
+	db.adm("create cus (c3, ck) key(c3, ck)")
+	db.act("insert { c3: 4 } into cus")
+	db.adm("create ivc (ck, ik) key(ik)")
+	db.adm("create bln (bk, ik) key (ik,bk)")
+	query := `
+			((cus extend bk = c3)
+		join by(ck,bk)
+				(bln
+			join by(ik)
+				(ivc where ik is 4)))
+		where ck is "" `
+	joinRev = impossible
+	defer func() { joinRev = 0 }()
+	tran := sizeTran{db.NewReadTran()}
+	q := ParseQuery(query, tran, nil)
+	q, _, _ = Setup(q, ReadMode, tran)
+	assert.This(Strategy(q)).Like(`
+			{1_000 0+250_000} cus^(c3,ck)
+			{500/1_000 0+250_000} WHERE ck is ""
+			{500/1_000 0+250_000} EXTEND bk = c3
+		{1/1_000 0+1_126_000} JOIN n:1 by(ck,bk)
+				{0.500x 1_000 0+125_500} bln^(ik,bk)
+				{500/1_000 0+125_500} WHERE ik is 4
+			{1/1_000 0+376_000} JOIN n:1 by(ik)
+				{0.001x 1_000 0+500} ivc^(ik)
+				{1/1_000 0+500} WHERE*1 ik is 4 and ck is ""`)
+	assert.This(queryAll2(q)).Is("")
+}
+
+func TestJoin_EmptyTempIndexBug(t *testing.T) {
+	db := heapDb()
+	db.adm("create ivc (ck, ik) key(ik)")
+	// db.act("insert { c3: 4 } into cus")
+	db.adm("create bln (bk, ik) key (ik,bk)")
+	query := `
+			(bln
+		join by(ik)
+			(ivc where ik is 4 and ck is ""))`
+	joinRev = impossible
+	defer func() { joinRev = 0 }()
+	tran := sizeTran{db.NewReadTran()}
+	q := ParseQuery(query, tran, nil)
+	idx := []string{"ck", "ik"}
+	q = setupIndex(q, ReadMode, idx, tran)
+	// fmt.Println(Strategy(q))
+	assert.T(t).Msg("empty TempIndex").
+		That(!strings.Contains(Strategy(q), "TEMPINDEX()"))
+	q.Select(idx, []string{"", ""})
+}
+
+func setupIndex(q Query, mode Mode, index []string, tran QueryTran) Query {
+	q = q.Transform()
+	fixcost, varcost := Optimize(q, mode, index, float64(1))
+	if fixcost+varcost >= impossible {
+		panic("impossible")
+	}
+	q = SetApproach(q, index, float64(1), tran)
+	return q
 }

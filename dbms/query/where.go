@@ -41,8 +41,7 @@ type Where struct {
 	selectCols []string
 	selectVals []string
 
-	idxSels    []idxSel // from optInit, result of perIndex
-	whereFixed []Fixed
+	idxSels []idxSel // from optInit, result of perIndex
 	Query1
 	// idxSelPos is the current index in idxSel.ptrngs
 	idxSelPos int
@@ -58,9 +57,17 @@ type Where struct {
 	selSet    bool
 
 	// exprMore is whether expr has more than idxSels
-	exprMore  bool
-	optInited bool
+	exprMore bool
+	optInited
 }
+
+type optInited byte
+
+const (
+	optInitNo optInited = iota
+	optInitInProgress
+	optInitYes
+)
 
 type whereApproach struct {
 	index []string
@@ -124,36 +131,88 @@ func (w *Where) format() string {
 	return "where " + w.expr.Echo()
 }
 
-// calcFixed sets w.whereFixed and w.fixed and may set w.conflict
+// calcFixed sets w.fixed and may set w.conflict
 func (w *Where) calcFixed() {
-	w.whereFixed = w.exprsToFixed()
-	fixed, none := combineFixed(w.source.Fixed(), w.whereFixed)
+	efixed, conflict := w.exprsToFixed()
+	if conflict {
+		w.conflict = true
+		return
+	}
+	fixed, none := combineFixed(w.source.Fixed(), efixed)
 	if none {
 		w.conflict = true
+		return
 	}
 	w.fixed = fixed
 }
 
-func (w *Where) exprsToFixed() []Fixed {
-	var fixed []Fixed
+func (w *Where) exprsToFixed() (fixed []Fixed, conflict bool) {
 	for _, e := range w.expr.Exprs {
-		fixed = addFixed(fixed, e)
+		fixed, conflict = addFixed(fixed, e)
+		if conflict {
+			return nil, true
+		}
 	}
-	return fixed
+	return fixed, false
 }
 
-func addFixed(fixed []Fixed, e ast.Expr) []Fixed {
-	// MAYBE: handle IN and OR, could use colSels
+func addFixed(fixed []Fixed, e ast.Expr) ([]Fixed, bool) {
+	// MAYBE: handle OR, could use colSels
 	if b, ok := e.(*ast.Binary); ok && (b.Tok == tok.Is || b.Tok == tok.Lte) {
 		if id, ok := b.Lhs.(*ast.Ident); ok {
 			if c, ok := b.Rhs.(*ast.Constant); ok {
 				if b.Tok == tok.Is || c.Val == EmptyStr {
-					fixed = append(fixed, NewFixed(id.Name, c.Val))
+					return fixedAnd(fixed, id.Name, c.Val)
 				}
 			}
 		}
+	} else if col, vals := inToFixed(e); col != "" {
+		return fixedAnd(fixed, col, vals...)
 	}
-	return fixed
+	return fixed, false
+}
+
+func inToFixed(e ast.Expr) (col string, vals []Value) {
+	in, ok := e.(*ast.In)
+	if !ok {
+		return "", nil
+	}
+	id, ok := in.E.(*ast.Ident)
+	if !ok {
+		return "", nil
+	}
+	for _, e2 := range in.Exprs {
+		if c, ok := e2.(*ast.Constant); ok {
+			vals = append(vals, c.Val)
+		} else {
+			return "", nil
+		}
+	}
+	return id.Name, vals
+}
+
+// fixedAnd adds col,vals to fixed, handling if col already exists
+func fixedAnd(fixed []Fixed, col string, vals ...Value) ([]Fixed, bool) {
+	vs := make([]string, len(vals))
+	for i, v := range vals {
+		vs[i] = Pack(v.(Packable))
+	}
+	for i, f := range fixed {
+		if f.col == col {
+			v := set.Intersect(f.values, vs)
+			if len(v) == 0 {
+				return nil, true // conflict
+			}
+			if len(v) == len(f.values) {
+				return fixed, false // no change
+			}
+			fixed := slices.Clone(fixed)
+			fixed[i].values = v
+			return fixed, false
+		}
+	}
+	// col not found
+	return append(fixed, Fixed{col: col, values: vs}), false
 }
 
 func (w *Where) Keys() [][]string {
@@ -182,15 +241,7 @@ func (w *Where) fastSingle() bool {
 }
 
 func (w *Where) Indexes() [][]string {
-	if w.indexes == nil {
-		w.optInit()
-		if !w.singleton {
-			w.indexes = w.source.Indexes()
-		}
-		if w.indexes == nil {
-			w.indexes = [][]string{} // not nil
-		}
-	}
+	w.optInit() // sets indexes
 	return w.indexes
 }
 
@@ -200,7 +251,7 @@ func (w *Where) Nrows() (int, int) {
 }
 
 func (w *Where) calcNrows() (int, int) {
-	assert.That(w.optInited)
+	assert.That(w.optInited == optInitInProgress)
 	srcNrows, srcPop := w.source.Nrows()
 	if w.conflict || srcPop == 0 {
 		return 0, srcPop
@@ -227,17 +278,17 @@ func (w *Where) calcNrows() (int, int) {
 }
 
 func (w *Where) Transform() Query {
+	if w.conflict {
+		return NewNothing(w)
+	}
 	src := w.source.Transform()
 	if len(w.expr.Exprs) == 0 {
 		// remove empty where
 		return src
 	}
-	if w.conflict {
-		return NewNothing(w.Columns())
-	}
 	switch q := src.(type) {
 	case *Nothing:
-		return NewNothing(w.Columns())
+		return NewNothing(w)
 	case *Tables:
 		return w.tablesLookup(q)
 	case *Where:
@@ -323,12 +374,12 @@ func (w *Where) Transform() Query {
 	case *Join:
 		// split where over join
 		return w.split(q, func(src1, src2 Query) Query {
-			return NewJoin(src1, src2, q.by).Transform()
+			return q.With(src1, src2).Transform()
 		})
 	case *LeftJoin:
 		if w.leftJoinToJoin(q) {
 			return w.split(q, func(src1, src2 Query) Query {
-				return NewJoin(src1, src2, q.by).Transform()
+				return NewJoin(src1, src2, q.by, w.t).Transform()
 			})
 		}
 		// split where over leftjoin (left side only)
@@ -346,7 +397,7 @@ func (w *Where) Transform() Query {
 		}
 		src1 := NewWhere(q.source1,
 			&ast.Nary{Tok: tok.And, Exprs: exprs1}, w.t)
-		q2 := NewLeftJoin(src1, q.source2, q.by).Transform()
+		q2 := q.With(src1, q.source2).Transform()
 		if common == nil {
 			return q2
 		}
@@ -365,16 +416,16 @@ func (w *Where) transform(src Query) Query {
 }
 
 func (w *Where) tablesLookup(tables *Tables) Query {
-	// Optimize: tables where table|tablename = <string>
+	// Optimize: tables where table = <string>
 	// This is to handle the speed issue from heavy use of TableExists?.
 	// It could be more general.
 	col, val := w.lookup1()
-	if col != "table" && col != "tablename" {
+	if col != "table" {
 		return w
 	}
 	s, ok := val.ToStr()
 	if !ok {
-		return NewNothing(w.Columns())
+		return NewNothing(w)
 	}
 	return NewTablesLookup(tables.tran, s)
 }
@@ -457,7 +508,7 @@ func (w *Where) split(q2 Query, newQ2 func(Query, Query) Query) Query {
 		q2 = newQ2(src1, src2).Transform()
 	}
 	if exprs1 == nil && exprs2 == nil {
-		return w
+		return w.transform(q2)
 	}
 	if common != nil {
 		e := &ast.Nary{Tok: tok.And, Exprs: common}
@@ -505,10 +556,11 @@ func (w *Where) exprFalse() bool {
 }
 
 func (w *Where) optInit() {
-	if w.optInited {
+	if w.optInited == optInitYes {
 		return
 	}
-	w.optInited = true
+	assert.That(w.optInited == optInitNo)
+	w.optInited = optInitInProgress
 	w.tbl, _ = w.source.(*Table)
 	if !w.conflict && w.tbl != nil {
 		w.idxSels = w.perIndex(w.colSels)
@@ -524,6 +576,10 @@ func (w *Where) optInit() {
 		}
 	}
 	w.setNrows(w.calcNrows())
+	if !w.singleton {
+		w.indexes = w.source.Indexes()
+	}
+	w.optInited = optInitYes
 }
 
 // bestIndex returns the best (lowest cost) index with an idxSel
@@ -684,7 +740,7 @@ func (w *Where) Select(cols, vals []string) {
 	// Note: conflict could come from any of expr, not just fixed.
 	// But to evaluate that would require building a Row.
 	// It should be rare.
-	satisfied, conflict := selectFixed(cols, vals, w.whereFixed)
+	satisfied, conflict := selectFixed(cols, vals, w.Fixed())
 	if conflict {
 		w.selOrg, w.selEnd = ixkey.Max, ""
 		w.selSet = true
@@ -718,7 +774,7 @@ func (w *Where) addFixed(cols []string, vals []string) ([]string, []string) {
 	cols = slices.Clip(cols)
 	vals = slices.Clip(vals)
 	for _, fix := range w.fixed {
-		if len(fix.values) == 1 && !slices.Contains(cols, fix.col) {
+		if fix.single() && !slices.Contains(cols, fix.col) {
 			cols = append(cols, fix.col)
 			vals = append(vals, fix.values[0])
 		}
@@ -767,4 +823,17 @@ func (w *Where) slowQueries() {
 }
 func (w *Where) slow() bool {
 	return w.nIn > 100 && w.nIn > w.nOut*100
+}
+
+func (w *Where) Simple(th *Thread) []Row {
+	w.ctx.Hdr = w.header
+	rows := w.source.Simple(th)
+	dst := 0
+	for _, row := range rows {
+		if w.filter(nil, row) {
+			rows[dst] = row
+			dst++
+		}
+	}
+	return rows[:dst]
 }

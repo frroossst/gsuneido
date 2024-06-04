@@ -38,7 +38,8 @@ var help = `options:
 	-compact
 	-d[ump] [table]
 	-h[elp] or -?
-	-l[oad] [table]
+	-l[oad] [table] (or @filename)
+	-p[ass]p[hrase]=string (for -load)
 	-p[ort][=#] (default 3147)
 	-repair
 	-s[erver]
@@ -48,6 +49,7 @@ var help = `options:
 // dbmsLocal is set if running with a local/standalone database.
 var dbmsLocal *dbms.DbmsLocal
 var mainThread Thread
+var sviews Sviews
 
 func main() {
 	options.BuiltDate = builtDate
@@ -68,6 +70,12 @@ func main() {
 			Exit = system.StopService
 		}
 	}
+
+	Libload = libload // dependency injection
+	mainThread.Name = "main"
+	mainThread.OpCount = 1009
+	mainThread.SetSviews(&sviews)
+	MainThread = &mainThread
 
 	switch options.Action {
 	case "":
@@ -94,13 +102,29 @@ func main() {
 		os.Exit(0)
 	case "load":
 		t := time.Now()
-		if options.Arg == "" {
-			nTables, nViews, err := tools.LoadDatabase("database.su", "suneido.db")
+		privateKey := ""
+		if options.Passphrase != "" {
+			buf, err := io.ReadAll(os.Stdin)
+			ck(err)
+			privateKey = string(buf)
+		}
+		from := "database.su"
+		table := ""
+		if options.Arg != "" {
+			if strings.HasPrefix(options.Arg, "@") {
+				from = options.Arg[1:]
+			} else {
+				table = options.Arg
+			}
+		}
+		if table == "" {
+			nTables, nViews, err := tools.LoadDatabase(from, "suneido.db",
+				privateKey, options.Passphrase)
 			ck(err)
 			Alert("loaded", nTables, "tables", nViews, "views in",
 				time.Since(t).Round(time.Millisecond))
 		} else {
-			table := strings.TrimSuffix(options.Arg, ".su")
+			table = strings.TrimSuffix(table, ".su")
 			n, err := tools.LoadTable(table, "suneido.db")
 			ck(err)
 			Alert("loaded", n, "records to", table,
@@ -151,11 +175,6 @@ func main() {
 		Alert("invalid action:", options.Action)
 		os.Exit(1)
 	}
-	Libload = libload // dependency injection
-	mainThread.Name = "main"
-	mainThread.UIThread = true
-	MainThread = &mainThread
-	builtin.UIThread = &mainThread
 	defer func() {
 		if e := recover(); e != nil {
 			log.Println("ERROR:", e, "(exiting)")
@@ -165,18 +184,10 @@ func main() {
 	}()
 	// dependency injection of GetDbms
 	if options.Action == "client" {
-		conn, jserver := dbms.ConnectClient(options.Arg, options.Port)
-		if jserver {
-			mainThread.SetDbms(dbms.NewJsunClient(conn))
-			GetDbms = func() IDbms {
-				conn, _ := dbms.ConnectClient(options.Arg, options.Port)
-				return dbms.NewJsunClient(conn)
-			}
-		} else {
-			client := dbms.NewDbmsClient(conn)
-			GetDbms = func() IDbms {
-				return client.NewSession()
-			}
+		conn := dbms.ConnectClient(options.Arg, options.Port)
+		client := dbms.NewDbmsClient(conn)
+		GetDbms = func() IDbms {
+			return client.NewSession()
 		}
 		if mode == "gui" {
 			clientErrorLog()
@@ -198,13 +209,7 @@ func main() {
 }
 
 func redirect() {
-	getId := func() string {
-		if MainThread == nil {
-			return ""
-		}
-		return MainThread.Session()
-	}
-	if err := system.Redirect(options.Errlog, getId); err != nil {
+	if err := system.Redirect(options.Errlog); err != nil {
 		Fatal("Redirect failed:", err)
 	}
 }
@@ -229,12 +234,15 @@ func ck(err error) {
 // This is to record errors that occurred on the client
 // when the server was not connected.
 func clientErrorLog() {
-	dbms := mainThread.Dbms()
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmsgprefix)
+	sid := mainThread.SessionId("") + " "
+	log.SetPrefix(sid)
 
 	f, err := os.Open(options.Errlog)
 	if err != nil {
 		return
 	}
+	dbms := mainThread.Dbms()
 	defer func() {
 		f.Close()
 		os.Truncate(options.Errlog, 0) // can't remove since open as stderr
@@ -247,7 +255,11 @@ func clientErrorLog() {
 	in.Buffer(nil, 1024)
 	nlines := 0
 	for in.Scan() {
-		dbms.Log("PREV: " + in.Text())
+		s := "PREV: " + in.Text()
+		if !strings.Contains(s, sid) {
+			s = sid + s
+        }
+		dbms.Log(s)
 		if nlines++; nlines > 1000 {
 			dbms.Log("PREV: too many errors")
 			break
@@ -260,13 +272,11 @@ func runServer() {
 	log.Println("starting server")
 	openDbms()
 	startHttpStatus()
-	Libload = libload // dependency injection
-	mainThread.Name = "main"
 	run("Init()")
 	options.DbStatus.Store("")
-	exit.Add(stopServer)
+	exit.Add("stop server", stopServer)
 	dbms.Server(dbmsLocal)
-	log.Fatalln("server should not return")
+	log.Fatalln("FATAL server should not return")
 }
 
 func stopServer() {
@@ -307,7 +317,7 @@ func openDbms() {
 	dbmsLocal = dbms.NewDbmsLocal(db)
 	DbmsAuth = options.Action == "server" || mode != "gui" || !db.HaveUsers()
 	GetDbms = getDbms
-	exit.Add(func() {
+	exit.Add("close database", func() {
 		if options.Action == "server" {
 			log.Println("database closing")
 			defer log.Println("database closed")
@@ -318,11 +328,11 @@ func openDbms() {
 }
 
 func persistInterval() time.Duration {
-	if options.Action == "server" {
-		return 60 * time.Second
+	d := 60 * time.Second
+	if options.Mode == "gui" {
+		d = 10 * time.Second
 	}
-	// else standalone
-	return 10 * time.Second
+	return d
 }
 
 func getDbms() IDbms {
@@ -429,6 +439,7 @@ func eval(src string) {
 	// fmt.Println(DisasmMixed(fn, src))
 
 	mainThread.Reset()
+	mainThread.SetSviews(&sviews)
 	result := mainThread.Call(fn)
 	if result != nil {
 		fmt.Println(WithType(result)) // NOTE: doesn't use ToString

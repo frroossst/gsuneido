@@ -5,6 +5,7 @@ package db19
 
 import (
 	"errors"
+	"log"
 	"os"
 	"sync/atomic"
 
@@ -35,7 +36,6 @@ type Database struct {
 	// It must only updated via UpdateState.
 	state stateHolder
 
-	core.Sviews
 	mode stor.Mode
 	// schemaLock is used to prevent concurrent schema modification
 	schemaLock atomic.Bool
@@ -79,11 +79,6 @@ func OpenDatabase(filename string) (*Database, error) {
 	return OpenDb(filename, stor.Update, true)
 }
 
-// OpenDatabaseRead opens the database in the named file for read only.
-func OpenDatabaseRead(filename string) (*Database, error) {
-	return OpenDb(filename, stor.Read, true)
-}
-
 // OpenDb opens the database in the named file.
 // NOTE: The returned Database does not have a checker.
 func OpenDb(filename string, mode stor.Mode, check bool) (db *Database, err error) {
@@ -116,7 +111,9 @@ func OpenDbStor(store *stor.Stor, mode stor.Mode, check bool) (db *Database, err
 		core.Fatal("invalid database version")
 	}
 	size := stor.ReadSmallOffset(buf[len(magic):])
-	if size != store.Size() {
+	if size == 0 {
+		return nil, errors.New("corruption previously detected")
+	} else if size != store.Size() {
 		return nil, errors.New("bad size, not shut down properly?")
 	}
 
@@ -194,6 +191,9 @@ func (db *Database) Create(schema *schema.Schema) {
 }
 
 func (db *Database) lockSchema() {
+	if db.Corrupted() {
+		panic("database is locked")
+	}
 	if !db.schemaLock.CompareAndSwap(false, true) {
 		panic("concurrent schema modifications are not allowed")
 	}
@@ -487,6 +487,9 @@ func (db *Database) AlterDrop(schema *schema.Schema) bool {
 }
 
 func (db *Database) AddView(name, def string) bool {
+	if db.Corrupted() {
+		panic("database is locked")
+	}
 	result := false
 	db.UpdateState(func(state *DbState) {
 		if m := state.Meta.AddView(name, def); m != nil {
@@ -541,10 +544,12 @@ func (db *Database) ckOpen() {
 	}
 }
 
+// Corrupt marks the database as corrupted.
 func (db *Database) Corrupt() {
 	if db.corrupted.Swap(true) {
 		return
 	}
+	log.Println("ERROR database corruption detected")
 	options.DbStatus.Store("corrupted")
 	buf := make([]byte, stor.SmallOffsetLen)
 	if db.mode != stor.Read {
@@ -557,6 +562,10 @@ func (db *Database) Corrupt() {
 			f.Write(buf)
 		}
 	}
+}
+
+func (db *Database) Corrupted() bool {
+	return db.corrupted.Load()
 }
 
 // Close closes the database store, writing the current size to the start.
@@ -572,6 +581,9 @@ func (db *Database) close(unmap bool) {
 	}
 	if db.ck != nil {
 		db.ck.Stop() // writes final state
+		if options.Action == "server" {
+			log.Println("database stopped")
+		}
 	} else if db.mode != stor.Read {
 		db.persist(&execPersistSingle{}) // for testing
 	}

@@ -68,7 +68,8 @@ func (c *Compatible) SetTran(t QueryTran) {
 	c.st = MakeSuTran(t)
 }
 
-// source2Has returns true if a row from source exists in source2
+// source2Has returns true if a row from source exists in source2.
+// It does Lookup on source2.
 func (c *Compatible) source2Has(th *Thread, row Row) bool {
 	if c.disjoint != "" {
 		return false
@@ -89,10 +90,12 @@ func (c *Compatible) equal(th *Thread, row1, row2 Row) bool {
 		c.allCols, th, c.st)
 }
 
-func bestKey2(src2 Query, mode Mode, nrows int) bestIndex {
+// bestLookupKey is used by Intersect and Minus
+func bestLookupKey(q Query, mode Mode, nrows int) bestIndex {
+	//TODO possibly exclude fixed
 	best := newBestIndex()
-	for _, key := range src2.Keys() {
-		fixcost, varcost := LookupCost(src2, mode, key, nrows)
+	for _, key := range q.Keys() {
+		fixcost, varcost := LookupCost(q, mode, key, nrows)
 		best.update(key, fixcost, varcost)
 	}
 	return best

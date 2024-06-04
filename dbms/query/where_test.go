@@ -292,7 +292,6 @@ func TestWhere_ptrange(t *testing.T) {
 		// fmt.Printf("idxSel ptrange\n\t%q\n\t%q\n",
 		// 	w.idxSel.ptrngs[0].org, w.idxSel.ptrngs[0].end)
 		w.fixed = nil
-		w.whereFixed = nil
 		w.singleton = false
 		w.Select(selCols, selVals)
 		// fmt.Printf("selOrg, selEnd\n\t%q\n\t%q\n", w.selOrg, w.selEnd)
@@ -302,4 +301,20 @@ func TestWhere_ptrange(t *testing.T) {
 	}
 	test("a is '1' and b is '2' and c is '3'",
 		[]string{"a"}, []string{Pack(SuStr("1"))})
+}
+
+func TestWhere_fixed(t *testing.T) {
+	test := func(query, expected string) {
+		t.Helper()
+		w := ParseQuery("table where "+query, testTran{}, nil).(*Where)
+		assert.T(t).This(fixedStr(w.Fixed())).Is(expected)
+	}
+	test("a", "[]")
+	test("a is 1", "[a=(1)]")
+	test("a is 1 and b is 2", "[a=(1), b=(2)]")
+	test("a in (1,2,3)", "[a=(1,2,3)]")
+	test("a is 1 and a is 1", "[a=(1)]")
+	test("a in (1,2) and a is 1", "[a=(1)]")
+	test("a in (1,2,3) and a in (2,3,4)", "[a=(2,3)]")
+	test("a in (1,2) and a in (3,4)", "[]")
 }

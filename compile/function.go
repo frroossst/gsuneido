@@ -273,7 +273,9 @@ func (p *Parser) switchCase() ast.Case {
 	p.Match(tok.Case)
 	var exprs []ast.Expr
 	for {
-		exprs = append(exprs, p.Expression())
+		pos := p.Pos
+		expr := p.Expression()
+		exprs = append(exprs, p.exprPos(expr, pos, p.EndPos))
 		if !p.MatchIf(tok.Comma) {
 			break
 		}
@@ -308,8 +310,10 @@ func (p *Parser) whileStmt() *ast.While {
 func (p *Parser) dowhileStmt() *ast.DoWhile {
 	body := p.statement()
 	p.Match(tok.While)
-	cond := p.Expression()
-	return &ast.DoWhile{Body: body, Cond: cond}
+	pos := p.Pos
+	expr := p.Expression()
+	return &ast.DoWhile{Body: body,
+		Cond: p.exprPos(expr, pos, p.EndPos)}
 }
 
 func (p *Parser) forStmt() ast.Statement {
@@ -318,6 +322,8 @@ func (p *Parser) forStmt() ast.Statement {
 	p.Match(tok.For)
 	if forIn {
 		return p.forIn()
+	} else if p.Token != tok.LParen {
+		return p.forRange()
 	}
 	return p.forClassic()
 }
@@ -340,12 +346,35 @@ func (p *Parser) forIn() *ast.ForIn {
 	pos := p.Pos
 	p.MatchIdent()
 	p.Match(tok.In)
-	expr := p.exprExpecting(!parens)
+	var expr ast.Expr
+	if p.Token == tok.RangeTo {
+		expr = p.Constant(Zero)
+	} else {
+		pos := p.Pos
+		expr = p.exprExpecting(!parens)
+		expr = p.exprPos(expr, pos, p.EndPos)
+	}
+	var expr2 Expr
+	if !parens && p.Token == tok.RangeTo {
+		p.Next()
+		pos := p.Pos
+		expr2 = p.exprExpecting(!parens)
+		expr2 = p.exprPos(expr2, pos, p.EndPos)
+	}
 	if parens {
 		p.Match(tok.RParen)
 	}
 	body := p.statement()
-	return &ast.ForIn{Var: ast.Ident{Name: id, Pos: pos}, E: expr, Body: body}
+	return &ast.ForIn{Var: ast.Ident{Name: id, Pos: pos},
+		E: expr, E2: expr2, Body: body}
+}
+
+func (p *Parser) forRange() *ast.ForIn {
+	p.Match(tok.RangeTo)
+	expr := p.Constant(Zero)
+	expr2 := p.exprExpecting(true)
+	body := p.statement()
+	return &ast.ForIn{E: expr, E2: expr2, Body: body}
 }
 
 func (p *Parser) forClassic() *ast.For {
@@ -377,11 +406,13 @@ func (p *Parser) optExprList(after tok.Token) []ast.Expr {
 	return exprs
 }
 
-// used by if, while, and do-while
+// used by if and while
 func (p *Parser) ctrlExpr() ast.Expr {
 	parens := p.MatchIf(tok.LParen)
 	keepParens := p.Token == tok.LParen
+	pos := p.Pos
 	expr := p.exprExpecting(!parens)
+	expr = p.exprPos(expr, pos, p.EndPos)
 	if parens {
 		p.Match(tok.RParen)
 	}
@@ -410,7 +441,12 @@ func (p *Parser) returnStmt() *ast.Return {
 }
 
 func (p *Parser) tryStmt() *ast.TryCatch {
+	if p.inTry {
+		p.Error("nested try not supported")
+	}
+	p.funcInfo.inTry = true
 	try := p.statement()
+	p.funcInfo.inTry = false
 	var catchVar string
 	var varPos int32
 	var catchFilter string

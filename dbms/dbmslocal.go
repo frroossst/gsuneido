@@ -44,9 +44,6 @@ var _ IDbms = (*DbmsLocal)(nil)
 
 func (dbms *DbmsLocal) Admin(admin string, sv *Sviews) {
 	trace.Dbms.Println("Admin", admin)
-	if sv == nil {
-		sv = &dbms.db.Sviews
-	}
 	qry.DoAdmin(dbms.db, admin, sv)
 }
 
@@ -82,13 +79,10 @@ func (*DbmsLocal) Connections() Value {
 	if options.Action == "server" {
 		return connections()
 	}
-	return EmptyObject
+	return &SuObject{}
 }
 
 func (dbms *DbmsLocal) Cursor(query string, sv *Sviews) ICursor {
-	if sv == nil {
-		sv = &dbms.db.Sviews
-	}
 	tran := dbms.db.NewReadTran()
 	q, fixcost, varcost := buildQuery(query, tran, sv, qry.CursorMode)
 	trace.Query.Println("cursor", fixcost+varcost, "-", query)
@@ -115,12 +109,18 @@ func (dbms *DbmsLocal) EnableTrigger(table string) {
 	dbms.db.EnableTrigger(table)
 }
 
-func (dbms *DbmsLocal) Dump(table string) string {
+func (dbms *DbmsLocal) Dump(table, to, publicKey string) string {
 	var err error
 	if table == "" {
-		_, _, err = tools.Dump(dbms.db, "database.su")
+		if to == "" {
+			to = "database.su"
+		}
+		_, _, err = tools.Dump(dbms.db, to, publicKey)
 	} else {
-		_, err = tools.DumpDbTable(dbms.db, table, table+".su")
+		if to == "" {
+			to = table + ".su"
+		}
+		_, err = tools.DumpDbTable(dbms.db, table, to, publicKey)
 	}
 	if err != nil {
 		return err.Error()
@@ -148,18 +148,16 @@ func (dbms *DbmsLocal) Final() int {
 
 // Get implements QueryFirst, QueryLast, Query1
 func (dbms *DbmsLocal) Get(
-	th *Thread, query string, dir Dir, sv *Sviews) (Row, *Header, string) {
+	th *Thread, query string, dir Dir) (Row, *Header, string) {
 	tran := dbms.db.NewReadTran()
 	defer tran.Complete()
-	if sv == nil {
-		sv = &dbms.db.Sviews
-	}
-	return get(th, tran, query, dir, sv)
+	return get(th, tran, query, dir)
 }
 
-func get(th *Thread, tran qry.QueryTran, query string, dir Dir,
-	sv *Sviews) (Row, *Header, string) {
-	q, fixcost, varcost := buildQuery(query, tran, sv, qry.ReadMode)
+func get(th *Thread, tran qry.QueryTran, query string, dir Dir) (Row, *Header, string) {
+	q := qry.ParseQuery(query, tran, th.Sviews())
+	q, fixcost, varcost := qry.Setup1(q, qry.ReadMode, tran)
+	qry.Warnings(query, q)
 	if trace.Query.On() {
 		d := map[Dir]string{Only: "one", Next: "first", Prev: "last"}[dir]
 		trace.Query.Println(d, fixcost+varcost, "-", query)
@@ -193,8 +191,11 @@ func (*DbmsLocal) Kill(addr string) int {
 	return 0
 }
 
-func (dbms *DbmsLocal) Load(table string) int {
-	n, err := tools.LoadDbTable(table, dbms.db)
+func (dbms *DbmsLocal) Load(table, from, privateKey, passphrase string) int {
+	if from == "" {
+		from = table + ".su"
+	}
+	n, err := tools.LoadDbTable(table, from, privateKey, passphrase, dbms.db)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -317,9 +318,10 @@ func (dbms *DbmsLocal) Transactions() *SuObject {
 	if trans == nil {
 		return SuObjectOf(Zero) // corrupt
 	}
+	slices.Sort(trans)
 	var ob SuObject
 	for _, t := range trans {
-		ob.Add(IntVal(t<<1 | 1)) // update tran# are odd
+		ob.Add(IntVal(t))
 	}
 	return &ob
 }
@@ -398,33 +400,21 @@ func init() {
 	}
 }
 
-type TranLocal interface {
-	Num() int
-}
-
 type ReadTranLocal struct {
 	*db19.ReadTran
-	TranLocal
 }
 
-func (t ReadTranLocal) Get(th *Thread, query string, dir Dir,
-	sv *Sviews) (Row, *Header, string) {
-	if sv == nil {
-		sv = t.GetSviews()
-	}
-	return get(th, t.ReadTran, query, dir, sv)
+func (t ReadTranLocal) Get(th *Thread, query string, dir Dir) (Row, *Header, string) {
+	return get(th, t.ReadTran, query, dir)
 }
 
 func (t ReadTranLocal) Query(query string, sv *Sviews) IQuery {
-	if sv == nil {
-		sv = t.GetSviews()
-	}
 	q, fixcost, varcost := buildQuery(query, t.ReadTran, sv, qry.ReadMode)
 	trace.Query.Println(fixcost+varcost, "-", query)
 	return queryLocal{Query: q, cost: fixcost + varcost, mode: qry.ReadMode}
 }
 
-func (t ReadTranLocal) Action(*Thread, string, *Sviews) int {
+func (t ReadTranLocal) Action(*Thread, string) int {
 	panic("cannot do action in read-only transaction")
 }
 
@@ -432,32 +422,21 @@ func (t ReadTranLocal) Action(*Thread, string, *Sviews) int {
 
 type UpdateTranLocal struct {
 	*db19.UpdateTran
-	TranLocal
 }
 
-func (t UpdateTranLocal) Get(th *Thread, query string, dir Dir,
-	sv *Sviews) (Row, *Header, string) {
-	if sv == nil {
-		sv = t.GetSviews()
-	}
-	return get(th, t.UpdateTran, query, dir, sv)
+func (t UpdateTranLocal) Get(th *Thread, query string, dir Dir) (Row, *Header, string) {
+	return get(th, t.UpdateTran, query, dir)
 }
 
 func (t UpdateTranLocal) Query(query string, sv *Sviews) IQuery {
-	if sv == nil {
-		sv = t.GetSviews()
-	}
 	q, fixcost, varcost := buildQuery(query, t.UpdateTran, sv, qry.UpdateMode)
 	trace.Query.Println("update", fixcost+varcost, "-", query)
 	return queryLocal{Query: q, cost: fixcost + varcost, mode: qry.UpdateMode}
 }
 
-func (t UpdateTranLocal) Action(th *Thread, action string, sv *Sviews) int {
+func (t UpdateTranLocal) Action(th *Thread, action string) int {
 	trace.Dbms.Println("Action", action)
-	if sv == nil {
-		sv = t.GetSviews()
-	}
-	return qry.DoAction(th, t.UpdateTran, action, sv)
+	return qry.DoAction(th, t.UpdateTran, action)
 }
 
 // queryLocal

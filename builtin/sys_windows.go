@@ -13,11 +13,6 @@ import (
 
 var kernel32 = windows.MustLoadDLL("kernel32.dll")
 
-// dll bool Kernel32:GetDiskFreeSpaceEx()
-// [in] string			directoryName,
-// ULARGE_INTEGER*		freeBytesAvailableToCaller,
-// ULARGE_INTEGER*		totalNumberOfBytes,
-// ULARGE_INTEGER*		totalNumberOfFreeBytes)
 var getDiskFreeSpaceEx = kernel32.MustFindProc("GetDiskFreeSpaceExA").Addr()
 
 var _ = builtin(GetDiskFreeSpace, "(dir = '.')")
@@ -25,11 +20,14 @@ var _ = builtin(GetDiskFreeSpace, "(dir = '.')")
 func GetDiskFreeSpace(arg Value) Value {
 	dir := zbuf(arg)
 	var n int64
-	syscall.SyscallN(getDiskFreeSpaceEx,
+	rtn, _, e := syscall.SyscallN(getDiskFreeSpaceEx,
 		uintptr(unsafe.Pointer(&dir[0])),
 		uintptr(unsafe.Pointer(&n)),
 		0,
 		0)
+	if rtn == 0 {
+		panic("GetDiskFreeSpace: " + e.Error())
+	}
 	return Int64Val(n)
 }
 
@@ -56,10 +54,10 @@ var globalMemoryStatusEx = kernel32.MustFindProc("GlobalMemoryStatusEx").Addr()
 func systemMemory() uint64 {
 	buf := make([]byte, nMemoryStatusEx)
 	(*stMemoryStatusEx)(unsafe.Pointer(&buf[0])).dwLength = uint32(nMemoryStatusEx)
-	rtn, _, _ := syscall.SyscallN(globalMemoryStatusEx,
+	rtn, _, e := syscall.SyscallN(globalMemoryStatusEx,
 		uintptr(unsafe.Pointer(&buf[0])))
 	if rtn == 0 {
-		return 0
+		panic("SystemMemory: " + e.Error())
 	}
 	return (*stMemoryStatusEx)(unsafe.Pointer(&buf[0])).ullTotalPhys
 }
@@ -70,12 +68,15 @@ var _ = builtin(CopyFile, "(from, to, failIfExists)")
 func CopyFile(th *Thread, args []Value) Value {
 	from := zbuf(args[0])
 	to := zbuf(args[1])
-	rtn, _, _ := syscall.SyscallN(copyFile,
+	rtn, _, e := syscall.SyscallN(copyFile,
 		uintptr(unsafe.Pointer(&from[0])),
 		uintptr(unsafe.Pointer(&to[0])),
 		boolArg(args[2]))
-	th.ReturnThrow = true
-	return boolRet(rtn)
+	if rtn == 0 {
+		th.ReturnThrow = true
+		return SuStr("CopyFile: " + e.Error())
+	}
+	return True
 }
 
 func boolArg(arg Value) uintptr {
@@ -93,11 +94,24 @@ func boolRet(rtn uintptr) Value {
 }
 
 var deleteFileA = kernel32.MustFindProc("DeleteFileA").Addr()
+var setFileAttributesA = kernel32.MustFindProc("SetFileAttributesA").Addr()
+
+const access_denied = 5
 
 func deleteFile(filename string) error {
 	file := zbuf(SuStr(filename))
 	rtn, _, e := syscall.SyscallN(deleteFileA,
 		uintptr(unsafe.Pointer(&file[0])))
+	if rtn == 0 && e == access_denied {
+		// retry after removing the read-only attribute
+		r, _, _ := syscall.SyscallN(setFileAttributesA,
+			uintptr(unsafe.Pointer(&file[0])),
+			windows.FILE_ATTRIBUTE_NORMAL)
+		if r != 0 {
+			rtn, _, e = syscall.SyscallN(deleteFileA,
+				uintptr(unsafe.Pointer(&file[0])))
+		}
+	}
 	if rtn == 0 {
 		return e
 	}

@@ -64,6 +64,7 @@ func (db *Database) Persist() *DbState {
 //
 // UpdateState is guarded by a mutex
 func (db *Database) UpdateState(fn func(*DbState)) {
+	assert.Msg("UpdateState called when database locked").That(!db.Corrupted())
 	db.state.updateState(fn)
 }
 
@@ -111,12 +112,10 @@ func (db *Database) CommitMerge(ut *UpdateTran) {
 //-------------------------------------------------------------------
 
 // persist writes index changes (and a new state) to the database file.
-// It is called from concur.go regularly e.g. once per minute.
-// flatten applies to the schema and info chains (not indexes).
-// NOTE: persist should only be called by the checker.
+// It is called from concur.go regularly e.g. once per minute and at shutdown.
 func (db *Database) persist(exec execPersist) *DbState {
 	if db.corrupted.Load() {
-		return db.GetState()
+		return nil
 	}
 	// fmt.Println("persist")
 	var newState *DbState
@@ -133,6 +132,12 @@ func (db *Database) persist(exec execPersist) *DbState {
 	})
 	db.Store.Flush()
 	return newState
+}
+
+// PersistSync is for tests
+func (db *Database) PersistSync() {
+	db.GetState().Meta.ResetClock() // prevent flattening
+	assert.That(db.persist(&execPersistSingle{}) != nil)
 }
 
 const magic1 = "\x01\x23\x45\x67\x89\xab\xcd\xef"
