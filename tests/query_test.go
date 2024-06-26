@@ -192,9 +192,9 @@ func BenchmarkProject_Hmap(b *testing.B) {
 	hn, en := 0, 0
 	type T struct {
 		row  Row
-		hash uint32
+		hash uint64
 	}
-	hfn := func(t T) uint32 {
+	hfn := func(t T) uint64 {
 		return t.hash
 	}
 	eqfn := func(x, y T) bool {
@@ -213,8 +213,8 @@ func BenchmarkProject_Hmap(b *testing.B) {
 	fmt.Println("rows", len(data), "hn", hn, "en", en)
 }
 
-func hashCols(row Row, hdr *Header, cols []string, th *Thread, st *SuTran) uint32 {
-	h := uint32(31)
+func hashCols(row Row, hdr *Header, cols []string, th *Thread, st *SuTran) uint64 {
+	h := uint64(17)
 	for _, col := range cols {
 		x := row.GetRawVal(hdr, col, th, st)
 		h = 31*h + hash.String(x)
@@ -255,7 +255,7 @@ func TestSimple(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
-	MakeSuTran = func(qt QueryTran) *SuTran {
+	MakeSuTran = func(QueryTran) *SuTran {
 		return nil
 	}
 	s := `(((cus extend r0 union cus) join ivc) join aln) union (((ivc where ik is '7' project ik,i2,i3,ck leftjoin cus) union (cus join (ivc where ik is '7'))) join (aln where ik is '7'))`
