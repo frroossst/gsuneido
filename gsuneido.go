@@ -73,7 +73,6 @@ func main() {
 
 	Libload = libload // dependency injection
 	mainThread.Name = "main"
-	mainThread.OpCount = 1009
 	mainThread.SetSviews(&sviews)
 	MainThread = &mainThread
 
@@ -169,6 +168,7 @@ func main() {
 			options.DbStatus.Store("")
 			startHttpStatus()
 		}
+		dbms.VersionMismatch = versionMismatch
 	case "error":
 		Fatal(options.Error)
 	default:
@@ -212,6 +212,16 @@ func redirect() {
 	if err := system.Redirect(options.Errlog); err != nil {
 		Fatal("Redirect failed:", err)
 	}
+}
+
+func versionMismatch(s string) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Println("client: version mismatch:", err)
+		}
+	}()
+	fn := compile.NamedConstant("stdlib", "VersionMismatch", s, nil).(*SuFunc)
+	mainThread.Call(fn)
 }
 
 func run(src string) {
@@ -258,7 +268,7 @@ func clientErrorLog() {
 		s := "PREV: " + in.Text()
 		if !strings.Contains(s, sid) {
 			s = sid + s
-        }
+		}
 		dbms.Log(s)
 		if nlines++; nlines > 1000 {
 			dbms.Log("PREV: too many errors")
@@ -280,7 +290,8 @@ func runServer() {
 }
 
 func stopServer() {
-	log.Println("server stopping")
+	exit.Progress("server stopping")
+	defer exit.Progress("server stopped")
 	httpServer.Close()
 	dbms.StopServer()
 	heap := builtin.HeapSys()
@@ -318,10 +329,8 @@ func openDbms() {
 	DbmsAuth = options.Action == "server" || mode != "gui" || !db.HaveUsers()
 	GetDbms = getDbms
 	exit.Add("close database", func() {
-		if options.Action == "server" {
-			log.Println("database closing")
-			defer log.Println("database closed")
-		}
+		exit.Progress("database closing")
+		defer exit.Progress("database closed")
 		db.CloseKeepMapped()
 	}) // keep mapped to avoid errors during shutdown
 	// go checkState()

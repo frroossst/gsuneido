@@ -16,6 +16,7 @@ import (
 	op "github.com/apmckinlay/gsuneido/core/opcodes"
 	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/hacks"
 	"github.com/apmckinlay/gsuneido/util/regex"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -80,15 +81,16 @@ func (cg *cgen) codegen(fn *ast.Function) *SuFunc {
 	}()
 	cg.function(fn)
 	cg.finishParamSpec()
-	for _, as := range cg.argspecs {
-		as.Names = cg.Values
+	cg.argspecs = slc.Shrink(cg.argspecs)
+	for i := range cg.argspecs {
+		cg.argspecs[i].Names = cg.Values
 	}
 
 	return &SuFunc{
 		Code:      hacks.BStoS(cg.code),
 		Nlocals:   uint8(len(cg.Names)),
 		ParamSpec: cg.ParamSpec,
-		ArgSpecs:  cg.argspecs, //TODO shrink to fit
+		ArgSpecs:  cg.argspecs,
 		SrcPos:    hacks.BStoS(cg.srcPos),
 		SrcBase:   cg.srcBase,
 	}
@@ -466,10 +468,16 @@ func (cg *cgen) forInStmt(node *ast.ForIn) {
 	}
 	cg.expr(node.E)
 	cg.emit(op.Iter)
-	labels := cg.newLabels()
-	cg.emitForIn(node.Var.Name, labels)
+	labels := &Labels{brk: -1, cont: -1}
+	start := cg.emitJump(op.Jump, -1)
+	loop := cg.label()
 	cg.statement(node.Body, labels, false)
-	cg.emitBwdJump(op.Jump, labels.cont)
+
+	cg.placeLabel(labels.cont)
+	cg.placeLabel(start)
+	label := loop - len(cg.code) - 4
+	cg.emit(op.ForIn, byte(cg.name(node.Var.Name)),
+		byte(label>>8), byte(label))
 	cg.placeLabel(labels.brk)
 	cg.emit(op.Pop)
 }
@@ -481,30 +489,26 @@ func (cg *cgen) emitForIn(name string, labels *Labels) {
 	labels.brk = adr
 }
 
+var fldr ast.Folder
+var minusOne = &ast.Constant{Val: MinusOne}
+
 func (cg *cgen) forRange(node *ast.ForIn) {
-	store := func() {}
-	if node.Var.Name != "" {
-		store = func() {
-			cg.store(cg.name(node.Var.Name))
-		}
-	}
-	cg.expr(node.E2) // stays on stack
-	cg.expr(node.E) // stays on stack
-	store()
+	cg.expr(node.E2)                                          // stays on stack
+	cg.expr(fldr.Nary(tok.Add, []ast.Expr{node.E, minusOne})) // stays on stack
 	labels := &Labels{brk: -1, cont: -1}
-	cond := cg.emitJump(op.Jump, -1)
+	start := cg.emitJump(op.Jump, -1)
 	loop := cg.label()
 	cg.statement(node.Body, labels, false)
+
 	cg.placeLabel(labels.cont)
-
-	// increment
-	cg.emit(op.One)
-	cg.emit(op.Add)
-	store()
-
-	// condition
-	cg.placeLabel(cond)
-	cg.emitBwdJump(op.JumpLt, loop)
+	cg.placeLabel(start)
+	if node.Var.Name == "" {
+		cg.emitBwdJump(op.ForRange, loop)
+	} else {
+		label := loop - len(cg.code) - 4
+		cg.emit(op.ForRangeVar, byte(cg.name(node.Var.Name)),
+			byte(label>>8), byte(label))
+	}
 
 	cg.placeLabel(labels.brk)
 	cg.emit(op.Pop)

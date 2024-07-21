@@ -163,9 +163,16 @@ func (d *dasm) next() {
 		j := fetchInt16()
 		s += fmt.Sprint(" ", d.i+j)
 	case op.ForIn:
-		j := fetchInt16()
 		idx := fetchUint8()
-		s += " " + d.fn.Names[idx] + fmt.Sprint(" ", d.i+j-1)
+		j := fetchInt16()
+		s += " " + d.fn.Names[idx] + fmt.Sprint(" ", d.i+j)
+	case op.ForRange:
+		j := fetchInt16()
+		s += fmt.Sprint(" ", d.i+j)
+	case op.ForRangeVar:
+		idx := fetchUint8()
+		j := fetchInt16()
+		s += " " + d.fn.Names[idx] + fmt.Sprint(" ", d.i+j)
 	case op.Try:
 		j := fetchInt16()
 		v := d.fn.Values[fetchUint8()]
