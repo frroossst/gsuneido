@@ -1,0 +1,21 @@
+foo = function() {
+	a = 123
+	b = 456
+	return a, b
+}
+
+x, y = foo()
+Print(:x, :y)
+
+// basically converts to
+foo = function() {
+	a = 123
+	b = 456
+	return #(a, b)
+}
+
+tmp = foo()
+x = tmp.Get(0)
+y = tmp.Get(1)
+Print(:x, :y)
+

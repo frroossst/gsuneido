@@ -4,6 +4,8 @@
 package compile
 
 import (
+	"fmt"
+
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/core"
@@ -200,6 +202,7 @@ func (p *Parser) statement() (result ast.Statement) {
 		p.Next()
 		return p.semi(&ast.Continue{})
 	default:
+		// fmt.Println("ast.ExprStmt", p.Item)
 		return &ast.ExprStmt{E: p.trailingExpr()}
 	}
 }
@@ -224,6 +227,21 @@ func (p *Parser) trailingExpr() ast.Expr {
 		}
 	}
 	return expr
+}
+
+func (p *Parser) trailingExprN() []ast.Expr {
+
+	allExpressions := make([]ast.Expr, 1)
+
+	allExpressions = append(allExpressions, p.Expression())
+	// keep consuming expressions that are separated by a comma
+	fmt.Println("trailingExprN", allExpressions, p.Item, p.Token)
+	for p.Token == tok.Comma {
+		p.Next()
+		allExpressions = append(allExpressions, p.Expression())
+	}
+
+	return allExpressions
 }
 
 func (p *Parser) semi(stmt ast.Statement) ast.Statement {
@@ -436,8 +454,18 @@ func (p *Parser) returnStmt() *ast.Return {
 	returnThrow := false
 	if p.MatchIf(tok.Throw) {
 		returnThrow = true
+		// fmt.Println("here")
+		trExpr2 := p.trailingExprN()
+		// fmt.Println("returnStmt", trExpr2, p.Item)
+
+		// construct an Object expression
+		return &ast.Return{E: trExpr2[0], ReturnThrow: returnThrow}
 	}
-	return &ast.Return{E: p.trailingExpr(), ReturnThrow: returnThrow}
+
+	trExpr := p.trailingExpr()
+	// fmt.Println("returnStmt", trExpr, p.Item)
+
+	return &ast.Return{E: trExpr, ReturnThrow: returnThrow}
 }
 
 func (p *Parser) tryStmt() *ast.TryCatch {
