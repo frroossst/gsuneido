@@ -702,6 +702,31 @@ func (a *If) Children(fn func(Node) Node) {
 	childStmt(fn, &a.Else)
 }
 
+type ReturnMultiple struct {
+	Exprs []Expr
+	stmtNodeT
+	ReturnThrow bool
+}
+
+func (a *ReturnMultiple) String() string {
+	s := "ReturnMultiple("
+	if a.ReturnThrow {
+		s = "ReturnThrowMultiple("
+	}
+	sep := ""
+	for _, e := range a.Exprs {
+		s += sep + e.String()
+		sep = " "
+	}
+	return s + ")"
+}
+
+func (a *ReturnMultiple) Children(fn func(Node) Node) {
+	for i := range a.Exprs {
+		childExpr(fn, &a.Exprs[i])
+	}
+}
+
 type Return struct {
 	E Expr
 	stmtNodeT

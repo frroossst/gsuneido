@@ -231,16 +231,27 @@ func (p *Parser) trailingExpr() ast.Expr {
 
 func (p *Parser) trailingExprN() []ast.Expr {
 
-	allExpressions := make([]ast.Expr, 1)
+	var allExpressions []ast.Expr
 
 	allExpressions = append(allExpressions, p.Expression())
 	// keep consuming expressions that are separated by a comma
 	fmt.Println("trailingExprN", allExpressions, p.Item, p.Token)
-	for p.Token == tok.Comma {
+
+	switch p.Token {
+	case tok.Comma:
 		p.Next()
 		allExpressions = append(allExpressions, p.Expression())
+	case tok.Semicolon:
+		p.Next()
+	case tok.RCurly, tok.Return, tok.If, tok.Else, tok.Switch, tok.Forever,
+		tok.While, tok.Do, tok.For, tok.Throw, tok.Try, tok.Catch,
+		tok.Break, tok.Continue, tok.Case, tok.Default:
+		// ok
+	default:
+		if !p.newline {
+			p.Error()
+		}
 	}
-
 	return allExpressions
 }
 
@@ -447,25 +458,22 @@ func (p *Parser) exprExpecting(expecting bool) ast.Expr {
 	return expr
 }
 
-func (p *Parser) returnStmt() *ast.Return {
+func (p *Parser) returnStmt() ast.Statement {
 	if p.newline || p.MatchIf(tok.Semicolon) || p.Token == tok.RCurly {
 		return &ast.Return{}
 	}
 	returnThrow := false
 	if p.MatchIf(tok.Throw) {
 		returnThrow = true
-		// fmt.Println("here")
-		trExpr2 := p.trailingExprN()
-		// fmt.Println("returnStmt", trExpr2, p.Item)
-
-		// construct an Object expression
-		return &ast.Return{E: trExpr2[0], ReturnThrow: returnThrow}
 	}
 
-	trExpr := p.trailingExpr()
-	// fmt.Println("returnStmt", trExpr, p.Item)
+	trailing_expr := p.trailingExprN()
 
-	return &ast.Return{E: trExpr, ReturnThrow: returnThrow}
+	if len(trailing_expr) == 1 {
+		return &ast.Return{E: trailing_expr[0], ReturnThrow: returnThrow}
+	} else {
+		return &ast.ReturnMultiple{Exprs: trailing_expr, ReturnThrow: returnThrow}
+	}
 }
 
 func (p *Parser) tryStmt() *ast.TryCatch {
