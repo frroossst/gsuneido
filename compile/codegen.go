@@ -286,6 +286,8 @@ func (cg *cgen) statement(node ast.Statement, labels *Labels, lastStmt bool) {
 		cg.statements(node.Body, labels)
 	case *ast.Return:
 		cg.returnStmt(node, lastStmt)
+	case *ast.ReturnMultiple:
+		cg.returnMultipleStmt(node, lastStmt)
 	case *ast.If:
 		cg.ifStmt(node, labels)
 	case *ast.Switch:
@@ -319,6 +321,23 @@ func (cg *cgen) statement(node ast.Statement, labels *Labels, lastStmt bool) {
 func (cg *cgen) statements(stmts []ast.Statement, labels *Labels) {
 	for _, stmt := range stmts {
 		cg.statement(stmt, labels, false)
+	}
+}
+
+func (cg *cgen) returnMultipleStmt(node *ast.ReturnMultiple, lastStmt bool) {
+	exprs := node.Exprs
+	if len(exprs) <= 1 {
+		panic("return multiple with no expressions or just one expression?! HINT: may be a parser error")
+	} else {
+		for _, expr := range exprs {
+			if expr != nil {
+				cg.expr2(expr, callNilOk)
+			}
+		}
+
+		if !cg.isBlock {
+			cg.emit(op.ReturnMultiple)
+		}
 	}
 }
 
