@@ -72,9 +72,6 @@ type thread1 struct {
 	// Quote is used by Display to request specific quotes
 	Quote int
 
-	// OpCount counts op codes in interp, for polling
-	OpCount int
-
 	// sp is the stack pointer, top is stack[sp-1]
 	sp int
 
@@ -304,7 +301,7 @@ func (th *Thread) SetDbms(dbms IDbms) {
 }
 
 // GetDbms requires dependency injection
-var GetDbms func() IDbms
+var GetDbms = func() IDbms { panic("no dbms") }
 
 var DbmsAuth = false
 

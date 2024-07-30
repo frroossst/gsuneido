@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -54,7 +55,7 @@ var sviews Sviews
 func main() {
 	options.BuiltDate = builtDate
 	options.Mode = mode
-	options.Parse(os.Args[1:])
+	options.Parse(getargs())
 	if options.Action == "client" {
 		options.Errlog = builtin.ErrlogDir() + "suneido" + options.Port + ".err"
 	}
@@ -73,7 +74,6 @@ func main() {
 
 	Libload = libload // dependency injection
 	mainThread.Name = "main"
-	mainThread.OpCount = 1009
 	mainThread.SetSviews(&sviews)
 	MainThread = &mainThread
 
@@ -169,6 +169,7 @@ func main() {
 			options.DbStatus.Store("")
 			startHttpStatus()
 		}
+		dbms.VersionMismatch = versionMismatch
 	case "error":
 		Fatal(options.Error)
 	default:
@@ -208,10 +209,42 @@ func main() {
 	}
 }
 
+func getargs() []string {
+	args := os.Args[1:]
+	if len(args) > 0 {
+		return args
+	}
+	b, err := os.ReadFile("suneido.args")
+	if errors.Is(err, os.ErrNotExist) {
+		path, err := os.Executable()
+		ck(err)
+		path = filepath.Dir(path) + "/suneido.args"
+		b, err = os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return args
+		}
+	}
+	ck(err)
+	s := strings.TrimSpace(string(b))
+	args = builtin.SplitCommand(s)
+	return args
+}
+
 func redirect() {
 	if err := system.Redirect(options.Errlog); err != nil {
 		Fatal("Redirect failed:", err)
 	}
+}
+
+func versionMismatch(s string) {
+	defer func() {
+		if err := recover(); err != nil {
+			Fatal("VersionMismatch:", err)
+		}
+	}()
+	fn := compile.NamedConstant("stdlib", "VersionMismatch", s, nil)
+	mainThread.Call(fn)
+	exit.Exit(0)
 }
 
 func run(src string) {
@@ -258,7 +291,7 @@ func clientErrorLog() {
 		s := "PREV: " + in.Text()
 		if !strings.Contains(s, sid) {
 			s = sid + s
-        }
+		}
 		dbms.Log(s)
 		if nlines++; nlines > 1000 {
 			dbms.Log("PREV: too many errors")
@@ -280,7 +313,8 @@ func runServer() {
 }
 
 func stopServer() {
-	log.Println("server stopping")
+	exit.Progress("server stopping")
+	defer exit.Progress("server stopped")
 	httpServer.Close()
 	dbms.StopServer()
 	heap := builtin.HeapSys()
@@ -293,7 +327,11 @@ var db *db19.Database
 func openDbms() {
 	var err error
 	db, err = db19.OpenDatabase("suneido.db")
-	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) {
+	if errors.Is(err, fs.ErrNotExist) {
+		runCommandLine()
+		exit.Exit(0)
+	}
+	if errors.Is(err, fs.ErrPermission) {
 		Fatal(err)
 	}
 	if err != nil {
@@ -318,13 +356,32 @@ func openDbms() {
 	DbmsAuth = options.Action == "server" || mode != "gui" || !db.HaveUsers()
 	GetDbms = getDbms
 	exit.Add("close database", func() {
-		if options.Action == "server" {
-			log.Println("database closing")
-			defer log.Println("database closed")
-		}
+		exit.Progress("database closing")
+		defer exit.Progress("database closed")
 		db.CloseKeepMapped()
 	}) // keep mapped to avoid errors during shutdown
 	// go checkState()
+}
+
+func runCommandLine() {
+	cmd := options.CmdLine
+	if len(cmd) > 1 && cmd[0] == '"' && cmd[len(cmd)-1] == '"' {
+		cmd = cmd[1 : len(cmd)-1]
+    }
+	if cmd == "" {
+		return
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			Fatal("runCommandLine:", err)
+		}
+	}()
+	if s, err := os.ReadFile(cmd); err == nil {
+		fn := compile.NamedConstant("", "runCommandLine", string(s), nil)
+		mainThread.Call(fn)
+		return
+	}
+	compile.EvalString(&mainThread, cmd)
 }
 
 func persistInterval() time.Duration {

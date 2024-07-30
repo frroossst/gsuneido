@@ -11,6 +11,10 @@ import (
 var RunOnGoSide func()    // injected
 var Interrupt func() bool // injected
 
+const opInterval = 4001 // ???
+var opCount int = opInterval
+var InRunUI = false // no synchronization since only accessed by main thread
+
 var BlockBreak = BuiltinSuExcept("block:break")
 var BlockContinue = BuiltinSuExcept("block:continue")
 var BlockReturn = BuiltinSuExcept("block return")
@@ -164,15 +168,15 @@ loop:
 		// _, da := Disasm1(fr.fn, fr.ip)
 		// fmt.Printf("%d: %d: %s\n", t.fp, fr.ip, da)
 		if wingui { // const so should be compiled away
-			if th == MainThread {
-				if th.OpCount == 0 {
-					th.OpCount = 1009 // reset counter
+			if th == MainThread && !InRunUI {
+				opCount--
+				if opCount <= 0 {
+					opCount = opInterval // reset counter
 					RunOnGoSide()
 					if Interrupt() {
 						panic("interrupt")
 					}
 				}
-				th.OpCount--
 			}
 		}
 		oc = op.Opcode(code[fr.ip])
@@ -430,7 +434,7 @@ loop:
 				fr.ip += 2
 			}
 		case op.JumpLt:
-			if OpLt(th.stack[th.sp-1], th.stack[th.sp-2]) == True {
+			if strictCompare(th.stack[th.sp-1], th.stack[th.sp-2]) < 0 {
 				jump()
 			} else {
 				fr.ip += 2
@@ -438,15 +442,27 @@ loop:
 		case op.Iter:
 			th.stack[th.sp-1] = OpIter(th.stack[th.sp-1])
 		case op.ForIn:
-			brk := fetchInt16()
-			local := fetchUint8()
-			iter := th.Top()
-			nextable := iter.(interface{ Next() Value })
-			next := nextable.Next()
+			next := th.Top().(interface{ Next() Value }).Next()
 			if next != nil {
-				fr.locals.v[local] = next
+				fr.locals.v[fetchUint8()] = next
+				jump()
 			} else {
-				fr.ip += brk - 1 // break
+				fr.ip += 3
+			}
+		case op.ForRange:
+			th.stack[th.sp-1] = OpAdd1(th.stack[th.sp-1])
+			if strictCompare(th.stack[th.sp-1], th.stack[th.sp-2]) < 0 {
+				jump()
+			} else {
+				fr.ip += 2
+			}
+		case op.ForRangeVar:
+			th.stack[th.sp-1] = OpAdd1(th.stack[th.sp-1])
+			fr.locals.v[fetchUint8()] = th.stack[th.sp-1]
+			if strictCompare(th.stack[th.sp-1], th.stack[th.sp-2]) < 0 {
+				jump()
+			} else {
+				fr.ip += 2
 			}
 		case op.ReturnNil:
 			th.Push(nil)

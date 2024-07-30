@@ -5,7 +5,6 @@ package dbms
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -14,9 +13,9 @@ import (
 	"time"
 
 	. "github.com/apmckinlay/gsuneido/core"
-	"github.com/apmckinlay/gsuneido/options"
-	"github.com/apmckinlay/gsuneido/util/str"
 )
+
+var VersionMismatch func(string) // injected by gsuneido.go
 
 func ConnectClient(addr string, port string) net.Conn {
 	conn, err := net.Dial("tcp", addr+":"+port)
@@ -24,47 +23,27 @@ func ConnectClient(addr string, port string) net.Conn {
 		checkServerStatus(addr, port)
 		cantConnect(err.Error())
 	}
+	conn.Write(hello())
 	errmsg := checkHello(conn)
 	if errmsg != "" {
+		if strings.HasPrefix(errmsg, "version mismatch") {
+			clientVersionMismatch(conn)
+		}
 		cantConnect(errmsg)
 	}
 	return conn
 }
 
-func cantConnect(s string) {
-	Fatal("client: connect failed:", s)
-}
-
-const helloTimeout = 500 * time.Millisecond
-
-// checkHello is used by both the client and the server
-func checkHello(conn net.Conn) string {
-	var buf [helloSize]byte
-	conn.SetReadDeadline(time.Now().Add(helloTimeout))
-	n, err := io.ReadFull(conn, buf[:])
-	var never time.Time
-	conn.SetReadDeadline(never)
+func clientVersionMismatch(conn net.Conn) {
+	buf := make([]byte, 2)
+	io.ReadFull(conn, buf)
+	n := int(buf[0])<<8 | int(buf[1])
 	if n == 0 {
-		return "hello: timeout"
+		return
 	}
-	if n != helloSize || err != nil {
-		return "hello: invalid response"
-	}
-	s := string(buf[:])
-	if !strings.HasPrefix(s, "Suneido ") {
-		return "hello: invalid response"
-	}
-	s = strings.TrimPrefix(s, "Suneido ")
-	if noTime(s) != noTime(options.BuiltDate) && !options.IgnoreVersion {
-		return fmt.Sprintf("version mismatch (got %s, want %s)",
-			noTime(s), noTime(options.BuiltDate))
-	}
-	return ""
-}
-
-func noTime(s string) string {
-	s = str.BeforeFirst(s, ":")
-	return str.BeforeLast(s, " ")
+	buf = make([]byte, n)
+	io.ReadFull(conn, buf)
+	VersionMismatch(string(buf))
 }
 
 func checkServerStatus(addr string, port string) {
@@ -88,4 +67,8 @@ func checkServerStatus(addr string, port string) {
 		bytes.Contains(buf, []byte("Repairing database ...")) {
 		cantConnect("Database is being repaired, please try again later")
 	}
+}
+
+func cantConnect(s string) {
+	Fatal("client: connect failed:", s)
 }
