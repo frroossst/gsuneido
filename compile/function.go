@@ -203,6 +203,11 @@ func (p *Parser) statement() (result ast.Statement) {
 		return p.semi(&ast.Continue{})
 	default:
 		// fmt.Println("ast.ExprStmt", p.Item)
+		curr_pos := p.Pos
+		_ = curr_pos
+		// consume expression , expression, ... = expression(s)
+		// if so, then return ast.MultiAssign
+		// else reset position and return ast.ExprStmt with trailingExpr
 		return &ast.ExprStmt{E: p.trailingExpr()}
 	}
 }

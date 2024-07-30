@@ -36,6 +36,7 @@ func (p *Parser) pcExpr(minprec int8) ast.Expr {
 		if p.newline {
 			break
 		}
+
 		p.Next()
 		switch {
 		case token == tok.Dot:
