@@ -48,9 +48,6 @@ type thread1 struct {
 	// The end of the slice is the top of the stack.
 	stack [maxStack]Value
 
-	// subThreadOf is used for sessions.
-	subThreadOf *Thread
-
 	// blockReturnFrame is the parent frame of the block that is returning
 	blockReturnFrame *Frame
 
@@ -159,19 +156,14 @@ func (th *Thread) Reset() {
 	assert.That(len(th.rules.list) == 0)
 	th.thread1 = thread1{} // zero it
 	th.Name = str.BeforeFirst(th.Name, " ")
+	th.Suneido.Store(nil)
 }
 
 func (th *Thread) Session() string {
-	if th.subThreadOf != nil {
-		th = th.subThreadOf
-	}
 	return th.session.Load()
 }
 
 func (th *Thread) SetSession(s string) {
-	if th.subThreadOf != nil {
-		th = th.subThreadOf
-	}
 	th.session.Store(s)
 }
 
@@ -301,7 +293,7 @@ func (th *Thread) SetDbms(dbms IDbms) {
 }
 
 // GetDbms requires dependency injection
-var GetDbms func() IDbms
+var GetDbms = func() IDbms { panic("no dbms") }
 
 var DbmsAuth = false
 
@@ -324,19 +316,6 @@ func (th *Thread) Close() {
 	}
 }
 
-// SubThread is a NewThread with the same dbms as this thread.
-// This is used for SuneidoAPP threads.
-// We want a new thread for isolation e.g. for exceptions or dynamic variables
-// but we don't need the overhead of another dbms connection.
-// WARNING: This should only be used where it is guaranteed
-// that the Threads will NOT be used concurrently.
-func (th *Thread) SubThread() *Thread {
-	t2 := NewThread(th)
-	t2.dbms = th.dbms
-	t2.subThreadOf = th
-	return t2
-}
-
 func (th *Thread) Cat(x, y Value) Value {
 	return OpCat(th, x, y)
 }
@@ -356,9 +335,7 @@ func (th *Thread) SessionId(id string) string {
 }
 
 func (th *Thread) RunWithMainSuneido(fn func() Value) Value {
-	defer func(orig *SuneidoObject) {
-		th.Suneido.Store(orig)
-	}(th.Suneido.Load())
+	defer th.Suneido.Store(th.Suneido.Load())
 	th.Suneido.Store(nil)
 	return fn()
 }
@@ -385,6 +362,11 @@ func (th *Thread) Sviews() *Sviews {
 		return nil
 	}
 	return th.sv
+}
+
+// CodeClass returns the ClassName of the current function
+func (th *Thread) ClassName() string {
+	return th.frames[th.fp-1].fn.ClassName
 }
 
 //-------------------------------------------------------------------

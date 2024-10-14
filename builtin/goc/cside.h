@@ -32,8 +32,8 @@ enum {
 	msg_callback3,
 	msg_callback4,
 	msg_msgloop,
-	msg_timerid,
-	msg_runongoside,
+	msg_timer,
+	msg_notify,
 	msg_sunapp,
 	msg_queryidispatch,
 	msg_createinstance,
@@ -42,8 +42,10 @@ enum {
 	msg_interrupt,
 	msg_embedbrowserobject,
 	msg_unembedbrowserobject,
+	msg_webview2,
     msg_createlexer,
 	msg_shutdown,
+	msg_setupconsole,
 };
 
 typedef uintptr(__stdcall* cb2_t)(uintptr a, uintptr b);
@@ -58,3 +60,5 @@ typedef struct {
 	char* buf;
 	int size;
 } buf_t;
+
+// deps last modified 2024-10-09 17:43:55 UTC

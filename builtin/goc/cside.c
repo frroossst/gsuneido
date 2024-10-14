@@ -4,7 +4,6 @@
 #include "cside.h"
 #include <stdatomic.h>
 
-extern void timerId();
 int Scintilla_RegisterClasses(void* hInstance);
 
 uintptr interact();
@@ -111,6 +110,7 @@ uintptr invoke(
 long release(uintptr iunk);
 long EmbedBrowserObject(uintptr hwnd, uintptr pBrowserObject, uintptr pPtr);
 void UnEmbedBrowserObject(uintptr browserObject, uintptr ptr);
+long WebView2(uintptr op, uintptr arg1, uintptr arg2, uintptr arg3, uintptr arg4, uintptr arg5);
 uintptr CreateLexer(const char* name);
 
 #undef UNICODE
@@ -184,10 +184,17 @@ static int interrupt() {
 	return hotkey;
 }
 
+// interact does a call *to* the other side with signalAndWait
+// which blocks us and unblocks the other side.
+// signalAndWait will return when the other side does signalAndWait.
+// We will get the result via msg_result and return.
+// However in between there may be calls *from* the other side
+// which is why there is the loop.
 uintptr interact() {
 	if (GetCurrentThreadId() != main_threadid)
 		msgexit("FATAL: interact called from different thread\r\n");
 	for (;;) {
+		signalAndWait(); // block us and unblock the other side
 		// these are the messages sent from go-side to c-side
 		switch (args[0]) {
 		case msg_syscall:
@@ -227,15 +234,22 @@ uintptr interact() {
 			UnEmbedBrowserObject(args[1], args[2]);
 			args[0] = msg_result;
 			break;
+		case msg_webview2:
+			args[1] = WebView2(args[1], args[2], args[3], args[4], args[5], args[6]);
+			args[0] = msg_result;
+			break;
         case msg_createlexer:
             args[1] = CreateLexer((const char*)args[1]);
             args[0] = msg_result;
             break;
+		case msg_setupconsole:
+			args[1] = DeleteMenu(GetSystemMenu(GetConsoleWindow(), 0),
+				SC_CLOSE, MF_BYCOMMAND);
+			args[0] = msg_result;
 		case msg_result:
 			args[0] = msg_none;
 			return args[1];
 		}
-		signalAndWait();
 	}
 }
 
@@ -325,7 +339,7 @@ static void destroy_windows() {
 // so it will only be called when there are no other messages to process.
 static VOID CALLBACK timer(
 	HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime) {
-	args[0] = msg_runongoside;
+	args[0] = msg_timer;
 	interact();
 }
 
@@ -338,7 +352,7 @@ const UINT sunappMsg = WM_USER + 1;
 static LRESULT CALLBACK helperWndProc(
 	HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	if (uMsg == notifyMsg) {
-		args[0] = msg_runongoside;
+		args[0] = msg_notify;
 		interact();
 		return 0;
 	} else if (uMsg == sunappMsg) {
@@ -393,8 +407,8 @@ static DWORD WINAPI thread(LPVOID lpParameter) {
 	CreateThread(NULL, 8192, timer_thread, 0, 0, 0);
 	setupHelper();
 	args[0] = msg_none;
-	interact(); // let start() continue and return
 	SetTimer(0, 0, timerIntervalMS, timer);
+	interact(); // let start() continue and return
 	int exitcode = message_loop(0);
 	destroy_windows();
 	args[0] = msg_shutdown;

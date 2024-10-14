@@ -15,6 +15,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 type Summarize struct {
@@ -36,9 +37,9 @@ type Summarize struct {
 }
 
 type summarizeApproach struct {
-	index    []string
-	strategy sumStrategy
-	frac     float64
+	index []string
+	strat sumStrategy
+	frac  float64
 }
 
 type sumStrategy int
@@ -131,22 +132,22 @@ func (su *Summarize) SetTran(t QueryTran) {
 }
 
 func (su *Summarize) String() string {
-	return parenQ2(su.source) + " " + su.stringOp()
-}
-
-func (su *Summarize) stringOp() string {
-	s := "SUMMARIZE"
-	switch su.strategy {
+	s := "summarize"
+	switch su.strat {
+	case 0:
+		s += str.Opt("/*", string(su.hint), "*/")
 	case sumSeq:
-		s += "-SEQ"
+		s += "-seq"
 	case sumMap:
-		s += "-MAP"
+		s += "-map"
 	case sumIdx:
-		s += "-IDX"
+		s += "-idx"
 	case sumTbl:
-		s += "-TBL"
+		s += "-tbl"
+	default:
+		assert.ShouldNotReachHere()
 	}
-	if su.wholeRow {
+	if su.strat != 0 && su.wholeRow {
 		s += "*"
 	}
 	return s + su.string2()
@@ -170,10 +171,6 @@ func (su *Summarize) string2() string {
 		}
 	}
 	return s
-}
-
-func (su *Summarize) format() string {
-	return "summarize" + str.Opt("/*", string(su.hint), "*/") + su.string2()
 }
 
 func (su *Summarize) getNrows() (int, int) {
@@ -217,7 +214,7 @@ func (su *Summarize) optimize(mode Mode, index []string, frac float64) (Cost, Co
 	if _, ok := su.source.(*Table); ok &&
 		len(su.by) == 0 && len(su.ops) == 1 && su.ops[0] == "count" {
 		Optimize(su.source, mode, nil, 0)
-		return 0, 1, &summarizeApproach{strategy: sumTbl}
+		return 0, 1, &summarizeApproach{strat: sumTbl}
 	}
 	seqFixCost, seqVarCost, seqApp := su.seqCost(mode, index, frac)
 	idxFixCost, idxVarCost, idxApp := su.idxCost(mode)
@@ -233,7 +230,7 @@ func (su *Summarize) seqCost(mode Mode, index []string, frac float64) (Cost, Cos
 	if len(su.by) == 0 {
 		frac = min(1, frac)
 	}
-	approach := &summarizeApproach{strategy: sumSeq, frac: frac}
+	approach := &summarizeApproach{strat: sumSeq, frac: frac}
 	if len(su.by) == 0 || hasKey(su.by, su.source.Keys(), su.source.Fixed()) {
 		if len(su.by) != 0 {
 			approach.index = index
@@ -260,7 +257,7 @@ func (su *Summarize) idxCost(mode Mode) (Cost, Cost, any) {
 	}
 	fixcost, varcost := Optimize(su.source, mode, su.ons, frac)
 	return fixcost, varcost,
-		&summarizeApproach{strategy: sumIdx, index: su.ons, frac: frac}
+		&summarizeApproach{strat: sumIdx, index: su.ons, frac: frac}
 }
 
 func (su *Summarize) mapCost(mode Mode, index []string, _ float64) (Cost, Cost, any) {
@@ -272,12 +269,12 @@ func (su *Summarize) mapCost(mode Mode, index []string, _ float64) (Cost, Cost, 
 	}
 	fixcost, varcost := Optimize(su.source, mode, nil, 1)
 	fixcost += nrows * 20 // ???
-	return fixcost + varcost, 0, &summarizeApproach{strategy: sumMap, frac: 1}
+	return fixcost + varcost, 0, &summarizeApproach{strat: sumMap, frac: 1}
 }
 
 func (su *Summarize) setApproach(_ []string, frac float64, approach any, tran QueryTran) {
 	su.summarizeApproach = *approach.(*summarizeApproach)
-	switch su.strategy {
+	switch su.strat {
 	case sumTbl:
 		su.get = getTbl
 	case sumIdx:
@@ -288,6 +285,8 @@ func (su *Summarize) setApproach(_ []string, frac float64, approach any, tran Qu
 	case sumSeq:
 		t := sumSeqT{}
 		su.get = t.getSeq
+	default:
+		assert.ShouldNotReachHere()
 	}
 	su.source = SetApproach(su.source, su.index, su.frac, tran)
 	su.rewound = true
@@ -319,6 +318,7 @@ func (su *Summarize) Rewind() {
 }
 
 func (su *Summarize) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { su.tget += tsc.Read() - t }(tsc.Read())
 	defer func() { su.rewound = false }()
 	return su.get(th, su, dir)
 }

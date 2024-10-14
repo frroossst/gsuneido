@@ -18,6 +18,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 // NOTE: Where source and expr should NOT be modified,
@@ -59,6 +60,7 @@ type Where struct {
 	// exprMore is whether expr has more than idxSels
 	exprMore bool
 	optInited
+	optimized bool
 }
 
 type optInited byte
@@ -107,15 +109,14 @@ func (w *Where) SetTran(t QueryTran) {
 }
 
 func (w *Where) String() string {
-	return parenQ2(w.source) + " " + w.stringOp()
-}
-
-func (w *Where) stringOp() string {
-	s := "WHERE"
+	s := "where"
 	if w.conflict {
-		return s + " nothing"
+		s += " /*NOTHING*/"
+		if w.optimized {
+			return s
+		}
 	}
-	if w.singleton {
+	if w.optimized && w.singleton {
 		s += "*1"
 	}
 	if len(w.expr.Exprs) > 0 {
@@ -125,10 +126,6 @@ func (w *Where) stringOp() string {
 		s += fmt.Sprintf(" /*SLOW %d->%d*/", w.nIn, w.nOut)
 	}
 	return s
-}
-
-func (w *Where) format() string {
-	return "where " + w.expr.Echo()
 }
 
 // calcFixed sets w.fixed and may set w.conflict
@@ -206,7 +203,7 @@ func fixedAnd(fixed []Fixed, col string, vals ...Value) ([]Fixed, bool) {
 			if len(v) == len(f.values) {
 				return fixed, false // no change
 			}
-			fixed := slices.Clone(fixed)
+			fixed := slc.Clone(fixed)
 			fixed[i].values = v
 			return fixed, false
 		}
@@ -612,6 +609,7 @@ func (w *Where) getIdxSel(index []string) *idxSel {
 }
 
 func (w *Where) setApproach(index []string, frac float64, app any, tran QueryTran) {
+	w.optimized = true
 	if w.conflict {
 		return
 	}
@@ -635,6 +633,7 @@ func (w *Where) setApproach(index []string, frac float64, app any, tran QueryTra
 var MakeSuTran func(qt QueryTran) *SuTran
 
 func (w *Where) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { w.tget += tsc.Read() - t }(tsc.Read())
 	if w.selSet && w.selOrg == ixkey.Max && w.selEnd == "" {
 		return nil // conflict from Select
 	}

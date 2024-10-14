@@ -55,6 +55,15 @@ func getParents(th *Thread, class *SuClass) []*SuClass {
 	return parents
 }
 
+func (ob *SuInstance) FindParent(name string) *SuClass {
+	for _, c := range ob.parents {
+		if c.Name == name {
+			return c
+		}
+	}
+	return nil
+}
+
 func (ob *SuInstance) Base() *SuClass {
 	return ob.class
 }
@@ -224,4 +233,16 @@ func (ob *SuInstance) Clear() {
 
 func (ob *SuInstance) size() int {
 	return len(ob.Data)
+}
+
+func (ob *SuInstance) CompareAndSet(key, newval, oldval Value) bool {
+	if ob.Lock() {
+		defer ob.Unlock()
+	}
+	// only looks at instance itself, not parent classes
+	if x, _ := ob.Data[ToStr(key)]; x == oldval { // intentionally ==
+		ob.put(key, newval)
+		return true
+	}
+	return false
 }

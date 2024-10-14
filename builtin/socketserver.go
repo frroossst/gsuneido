@@ -5,9 +5,11 @@ package builtin
 
 import (
 	"bufio"
+	"io"
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"sync/atomic"
 
 	. "github.com/apmckinlay/gsuneido/core"
@@ -28,7 +30,7 @@ func ssCallClass(th *Thread, as *ArgSpec, this Value, args []Value) Value {
 	name, port, as2 := ssArgs(th, as, this, args)
 	class := this.(*SuClass)
 	sm := suServerMaster{SuInstance: class.New(th, as2)}
-	sm.listen(ToStr(name), ToInt(port))
+	sm.listen(th, ToStr(name), ToInt(port))
 	return nil
 }
 
@@ -102,17 +104,23 @@ var _ = AddInfo("server.nSocketServerConn", &nSocketServerConn)
 
 const ssmax = 500 // for all SocketServer's
 
-func (sm *suServerMaster) listen(name string, port int) {
+func (sm *suServerMaster) listen(th *Thread, name string, port int) {
 	nSocketServer.Add(1)
 	addr := ":" + strconv.Itoa(port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		panic(err)
 	}
+	if fn := sm.Lookup(th, "Killer"); fn != nil {
+		th.CallThis(fn, sm, &killer{kill: func() { ln.Close() }})
+	}
 	defer ln.Close()
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				return
+			}
 			panic(err)
 		}
 		if nSocketServerConn.Load() > ssmax {
@@ -164,6 +172,10 @@ func (sc *suServerConnect) Lookup(th *Thread, method string) Callable {
 		return f
 	}
 	return sc.SuInstance.Lookup(th, method)
+}
+
+func (sc *suServerConnect) writer() io.Writer {
+	return sc.client.writer()
 }
 
 func (sc *suServerConnect) close() {

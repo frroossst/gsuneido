@@ -12,11 +12,10 @@ import (
 	"fmt"
 	"log"
 
-	"slices"
-
 	"github.com/apmckinlay/gsuneido/db19/index/iterator"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/dbg"
+	"github.com/apmckinlay/gsuneido/util/generic/slc"
 )
 
 type T = ixbuf
@@ -303,7 +302,7 @@ func Combine(off1, off2 uint64) uint64 {
 	case delete_add:
 		return off2 | Update
 	default:
-		log.Printf("ERROR ixbuf invalid Combine %b %s %s\n",
+		log.Printf("ERROR: ixbuf invalid Combine %b %s %s\n",
 			ops, OffString(off1), OffString(off2))
 		dbg.PrintStack()
 		panic("ixbuf invalid Combine")
@@ -360,7 +359,7 @@ func (m *merge) flushbuf() {
 	if len(m.buf) == 0 {
 		return
 	}
-	m.out = append(m.out, slices.Clone(m.buf))
+	m.out = append(m.out, slc.Clone(m.buf))
 	m.size += len(m.buf)
 	m.buf = m.buf[:0] // reuse buf
 }

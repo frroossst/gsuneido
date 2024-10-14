@@ -42,9 +42,6 @@ var (
 // CmdLine is the remaining command line arguments
 var CmdLine string
 
-// Errlog is the log file name, set specially when client
-var Errlog = "error.log"
-
 // debugging options
 const (
 	ThreadDisabled        = false

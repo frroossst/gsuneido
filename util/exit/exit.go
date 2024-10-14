@@ -9,6 +9,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/apmckinlay/gsuneido/util/generic/atomics"
 )
 
 type exitfn struct {
@@ -49,10 +51,10 @@ func RunFuncs() {
 		if i >= 0 {
 			fmt.Println("Exit:", exitfns[i].desc, "didn't finish")
 		}
-		for _, s := range progress {
+		for _, s := range progress.Load() {
 			fmt.Println(s)
 		}
-		log.Fatalln("FATAL exit timeout")
+		log.Fatalln("FATAL: exit timeout")
 	}()
 
 	hanger.Lock() // never unlocked
@@ -61,10 +63,10 @@ func RunFuncs() {
 		func() {
 			defer func() {
 				if e := recover(); e != nil {
-					log.Println("ERROR during Exit"+exitfns[i].desc, ":", e)
+					log.Println("ERROR: Exit:", exitfns[i].desc + ":", e)
 				}
 			}()
-			progress = nil
+			progress.Store(nil)
 			exitfns[i].fn()
 			ds[i] = time.Since(t)
 		}()
@@ -74,11 +76,11 @@ func RunFuncs() {
 // Wait should only be called after Exit or RunFuncs. It blocks until exit.
 func Wait() {
 	hanger.Lock() // should be locked
-	log.Fatalln("FATAL exit.Wait: shouldn't reach here")
+	log.Fatalln("FATAL: exit.Wait: shouldn't reach here")
 }
 
-var progress []string
+var progress atomics.Value[[]string]
 
 func Progress(s string) {
-	progress = append(progress, fmt.Sprint(time.Since(t), " ", s))
+	progress.Store(append(progress.Load(), fmt.Sprint(time.Since(t), " ", s)))
 }

@@ -10,7 +10,9 @@ import (
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
+	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 type Extend struct {
@@ -22,6 +24,7 @@ type Extend struct {
 	physical []string // cols with exprs
 	selCols  []string
 	selVals  []string
+	srcFlds  []string
 	Query1
 	hasExprs bool
 	conflict bool
@@ -46,16 +49,23 @@ func NewExtend(src Query, cols []string, exprs []ast.Expr) *Extend {
 	e.header = e.getHeader()
 	e.keys = src.Keys()
 	e.indexes = src.Indexes()
+	e.srcFlds = src.Header().Physical()
 	e.setNrows(src.Nrows())
 	e.rowSiz.Set(e.getRowSize())
 	e.fast1.Set(src.fastSingle())
 	e.singleTbl.Set(!e.hasExprs && src.SingleTable())
 	e.lookCost.Set(src.lookupCost())
+
+	for _, expr := range e.exprs {
+		if c, ok := expr.(*ast.Constant); ok {
+			c.Packed = Pack(c.Val.(Packable))
+		}
+	}
 	return e
 }
 
 func (e *Extend) checkDependencies() {
-	avail := slices.Clone(e.source.Columns())
+	avail := slc.Clone(e.source.Columns())
 	for i := range e.cols {
 		if e.exprs[i] != nil {
 			ecols := e.exprs[i].Columns()
@@ -98,11 +108,7 @@ func (e *Extend) SetTran(t QueryTran) {
 }
 
 func (e *Extend) String() string {
-	return parenQ2(e.source) + " " + e.stringOp()
-}
-
-func (e *Extend) stringOp() string {
-	s := "EXTEND "
+	s := "extend "
 	sep := ""
 	for i, c := range e.cols {
 		s += sep + c
@@ -211,6 +217,7 @@ func (e *Extend) setApproach(index []string, frac float64, _ any, tran QueryTran
 // execution --------------------------------------------------------
 
 func (e *Extend) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { e.tget += tsc.Read() - t }(tsc.Read())
 	if e.conflict {
 		return nil
 	}
@@ -238,10 +245,17 @@ func (e *Extend) extendRow(th *Thread, row Row) Record {
 	var rb RecordBuilder
 	for _, expr := range e.exprs {
 		if expr != nil {
-			// incrementally build record so extends can see previous ones
-			e.ctx.Row = append(row, DbRec{Record: rb.Build()})
-			val := expr.Eval(&e.ctx)
-			rb.Add(val.(Packable))
+			if c, ok := expr.(*ast.Constant); ok {
+				rb.AddRaw(c.Packed)
+			} else if ast.IsColumn(expr, e.srcFlds) {
+				fld := expr.(*ast.Ident).Name
+				rb.AddRaw(row.GetRawVal(e.header, fld, e.ctx.Th, e.ctx.Tran))
+			} else {
+				// incrementally build record so extends can see previous ones
+				e.ctx.Row = append(row, DbRec{Record: rb.Build()})
+				val := expr.Eval(&e.ctx)
+				rb.Add(val.(Packable))
+			}
 		}
 	}
 	return rb.Trim().Build()

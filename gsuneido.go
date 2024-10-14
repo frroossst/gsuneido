@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/metrics"
 	"strings"
 	"time"
 
@@ -51,13 +52,14 @@ var help = `options:
 var dbmsLocal *dbms.DbmsLocal
 var mainThread Thread
 var sviews Sviews
+var errlog = "error.log"
 
 func main() {
 	options.BuiltDate = builtDate
 	options.Mode = mode
 	options.Parse(getargs())
 	if options.Action == "client" {
-		options.Errlog = builtin.ErrlogDir() + "suneido" + options.Port + ".err"
+		errlog = builtin.ErrlogDir() + "suneido" + options.Port + ".err"
 	}
 	Exit = exit.Exit
 	if mode == "gui" {
@@ -231,7 +233,7 @@ func getargs() []string {
 }
 
 func redirect() {
-	if err := system.Redirect(options.Errlog); err != nil {
+	if err := system.Redirect(errlog); err != nil {
 		Fatal("Redirect failed:", err)
 	}
 }
@@ -239,18 +241,19 @@ func redirect() {
 func versionMismatch(s string) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Println("client: version mismatch:", err)
+			Fatal("VersionMismatch:", err)
 		}
 	}()
-	fn := compile.NamedConstant("stdlib", "VersionMismatch", s, nil).(*SuFunc)
+	fn := compile.NamedConstant("stdlib", "VersionMismatch", s, nil)
 	mainThread.Call(fn)
+	exit.Exit(0)
 }
 
 func run(src string) {
 	defer func() {
 		if e := recover(); e != nil {
 			LogUncaught(&mainThread, src, e)
-			Fatal("ERROR from", src, e)
+			Fatal("ERROR: from", src, e)
 		}
 	}()
 	compile.EvalString(&mainThread, src)
@@ -270,14 +273,14 @@ func clientErrorLog() {
 	sid := mainThread.SessionId("") + " "
 	log.SetPrefix(sid)
 
-	f, err := os.Open(options.Errlog)
+	f, err := os.Open(errlog)
 	if err != nil {
 		return
 	}
 	dbms := mainThread.Dbms()
 	defer func() {
 		f.Close()
-		os.Truncate(options.Errlog, 0) // can't remove since open as stderr
+		os.Truncate(errlog, 0) // can't remove since open as stderr
 		if e := recover(); e != nil {
 			dbms.Log("send previous errors: " + fmt.Sprint(e))
 		}
@@ -308,7 +311,7 @@ func runServer() {
 	options.DbStatus.Store("")
 	exit.Add("stop server", stopServer)
 	dbms.Server(dbmsLocal)
-	log.Fatalln("FATAL server should not return")
+	log.Fatalln("FATAL: server should not return")
 }
 
 func stopServer() {
@@ -318,7 +321,15 @@ func stopServer() {
 	dbms.StopServer()
 	heap := builtin.HeapSys()
 	log.Println("server stopped, heap:", heap/(1024*1024), "mb,",
+		"in use:", heapInUse()/(1024*1024), "mb,",
 		"goroutines:", runtime.NumGoroutine())
+}
+
+func heapInUse() uint64 {
+	sample := make([]metrics.Sample, 1)
+	sample[0].Name = "/gc/heap/live:bytes"
+	metrics.Read(sample)
+	return sample[0].Value.Uint64()
 }
 
 var db *db19.Database
@@ -326,7 +337,11 @@ var db *db19.Database
 func openDbms() {
 	var err error
 	db, err = db19.OpenDatabase("suneido.db")
-	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) {
+	if errors.Is(err, fs.ErrNotExist) {
+		runCommandLine()
+		exit.Exit(0)
+	}
+	if errors.Is(err, fs.ErrPermission) {
 		Fatal(err)
 	}
 	if err != nil {
@@ -356,6 +371,27 @@ func openDbms() {
 		db.CloseKeepMapped()
 	}) // keep mapped to avoid errors during shutdown
 	// go checkState()
+}
+
+func runCommandLine() {
+	cmd := options.CmdLine
+	if len(cmd) > 1 && cmd[0] == '"' && cmd[len(cmd)-1] == '"' {
+		cmd = cmd[1 : len(cmd)-1]
+	}
+	if cmd == "" {
+		return
+	}
+	defer func() {
+		if err := recover(); err != nil {
+			Fatal("runCommandLine:", err)
+		}
+	}()
+	if s, err := os.ReadFile(cmd); err == nil {
+		fn := compile.NamedConstant("", "runCommandLine", string(s), nil)
+		mainThread.Call(fn)
+		return
+	}
+	compile.EvalString(&mainThread, cmd)
 }
 
 func persistInterval() time.Duration {

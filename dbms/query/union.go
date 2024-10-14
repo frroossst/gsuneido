@@ -13,7 +13,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
-	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 type Union struct {
@@ -25,17 +25,17 @@ type Union struct {
 	empty2    Row
 	row1      Row
 	Compatible
-	strategy unionStrategy
-	src2     bool
-	prevDir  Dir
-	src1     bool
-	rewound  bool
+	strat   unionStrategy
+	src2    bool
+	prevDir Dir
+	src1    bool
+	rewound bool
 }
 
 type unionApproach struct {
 	keyIndex   []string
 	idx1, idx2 []string
-	strategy   unionStrategy
+	strat      unionStrategy
 	reverse    bool
 }
 
@@ -59,30 +59,25 @@ func NewUnion(src1, src2 Query) *Union {
 }
 
 func (u *Union) String() string {
-	return u.String2(u.stringOp())
-}
-
-func (u *Union) stringOp() string {
-	strategy := ""
-	switch u.strategy {
+	s := "union"
+	if u.strat == 0 { // not optimized
+		if u.disjoint == "" {
+			s += " /*NOT DISJOINT*/"
+		}
+		return s
+	}
+	if u.disjoint != "" {
+		s += "-disjoint(" + u.disjoint + ")"
+	}
+	switch u.strat {
 	case unionMerge:
-		strategy += "-MERGE"
+		s += "-merge"
 	case unionLookup:
 		if u.disjoint == "" {
-			strategy += "-LOOKUP"
+			s += "-lookup"
 		}
 	}
-	if u.keyIndex != nil {
-		strategy += str.Join("(,)", u.keyIndex)
-	}
-	return u.Compatible.stringOp("UNION", strategy)
-}
-
-func (u *Union) format() string {
-	if u.disjoint == "" {
-		return "union /*NOT DISJOINT*/"
-	}
-	return "union"
+	return u.Compatible.String(s)
 }
 
 func (u *Union) Keys() [][]string {
@@ -213,7 +208,7 @@ func (u *Union) optimize(mode Mode, index []string, frac float64) (Cost, Cost, a
 		}
 		fixcost1, varcost1 := Optimize(u.source1, mode, index, frac)
 		fixcost2, varcost2 := Optimize(u.source2, mode, index, frac)
-		approach := &unionApproach{keyIndex: index, strategy: unionMerge,
+		approach := &unionApproach{keyIndex: index, strat: unionMerge,
 			idx1: index, idx2: index}
 		return fixcost1 + fixcost2, varcost1 + varcost2, approach
 	}
@@ -295,7 +290,7 @@ func (*Union) optMerge(src1, src2 Query, mode Mode, frac float64) (Cost, Cost, a
 	// intersect using set.Equal to ignore order
 	keys := set.IntersectFn(keys1, keys2, set.Equal[string])
 	mergeIndexes(keys, idxs1, idxs2, opt)
-	approach := &unionApproach{keyIndex: bestKey, strategy: unionMerge,
+	approach := &unionApproach{keyIndex: bestKey, strat: unionMerge,
 		idx1: bestIdx1, idx2: bestIdx2}
 	return bestFixCost, bestVarCost, approach
 }
@@ -335,7 +330,7 @@ func (u *Union) optLookup(src1, src2 Query, mode Mode, frac float64) (Cost, Cost
 			LookupCost(src2, mode, key, int(float64(nrows1)*frac))
 		best.update(key, fixcost2, varcost2)
 	}
-	approach := &unionApproach{keyIndex: best.index, strategy: unionLookup,
+	approach := &unionApproach{keyIndex: best.index, strat: unionLookup,
 		idx1: nil, idx2: best.index}
 	if src1 == u.source2 {
 		approach.reverse = true
@@ -346,16 +341,16 @@ func (u *Union) optLookup(src1, src2 Query, mode Mode, frac float64) (Cost, Cost
 
 func (u *Union) setApproach(_ []string, frac float64, approach any, tran QueryTran) {
 	app := approach.(*unionApproach)
-	u.strategy = app.strategy
-	if app.strategy == 0 {
-		u.strategy = unionLookup
+	u.strat = app.strat
+	if app.strat == 0 {
+		u.strat = unionLookup
 	}
 	u.keyIndex = app.keyIndex
 	if app.reverse {
 		u.source1, u.source2 = u.source2, u.source1
 	}
 	u.source1 = SetApproach(u.source1, app.idx1, frac, tran)
-	if app.strategy == unionLookup {
+	if app.strat == unionLookup {
 		frac = 0
 	}
 	u.source2 = SetApproach(u.source2, app.idx2, frac, tran)
@@ -378,8 +373,9 @@ func (u *Union) Rewind() {
 }
 
 func (u *Union) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { u.tget += tsc.Read() - t }(tsc.Read())
 	defer func() { u.rewound = false }()
-	switch u.strategy {
+	switch u.strat {
 	case unionLookup:
 		return u.getLookup(th, dir)
 	case unionMerge:
@@ -529,8 +525,8 @@ func (u *Union) Select(cols, vals []string) {
 func removeNonexistentEmpty(srccols, cols, vals []string) ([]string, []string) {
 	for i, col := range cols {
 		if !slices.Contains(srccols, col) && vals[i] == "" {
-			newcols := slices.Clone(cols[:i])
-			newvals := slices.Clone(vals[:i])
+			newcols := slc.Clone(cols[:i])
+			newvals := slc.Clone(vals[:i])
 			for ; i < len(cols); i++ {
 				if slices.Contains(srccols, cols[i]) || vals[i] != "" {
 					newcols = append(newcols, cols[i])

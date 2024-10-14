@@ -4,6 +4,7 @@
 package builtin
 
 import (
+	"runtime"
 	"sync"
 	"time"
 
@@ -74,6 +75,13 @@ func threadCallClass(th *Thread, args []Value) Value {
 
 var threadMethods = methods()
 
+var _ = staticMethod(thread_GC, "()")
+
+func thread_GC() Value {
+	runtime.GC()
+	return nil
+}
+
 var _ = staticMethod(thread_Name, "(name=false)")
 
 func thread_Name(th *Thread, args []Value) Value {
@@ -116,15 +124,14 @@ func thread_Profile(th *Thread, args []Value) Value {
 	th.StartProfile()
 	defer th.StopProfile()
 	th.Call(args[0])
-	total, self, ops, calls := th.StopProfile()
+	total, self, calls := th.StopProfile()
 	prof := &SuObject{}
-	for name, op := range ops {
+	for f, c := range calls {
 		ob := &SuObject{}
-		ob.Set(SuStr("name"), SuStr(name))
-		ob.Set(SuStr("ops"), IntVal(int(op)))
-		ob.Set(SuStr("calls"), IntVal(int(calls[name])))
-		ob.Set(SuStr("total"), IntVal(int(total[name])))
-		ob.Set(SuStr("self"), IntVal(int(self[name])))
+		ob.Set(SuStr("name"), SuStr(f.String()))
+		ob.Set(SuStr("calls"), IntVal(int(c)))
+		ob.Set(SuStr("total"), Int64Val(int64(total[f])))
+		ob.Set(SuStr("self"), Int64Val(int64(self[f])))
 		prof.Add(ob)
 	}
 	return prof
@@ -134,6 +141,22 @@ var _ = staticMethod(thread_NewSuneidoGlobal, "()")
 
 func thread_NewSuneidoGlobal(th *Thread, _ []Value) Value {
 	th.Suneido.Store(new(SuneidoObject))
+	return nil
+}
+
+var _ = staticMethod(thread_MainQ, "()")
+
+func thread_MainQ(th *Thread, _ []Value) Value {
+	return SuBool(th == MainThread)
+}
+
+var _ = staticMethod(thread_Exit, "()")
+
+func thread_Exit(th *Thread, _ []Value) Value {
+	if th == MainThread {
+		panic("suneido: cannot use Thread.Exit on main thread")
+	}
+	runtime.Goexit()
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 type Times struct {
@@ -32,11 +33,7 @@ func NewTimes(src1, src2 Query) *Times {
 }
 
 func (t *Times) String() string {
-	return t.Query2.String2("TIMES")
-}
-
-func (t *Times) stringOp() string {
-	return "TIMES"
+	return "times"
 }
 
 func (t *Times) getKeys() [][]string {
@@ -112,6 +109,7 @@ func (t *Times) Rewind() {
 }
 
 func (t *Times) Get(th *Thread, dir Dir) Row {
+	defer func(t0 uint64) { t.tget += tsc.Read() - t0 }(tsc.Read())
 	row2 := t.source2.Get(th, dir)
 	if t.rewound {
 		t.rewound = false

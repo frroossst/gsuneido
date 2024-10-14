@@ -4,9 +4,8 @@
 package hmap
 
 import (
-	"slices"
-
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/generic/slc"
 )
 
 // Hmap implements a hash map for SuObject
@@ -163,7 +162,7 @@ func (h *Hmap[K, V, H]) Get(key K) V {
 	return x
 }
 
-// Get returns the value for the key or nil if not found
+// Has returns true if the key exists in the table, false otherwise
 func (h *Hmap[K, V, H]) Has(key K) bool {
 	_, _, ok := h.Get2(key)
 	return ok
@@ -387,7 +386,7 @@ func (h *Hmap[K, V, H]) Clear() {
 
 // Copy returns a shallow copy of the Hmap
 func (h *Hmap[K, V, H]) Copy() *Hmap[K, V, H] {
-	return &Hmap[K, V, H]{size: h.size, blocks: slices.Clone(h.blocks),
+	return &Hmap[K, V, H]{size: h.size, blocks: slc.Clone(h.blocks),
 		capShift: h.capShift, version: h.version}
 }
 

@@ -4,9 +4,8 @@
 package core
 
 import (
-	"slices"
-
 	"github.com/apmckinlay/gsuneido/core/types"
+	"github.com/apmckinlay/gsuneido/util/generic/slc"
 )
 
 // SuClosure is an instance of a closure block
@@ -16,7 +15,7 @@ type SuClosure struct {
 	// It is used by interp to handle block returns.
 	parent *Frame
 	locals []Value // if concurrent, then read-only
-	SuFunc
+	*SuFunc
 	concurrent bool
 }
 
@@ -25,16 +24,20 @@ type SuClosure struct {
 var _ Value = (*SuClosure)(nil)
 
 func (b *SuClosure) String() string {
-	return "/* block */"
+	return "/* closure */"
+}
+
+func (b *SuClosure) Equal(other any) bool {
+	return b == other
 }
 
 func (b *SuClosure) Call(th *Thread, this Value, as *ArgSpec) Value {
-	bf := &b.SuFunc
+	bf := b.SuFunc
 
 	v := b.locals
 	if b.concurrent {
 		// make a mutable copy of the locals for the frame
-		v = slices.Clone(b.locals)
+		v = slc.Clone(b.locals)
 	}
 
 	// normally done by SuFunc Call
@@ -62,7 +65,7 @@ func (b *SuClosure) SetConcurrent() {
 	}
 	b.concurrent = true
 	// make a copy of the locals - read-only since it will be shared
-	v := slices.Clone(b.locals)
+	v := slc.Clone(b.locals)
 	// make them concurrent
 	for _, x := range v {
 		if x != nil {
