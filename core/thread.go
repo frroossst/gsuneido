@@ -156,6 +156,7 @@ func (th *Thread) Reset() {
 	assert.That(len(th.rules.list) == 0)
 	th.thread1 = thread1{} // zero it
 	th.Name = str.BeforeFirst(th.Name, " ")
+	th.Suneido.Store(nil)
 }
 
 func (th *Thread) Session() string {
@@ -334,9 +335,7 @@ func (th *Thread) SessionId(id string) string {
 }
 
 func (th *Thread) RunWithMainSuneido(fn func() Value) Value {
-	defer func(orig *SuneidoObject) {
-		th.Suneido.Store(orig)
-	}(th.Suneido.Load())
+	defer th.Suneido.Store(th.Suneido.Load())
 	th.Suneido.Store(nil)
 	return fn()
 }
@@ -363,6 +362,11 @@ func (th *Thread) Sviews() *Sviews {
 		return nil
 	}
 	return th.sv
+}
+
+// CodeClass returns the ClassName of the current function
+func (th *Thread) ClassName() string {
+	return th.frames[th.fp-1].fn.ClassName
 }
 
 //-------------------------------------------------------------------

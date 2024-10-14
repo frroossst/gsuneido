@@ -16,7 +16,7 @@ type ProjectNone struct {
 var _ Query = (*ProjectNone)(nil)
 
 func (*ProjectNone) String() string {
-	return "PROJECT-NONE"
+	return "project-none"
 }
 
 func (pn *ProjectNone) Transform() Query {
@@ -107,4 +107,15 @@ func (*ProjectNone) Select([]string, []string) {
 
 func (*ProjectNone) Simple(*Thread) []Row {
 	return nil
+}
+
+func (*ProjectNone) tGet() uint64 {
+	return 0
+}
+
+func (*ProjectNone) tGetSelf() uint64 {
+	return 0
+}
+
+func (*ProjectNone) setSelf(t uint64) {
 }

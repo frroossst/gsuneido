@@ -11,6 +11,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 type Sort struct {
@@ -43,24 +44,12 @@ func NewSort(src Query, reverse bool, order []string) *Sort {
 }
 
 func (sort *Sort) String() string {
-	return sort.source.String() + str.Opt(" ", sort.stringOp())
-}
-
-func (sort *Sort) stringOp() string {
 	r := ""
 	if sort.reverse {
 		r = "reverse"
 	}
 	if sort.index != nil {
 		return r
-	}
-	return "SORT " + str.Opt(r, " ") + str.Join(", ", sort.order)
-}
-
-func (sort *Sort) format() string {
-	r := ""
-	if sort.reverse {
-		r = "reverse"
 	}
 	return "sort " + str.Opt(r, " ") + str.Join(", ", sort.order)
 }
@@ -120,6 +109,7 @@ func (sort *Sort) setApproach(_ []string, frac float64, approach any, tran Query
 // The actual sorting is done with a TempIndex
 
 func (sort *Sort) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { sort.tget += tsc.Read() - t }(tsc.Read())
 	if sort.reverse {
 		dir = dir.Reverse()
 	}

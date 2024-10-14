@@ -10,6 +10,7 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile/lexer"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
+	"github.com/apmckinlay/gsuneido/core/types"
 	"github.com/apmckinlay/gsuneido/util/hacks"
 	"github.com/apmckinlay/gsuneido/util/regex"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -281,11 +282,13 @@ func string_MapN(th *Thread, this Value, args []Value) Value {
 	n := IfInt(args[0])
 	block := args[1]
 	var buf strings.Builder
+	buf.Grow(len(s)) // ???
 	for i := 0; i < len(s); i += n {
 		end := min(i+n, len(s))
-		val := th.Call(block, SuStr(s[i:end]))
+		val := th.Call(block, SuStr1(s[i:end]))
 		if val != nil {
 			buf.WriteString(AsStr(val))
+			CheckStringSize("MapN", buf.Len())
 		}
 	}
 	return SuStr(buf.String())
@@ -388,7 +391,10 @@ func string_PrefixQ(this, arg1, arg2 Value) Value {
 var _ = method(string_Repeat, "(count)")
 
 func string_Repeat(this, arg Value) Value {
-	return SuStr(strings.Repeat(ToStr(this), max(0, ToInt(arg))))
+	s := ToStr(this)
+	n := max(0, ToInt(arg))
+	CheckStringSize("Repeat", len(s) * n)
+	return SuStr(strings.Repeat(s, n))
 }
 
 var _ = method(string_Replace, "(pattern, block = '', count = false)")
@@ -531,7 +537,7 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) Value 
 	}
 	pat := th.Regex(patarg)
 	rep := ""
-	if !isFunc(reparg) {
+	if !callable(reparg) {
 		rep = AsStr(reparg)
 		reparg = nil
 		// use Go strings.Replace if literal
@@ -546,6 +552,10 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) Value 
 	nreps := 0
 	var buf strings.Builder
 	pat.ForEachMatch(s, func(cap *regex.Captures) bool {
+		if buf.Cap() == 0 {
+			buf.Grow(len(s)) // ???
+		}
+		CheckStringSize("Replace", buf.Len())
 		pos, end := cap[0], cap[1]
 		buf.WriteString(s[from:pos])
 		if reparg == nil {
@@ -553,7 +563,7 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) Value 
 			buf.WriteString(t)
 		} else {
 			r := s[pos:end]
-			v := th.Call(reparg, SuStr(r))
+			v := th.Call(reparg, SuStr1(r))
 			if v != nil {
 				r = AsStr(v)
 			}
@@ -571,6 +581,15 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) Value 
 		buf.WriteString(s[from:])
 	}
 	return SuStr(buf.String())
+}
+
+func callable(v Value) bool {
+	switch v.Type() {
+	case types.Function, types.Block, types.Method, types.BuiltinFunction,
+		types.Object, types.Class, types.Instance:
+		return true
+	}
+	return false
 }
 
 func position(arg Value, n int) int {

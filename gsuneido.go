@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/metrics"
 	"strings"
 	"time"
 
@@ -38,7 +39,6 @@ var help = `options:
 	-c[lient][=ipaddress] (default 127.0.0.1)
 	-compact
 	-d[ump] [table]
-	-e[rr]p[ort]=#
 	-h[elp] or -?
 	-l[oad] [table] (or @filename)
 	-p[ass]p[hrase]=string (for -load)
@@ -60,8 +60,6 @@ func main() {
 	options.Parse(getargs())
 	if options.Action == "client" {
 		errlog = builtin.ErrlogDir() + "suneido" + options.Port + ".err"
-	} else if options.ErrPort != "" {
-		errlog = builtin.ErrlogDir() + "suneido" + options.ErrPort + ".err"
 	}
 	Exit = exit.Exit
 	if mode == "gui" {
@@ -255,7 +253,7 @@ func run(src string) {
 	defer func() {
 		if e := recover(); e != nil {
 			LogUncaught(&mainThread, src, e)
-			Fatal("ERROR from", src, e)
+			Fatal("ERROR: from", src, e)
 		}
 	}()
 	compile.EvalString(&mainThread, src)
@@ -313,7 +311,7 @@ func runServer() {
 	options.DbStatus.Store("")
 	exit.Add("stop server", stopServer)
 	dbms.Server(dbmsLocal)
-	log.Fatalln("FATAL server should not return")
+	log.Fatalln("FATAL: server should not return")
 }
 
 func stopServer() {
@@ -323,7 +321,15 @@ func stopServer() {
 	dbms.StopServer()
 	heap := builtin.HeapSys()
 	log.Println("server stopped, heap:", heap/(1024*1024), "mb,",
+		"in use:", heapInUse()/(1024*1024), "mb,",
 		"goroutines:", runtime.NumGoroutine())
+}
+
+func heapInUse() uint64 {
+	sample := make([]metrics.Sample, 1)
+	sample[0].Name = "/gc/heap/live:bytes"
+	metrics.Read(sample)
+	return sample[0].Value.Uint64()
 }
 
 var db *db19.Database

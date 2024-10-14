@@ -16,6 +16,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 /*
@@ -45,6 +46,7 @@ type joinBase struct {
 	row2       Row // nil when we need a new row1
 	joinLike
 	joinType
+	optimized bool
 }
 
 type Join struct {
@@ -159,26 +161,16 @@ func newJoinLike(src1, src2 Query) joinLike {
 }
 
 func (jn *Join) String() string {
-	return parenQ2(jn.source1) + " " + jn.stringOp() + " " + paren(jn.source2)
+	return jn.joinBase.String("join")
 }
 
-func (jn *Join) stringOp() string {
-	return "JOIN" + jn.bystr()
-}
-
-func (jn *Join) format() string {
-	s := "join by" + str.Join("(,)", jn.by)
-	if jn.joinType == n_n {
-		s += " /*MANY TO MANY*/"
+func (jb *joinBase) String(op string) string {
+	if jb.optimized {
+		op += " " + jb.joinType.String()
+	} else if jb.joinType == n_n {
+		op += " /*MANY TO MANY*/"
 	}
-	return s
-}
-
-func (jb *joinBase) bystr() string {
-	if len(jb.by) == 0 {
-		return ""
-	}
-	return " " + str.Opt(jb.joinType.String(), " ") + "by" + str.Join("(,)", jb.by)
+	return op + " by" + str.Join("(,)", jb.by)
 }
 
 func (jb *joinBase) SetTran(qt QueryTran) {
@@ -212,6 +204,7 @@ func (jn *Join) getKeys() [][]string {
 }
 
 func (jn *Join) Transform() Query {
+	jn.optimized = true
 	if jn.conflict {
 		return NewNothing(jn)
 	}
@@ -408,6 +401,7 @@ func (jb *joinBase) rewind() {
 }
 
 func (jn *Join) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { jn.tget += tsc.Read() - t }(tsc.Read())
 	for {
 		if jn.row2 == nil && !jn.nextRow1(th, dir) {
 			return nil
@@ -466,7 +460,7 @@ func rowstr(hdr *Header, row Row) string {
 }
 
 func (jn *Join) Select(cols, vals []string) {
-	// fmt.Println(jn.stringOp(), "Select", cols, unpack(vals))
+	// fmt.Println(jn.strategy(), "Select", cols, unpack(vals))
 	jn.rewind()
 	jn.select1(cols, vals)
 }
@@ -502,7 +496,7 @@ func (jl *joinLike) splitSelect(cols, vals []string) (
 }
 
 func (jn *Join) Lookup(th *Thread, cols, vals []string) Row {
-	// fmt.Println(jn.stringOp(), "Lookup", cols, unpack(vals))
+	// fmt.Println(jn.strategy(), "Lookup", cols, unpack(vals))
 	defer jn.Select(nil, nil)
 	sel1cols, sel1vals, sel2cols, sel2vals := jn.splitSelect(cols, vals)
 	if jn.lookupFallback(sel1cols) {
@@ -606,19 +600,7 @@ func (lj *LeftJoin) With(src1, src2 Query) *LeftJoin {
 }
 
 func (lj *LeftJoin) String() string {
-	return parenQ2(lj.source1) + " " + lj.stringOp() + " " + paren(lj.source2)
-}
-
-func (lj *LeftJoin) stringOp() string {
-	return "LEFTJOIN" + lj.bystr()
-}
-
-func (lj *LeftJoin) format() string {
-	s := "leftjoin by" + str.Join("(,)", lj.by)
-	if lj.joinType == n_n {
-		s += " /*MANY TO MANY*/"
-	}
-	return s
+	return lj.joinBase.String("leftjoin")
 }
 
 func (lj *LeftJoin) getKeys() [][]string {
@@ -654,6 +636,7 @@ func (lj *LeftJoin) getFixed() []Fixed {
 }
 
 func (lj *LeftJoin) Transform() Query {
+	lj.optimized = true
 	src1 := lj.source1.Transform()
 	if _, ok := src1.(*Nothing); ok {
 		return NewNothing(lj)
@@ -744,6 +727,7 @@ func (lj *LeftJoin) pop(n1, n2 int) int {
 // execution
 
 func (lj *LeftJoin) Get(th *Thread, dir Dir) (r Row) {
+	defer func(t uint64) { lj.tget += tsc.Read() - t }(tsc.Read())
 	row1out := true
 	for {
 		if lj.row2 == nil {
@@ -755,7 +739,7 @@ func (lj *LeftJoin) Get(th *Thread, dir Dir) (r Row) {
 			row1out = false
 		}
 		lj.row2 = lj.source2.Get(th, dir)
-		// fmt.Println(lj.stringOp(), "row2", lj.row2)
+		// fmt.Println(lj.strategy(), "row2", lj.row2)
 		if !row1out || lj.row2 != nil {
 			row1out = true // regardless of filter
 			row2 := lj.row2
@@ -772,7 +756,7 @@ func (lj *LeftJoin) Get(th *Thread, dir Dir) (r Row) {
 }
 
 func (lj *LeftJoin) filter2(row2 Row) bool {
-	// fmt.Println(lj.stringOp(), "filter", lj.sel2cols, unpack(lj.sel2vals))
+	// fmt.Println(lj.strategy(), "filter", lj.sel2cols, unpack(lj.sel2vals))
 	for i, col := range lj.sel2cols {
 		if row2.GetRaw(lj.source2.Header(), col) != lj.sel2vals[i] {
 			return false
@@ -782,7 +766,7 @@ func (lj *LeftJoin) filter2(row2 Row) bool {
 }
 
 func (lj *LeftJoin) Select(cols, vals []string) {
-	// fmt.Println(lj.stringOp(), "Select", cols, unpack(vals))
+	// fmt.Println(lj.strategy(), "Select", cols, unpack(vals))
 	lj.rewind()
 	lj.select1(cols, vals)
 }

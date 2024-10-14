@@ -12,6 +12,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/sortlist"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 // TempIndex is inserted by SetApproach as required.
@@ -39,7 +40,7 @@ const derivedWarn = 8_000_000 // ??? // derivedWarn is also used by Project
 func NewTempIndex(src Query, order []string, tran QueryTran) *TempIndex {
 	order = withoutFixed(order, src.Fixed())
 	if len(order) == 0 {
-		log.Println("ERROR empty TempIndex")
+		log.Println("ERROR: empty TempIndex")
 	}
 	ti := TempIndex{order: order, tran: tran, selOrg: selMin, selEnd: selMax}
 	ti.source = src
@@ -54,11 +55,7 @@ func NewTempIndex(src Query, order []string, tran QueryTran) *TempIndex {
 }
 
 func (ti *TempIndex) String() string {
-	return parenQ2(ti.source) + " " + ti.stringOp()
-}
-
-func (ti *TempIndex) stringOp() string {
-	return "TEMPINDEX" + str.Join("(,)", ti.order)
+	return "tempindex" + str.Join("(,)", ti.order)
 }
 
 func (*TempIndex) Indexes() [][]string {
@@ -150,6 +147,7 @@ func (ti *TempIndex) matches(row Row, key []string) bool {
 }
 
 func (ti *TempIndex) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { ti.tget += tsc.Read() - t }(tsc.Read())
 	ti.th = th
 	defer func() { ti.th = nil }()
 	if ti.iter == nil {

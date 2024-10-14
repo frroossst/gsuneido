@@ -12,6 +12,7 @@
 			TablesLookup
 			Columns
 			Indexes
+			History
 		Query1
 			Extend
 			Project / Remove
@@ -53,6 +54,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/opt"
+	"github.com/apmckinlay/gsuneido/util/str"
 )
 
 type Query interface {
@@ -174,7 +176,16 @@ type Query interface {
 	// without transform or optimize.
 	Simple(th *Thread) []Row
 
+	// ValueGet is for Suneido.ParseQuery and queryvalue.go
+	// It would be Get, but that is already used in Query.
 	ValueGet(key Value) Value
+
+	// tGet is the tsc/time taken by Get
+	tGet() uint64
+
+	setSelf(t uint64)
+
+	tGetSelf() uint64
 }
 
 // queryBase is embedded by almost all Query types
@@ -192,6 +203,8 @@ type queryBase struct {
 	fast1     opt.Bool
 	singleTbl opt.Bool
 	lookCost  opt.Int
+	tget      uint64
+	tgetself  uint64
 	cache
 }
 
@@ -247,6 +260,18 @@ func (q *queryBase) lookupCost() Cost {
 // Updateable is overridden by Query1
 func (*queryBase) Updateable() string {
 	return ""
+}
+
+func (q *queryBase) tGet() uint64 {
+	return q.tget
+}
+
+func (q *queryBase) tGetSelf() uint64 {
+	return q.tgetself
+}
+
+func (q *queryBase) setSelf(t uint64) {
+	q.tgetself = t
 }
 
 // Mode is the transaction context - cursor, read, or update.
@@ -544,7 +569,7 @@ func (q1 *Query1) Rewind() {
 
 type q1i interface {
 	Source() Query
-	stringOp() string
+	String() string
 }
 
 func (q1 *Query1) Source() Query {
@@ -557,10 +582,6 @@ type Query2 struct {
 	source1 Query
 	source2 Query
 	queryBase
-}
-
-func (q2 *Query2) String2(op string) string {
-	return parenQ2(q2.source1) + " " + op + " " + paren(q2.source2)
 }
 
 func (q2 *Query2) SetTran(t QueryTran) {
@@ -588,8 +609,7 @@ func (q2 *Query2) keypairs() [][]string {
 }
 
 type q2i interface {
-	stringOp() string
-	Source() Query
+	q1i
 	Source2() Query
 }
 
@@ -599,25 +619,6 @@ func (q2 *Query2) Source() Query {
 
 func (q2 *Query2) Source2() Query {
 	return q2.source2
-}
-
-//-------------------------------------------------------------------
-
-// paren is a helper for Query String methods
-func paren(q Query) string {
-	switch q.(type) {
-	case *Table, *Tables, *TablesLookup, *Columns, *Indexes, *Views,
-		*Nothing, *ProjectNone:
-		return q.String()
-	}
-	return "(" + q.String() + ")"
-}
-
-func parenQ2(q Query) string {
-	if _, ok := q.(q2i); ok {
-		return "(" + q.String() + ")"
-	}
-	return q.String()
 }
 
 //-------------------------------------------------------------------
@@ -785,6 +786,39 @@ func (b *optmod) result() [][]string {
 
 // ------------------------------------------------------------------
 
+func String(q Query) string {
+	switch qi := q.(type) {
+	case q2i:
+		return paren2(qi.Source()) + " " + q.String() + " " + paren1(qi.Source2())
+	case *Sort:
+		return String(qi.Source()) + str.Opt(" ", q.String()) // no parens
+	case *View:
+		return q.String()
+	case q1i:
+		return paren2(qi.Source()) + str.Opt(" ", q.String())
+	default:
+		return q.String()
+	}
+}
+
+func paren1(q Query) string {
+	switch q.(type) {
+	case *Table, *Tables, *TablesLookup, *Columns, *Indexes, *Views,
+		*Nothing, *ProjectNone:
+		return String(q)
+	}
+	return "(" + String(q) + ")"
+}
+
+func paren2(q Query) string {
+	if _, ok := q.(q2i); ok {
+		return "(" + String(q) + ")"
+	}
+	return String(q)
+}
+
+// ------------------------------------------------------------------
+
 func Strategy(q Query) string {
 	return strategy(q, 0)
 }
@@ -810,13 +844,30 @@ func strategy(q Query, indent int) string { // recursive
 	switch q := q.(type) {
 	case q2i:
 		return strategy(q.Source(), indent+1) + "\n" +
-			in + cost + q.stringOp() + "\n" +
+			in + cost + q.String() + "\n" +
 			strategy(q.Source2(), indent+1)
 	case q1i:
 		return strategy(q.Source(), indent) + "\n" +
-			in + cost + q.stringOp()
+			in + cost + q.String()
 	default:
 		return in + cost + q.String()
+	}
+}
+
+func CalcSelf(q0 Query) { // recursive
+	if q0.tGetSelf() != 0 {
+		return // already calculated
+	}
+	switch q := q0.(type) {
+	case q2i:
+		q0.setSelf(q0.tGet() - q.Source().tGet() - q.Source2().tGet())
+		CalcSelf(q.Source())
+		CalcSelf(q.Source2())
+	case q1i:
+		q0.setSelf(q0.tGet() - q.Source().tGet())
+		CalcSelf(q.Source())
+	default:
+		q0.setSelf(q0.tGet())
 	}
 }
 

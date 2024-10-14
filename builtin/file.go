@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	. "github.com/apmckinlay/gsuneido/core"
@@ -19,6 +18,7 @@ import (
 type iFile interface {
 	io.ReadWriteCloser
 	io.Seeker
+	io.ReaderFrom
 }
 
 type suFile struct {
@@ -33,7 +33,6 @@ type suFile struct {
 	// Any reads or writes must update this.
 	// Not used for "a" (append) mode.
 	tell int64
-	bufs sync.Pool
 }
 
 var nFile atomic.Int32
@@ -163,13 +162,13 @@ var _ = method(file_Read, "(nbytes=false)")
 func file_Read(this, arg Value) Value {
 	sf := sfOpenRead(this)
 	n := int(sf.size() - sf.tell) // remaining
-	if n == 0 {                   // at end
-		return False
-	}
 	if arg != False {
-		if m := ToInt(arg); m < n {
+		if m := IfInt(arg); m < n {
 			n = m
 		}
+	}
+	if n == 0 { // at end
+		return False
 	}
 	buf := make([]byte, n)
 	_, err := io.ReadFull(sf.r, buf)
@@ -180,38 +179,14 @@ func file_Read(this, arg Value) Value {
 	return SuStr(hacks.BStoS(buf))
 }
 
-var _ = method(file_CopyTo, "(dest, nbytes)")
+var _ = method(file_CopyTo, "(dest, nbytes = false)")
 
 func file_CopyTo(th *Thread, this Value, args []Value) Value {
-	src := sfOpenRead(this)
-	dst := sfOpenWrite(args[0])
-	n := ToInt(args[1])
-	const max = 64 * 1042
-	if n < 0 || max < n {
-		panic("File: CopyTo: invalid nbytes")
-	}
-	buf := src.getBuf(n)
-	defer src.bufs.Put(buf)
-	nr, err := io.ReadFull(src.f, buf[:n])
-	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
-		panic("File: CopyTo: " + err.Error())
-	}
-	_, err = dst.f.Write(buf[:nr])
-	if err != nil {
-		panic("File: CopyTo: " + err.Error())
-	}
-	if nr != n {
-		th.ReturnThrow = true
-	}
-	return IntVal(nr)
+	return CopyTo(th, sfOpenRead(this).f, args[0], args[1])
 }
 
-func (sf *suFile) getBuf(n int) []byte {
-	b := sf.bufs.Get()
-	if b != nil && cap(b.([]byte)) >= n {
-		return b.([]byte)[:n]
-	}
-	return make([]byte, n)
+func (sf *suFile) writer() io.Writer {
+	return sfOpenWrite(sf).f
 }
 
 var _ = method(file_Readline, "()")
@@ -255,7 +230,11 @@ var _ = method(file_Tell, "()")
 func file_Tell(this Value) Value {
 	sf := sfOpen(this)
 	if sf.mode == "a" {
-		panic("File: Tell: invalid with mode 'a'")
+		off, err := sf.f.Seek(0, io.SeekEnd)
+		if err != nil {
+			panic("File: " + err.Error())
+		}
+		return Int64Val(off)
 	}
 	return Int64Val(sf.tell)
 }
@@ -363,8 +342,12 @@ func (a appender) Read([]byte) (int, error) {
 	panic("appender Read not implemented")
 }
 
-func (a appender) Seek(int64, int) (int64, error) {
-	panic("appender Seek not implemented")
+func (a appender) Seek(off int64, whence int) (int64, error) {
+	return a.f.Seek(off, whence)
+}
+
+func (a appender) ReadFrom(r io.Reader) (n int64, err error) {
+	return a.f.ReadFrom(r)
 }
 
 func (a appender) Close() error {

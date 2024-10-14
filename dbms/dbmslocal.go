@@ -102,6 +102,10 @@ func (*DbmsLocal) Cursors() int {
 	return 0
 }
 
+func (dbms *DbmsLocal) Corrupted() bool {
+	return dbms.db.Corrupted()
+}
+
 func (dbms *DbmsLocal) DisableTrigger(table string) {
 	dbms.db.DisableTrigger(table)
 }
@@ -466,7 +470,7 @@ func (q queryLocal) Strategy(formatted bool) string {
 	if formatted {
 		strategy = qry.Strategy(q.Query) + "\n"
 	} else {
-		strategy = q.String() + " "
+		strategy = qry.String(q.Query) + " "
 	}
 	n, _ := q.Nrows()
 	return fmt.Sprint(strategy,
@@ -487,6 +491,7 @@ func (q queryLocal) Get(th *Thread, dir Dir) (Row, string) {
 }
 
 func (q queryLocal) Tree() Value {
+	qry.CalcSelf(q.Query)
 	return qry.NewSuQueryNode(q.Query)
 }
 

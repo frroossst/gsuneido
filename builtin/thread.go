@@ -4,6 +4,7 @@
 package builtin
 
 import (
+	"runtime"
 	"sync"
 	"time"
 
@@ -74,6 +75,13 @@ func threadCallClass(th *Thread, args []Value) Value {
 
 var threadMethods = methods()
 
+var _ = staticMethod(thread_GC, "()")
+
+func thread_GC() Value {
+	runtime.GC()
+	return nil
+}
+
 var _ = staticMethod(thread_Name, "(name=false)")
 
 func thread_Name(th *Thread, args []Value) Value {
@@ -133,6 +141,22 @@ var _ = staticMethod(thread_NewSuneidoGlobal, "()")
 
 func thread_NewSuneidoGlobal(th *Thread, _ []Value) Value {
 	th.Suneido.Store(new(SuneidoObject))
+	return nil
+}
+
+var _ = staticMethod(thread_MainQ, "()")
+
+func thread_MainQ(th *Thread, _ []Value) Value {
+	return SuBool(th == MainThread)
+}
+
+var _ = staticMethod(thread_Exit, "()")
+
+func thread_Exit(th *Thread, _ []Value) Value {
+	if th == MainThread {
+		panic("suneido: cannot use Thread.Exit on main thread")
+	}
+	runtime.Goexit()
 	return nil
 }
 

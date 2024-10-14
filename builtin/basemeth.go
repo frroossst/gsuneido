@@ -6,6 +6,7 @@ package builtin
 import (
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/core/types"
+	"github.com/apmckinlay/gsuneido/util/assert"
 )
 
 // methods common to SuClass and SuInstance
@@ -81,6 +82,37 @@ func base_Size(th *Thread, this Value, args []Value) Value {
 	return this.(Findable).Finder(th, func(_ Value, mb *MemBase) Value {
 		return IntVal(mb.Size())
 	})
+}
+
+var _ = method(base_Synchronized, "(block)")
+
+func base_Synchronized(th *Thread, this Value, args []Value) Value {
+	name := th.ClassName()
+	var c *SuClass
+	if instance, ok := this.(*SuInstance); ok {
+		c = instance.FindParent(name) // to handle Unload
+	} else if x, ok := this.(*SuClass); ok && x.Name == name {
+		c = x
+	} else {
+		x := Global.GetName(th, name)
+		if y, ok := x.(*SuClass); ok {
+			c = y
+		}
+	}
+	if c == nil {
+		panic("ERROR: Synchronized: can't get code class " + name)
+	}
+	mut := c.Mut.Load()
+	if mut == nil {
+		// multiple threads could get here (race) but only one will succeed
+		m := MakeMutexT()
+		c.Mut.CompareAndSwap(nil, &m)
+		mut = c.Mut.Load()
+		assert.That(mut != nil)
+	}
+	mut.Lock()
+	defer mut.Unlock()
+	return th.Call(args[0])
 }
 
 // base skips the first

@@ -6,6 +6,7 @@ package query
 import (
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 type Minus struct {
@@ -30,15 +31,7 @@ func NewMinus(src1, src2 Query) *Minus {
 }
 
 func (m *Minus) String() string {
-	return m.String2(m.stringOp())
-}
-
-func (m *Minus) stringOp() string {
-	return m.Compatible.stringOp("MINUS", "")
-}
-
-func (*Minus) format() string {
-	return "minus"
+	return m.Compatible.String("minus")
 }
 
 func (m *Minus) getNrows() (int, int) {
@@ -89,6 +82,7 @@ func (m *Minus) setApproach(index []string, frac float64, approach any, tran Que
 }
 
 func (m *Minus) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { m.tget += tsc.Read() - t }(tsc.Read())
 	for {
 		row := m.source1.Get(th, dir)
 		if row == nil || !m.source2Has(th, row) {

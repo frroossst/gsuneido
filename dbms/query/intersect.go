@@ -9,6 +9,7 @@ import (
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
+	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
 type Intersect struct {
@@ -35,15 +36,7 @@ func NewIntersect(src1, src2 Query) *Intersect {
 }
 
 func (it *Intersect) String() string {
-	return it.String2(it.stringOp())
-}
-
-func (it *Intersect) stringOp() string {
-	return it.Compatible.stringOp("INTERSECT", "")
-}
-
-func (*Intersect) format() string {
-	return "intersect"
+	return it.Compatible.String("intersect")
 }
 
 func (it *Intersect) getHeader() *Header {
@@ -138,6 +131,7 @@ func (it *Intersect) setApproach(index []string, frac float64, approach any,
 }
 
 func (it *Intersect) Get(th *Thread, dir Dir) Row {
+	defer func(t uint64) { it.tget += tsc.Read() - t }(tsc.Read())
 	for {
 		row := it.source1.Get(th, dir)
 		if row == nil || it.source2Has(th, row) {

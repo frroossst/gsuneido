@@ -5,7 +5,7 @@ package goc
 
 // #cgo CFLAGS: -DWINVER=0x601 -D_WIN32_WINNT=0x0601
 // #cgo LDFLAGS: -L . -lscintilla -llexilla -lgdi32 -lcomdlg32 -lcomctl32 -limm32 -lmsimg32
-// #cgo LDFLAGS: -lurlmon -lole32 -loleaut32 -luuid -lwininet -static
+// #cgo LDFLAGS: -lurlmon -lole32 -loleaut32 -luuid -lwininet -lshlwapi -static
 // #include "cside.h"
 import "C"
 
@@ -39,7 +39,7 @@ func Run() {
 	C.args[0] = C.msg_result
 	C.signalAndWait() // return from C.thread interact
 	interact()
-	log.Fatalln("FATAL should not reach here")
+	log.Fatalln("FATAL: should not reach here")
 }
 
 func CThreadId() uintptr {
@@ -74,8 +74,16 @@ func UnEmbedBrowserObject(iunk, ptr uintptr) {
 	interact(C.msg_unembedbrowserobject, iunk, ptr)
 }
 
+func WebBrowser2(op, arg1, arg2, arg3, arg4, arg5 uintptr) uintptr {
+	return interact(C.msg_webview2, op, arg1, arg2, arg3, arg4, arg5);
+}
+
 func CreateLexer(name uintptr) uintptr {
 	return interact(C.msg_createlexer, name)
+}
+
+func SetupConsole() {
+	interact(C.msg_setupconsole)
 }
 
 // Interrupt checks if control+break has been pressed.
@@ -130,19 +138,23 @@ func Fatal(s string) {
 	}
 }
 
-// must be injected
+// injected
 var (
-	TimerId     func(a uintptr)
 	Callback2   func(i, a, b uintptr) uintptr
 	Callback3   func(i, a, b, c uintptr) uintptr
 	Callback4   func(i, a, b, c, d uintptr) uintptr
 	RunOnGoSide func()
 	SunAPP      func(string) string
 	Shutdown    func(exitcode int)
+	RunDefer    func()
 )
 
-// var LastError uintptr
-
+// interact does a call *to* the other side with signalAndWait
+// which blocks us and unblocks the other side.
+// signalAndWait will return when the other side does signalAndWait.
+// We will get the result via msg_result and return.
+// However in between there may be calls *from* the other side
+// which is why there is the loop.
 func interact(args ...uintptr) uintptr {
 	if windows.GetCurrentThreadId() != uiThreadId {
 		panic("illegal UI call from background thread")
@@ -151,6 +163,7 @@ func interact(args ...uintptr) uintptr {
 		C.args[i] = C.uintptr(a)
 	}
 	for {
+		C.signalAndWait() // block us and unblock the other side
 		// these are the messages sent from c-side to go-side
 		switch C.args[0] {
 		case C.msg_callback2:
@@ -166,10 +179,10 @@ func interact(args ...uintptr) uintptr {
 			C.args[1] = C.uintptr(Callback4(uintptr(C.args[1]),
 				uintptr(C.args[2]), uintptr(C.args[3]), uintptr(C.args[4]),
 				uintptr(C.args[5])))
-		case C.msg_timerid:
-			TimerId(uintptr(C.args[1]))
-			C.args[0] = C.msg_result
-		case C.msg_runongoside:
+		case C.msg_timer:
+			RunDefer()
+			fallthrough
+		case C.msg_notify:
 			RunOnGoSide()
 			C.args[0] = C.msg_result
 		case C.msg_sunapp:
@@ -181,10 +194,8 @@ func interact(args ...uintptr) uintptr {
 		case C.msg_shutdown:
 			Shutdown(int(C.args[1]))
 		case C.msg_result:
-			// LastError = uintptr(C.args[2]) // for syscall
 			return uintptr(C.args[1])
 		}
-		C.signalAndWait()
 	}
 }
 

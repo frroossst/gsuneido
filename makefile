@@ -15,9 +15,11 @@ ifdef PATHEXT
 	CONSOLE = $(GO) $(BUILD) -o gsuneido.com -ldflags "$(LDFLAGS)" -tags com
 	PORTABLE = export CGO_ENABLED=0 ; $(GO) $(BUILD) -o gsport.exe \
 		-ldflags "$(LDFLAGS)" -tags portable
+	CSIDE = $(GO) run cmd/deps/deps.go
 endif
 
 build:
+	@$(CSIDE)
 	@$(GO) version
 	@rm -f $(OUTPUT)
 ifdef PATHEXT
@@ -29,11 +31,13 @@ else
 endif
 
 gsuneido:
+	@$(CSIDE)
 	@rm -f gsuneido.exe
 	$(GO) $(BUILD) -v -ldflags "$(GUIFLAGS)"
 
 race:
 ifdef PATHEXT
+	@$(CSIDE)
 	$(GO) $(BUILD) -v -ldflags "$(GUIFLAGS)" -race -o race/
 	$(PORTABLE) -race -o race/gsport.exe
 else
@@ -88,6 +92,10 @@ help:
 	@echo "    build gsuneido"
 	@echo "gsuneido"
 	@echo "    build gsuneido executable"
+	@echo "portable"
+	@echo "    build windows gsport"
+	@echo "arm"
+	@echo "    build arm linux executable"
 	@echo "test"
 	@echo "    run tests"
 	@echo "clean"
