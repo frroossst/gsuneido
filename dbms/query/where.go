@@ -618,7 +618,7 @@ func (w *Where) setApproach(index []string, frac float64, app any, tran QueryTra
 		idx := wapp.index
 		w.tbl.setIndex(idx)
 		w.idxSel = w.getIdxSel(idx)
-		w.tbl.cacheSetCost(frac*w.idxSel.frac, 0, wapp.cost)
+		w.tbl.setCost(frac*w.idxSel.frac, 0, wapp.cost)
 		w.idxSelPos = -1
 	} else { // filter
 		w.source = SetApproach(w.source, index, frac, tran)
@@ -643,7 +643,9 @@ func (w *Where) Get(th *Thread, dir Dir) Row {
 			w.nOut++
 			if row == nil {
 				w.slowQueries()
+				return nil
 			}
+			w.ngets++
 			return row
 		}
 	}
@@ -725,6 +727,7 @@ func (w *Where) Rewind() {
 
 func (w *Where) Select(cols, vals []string) {
 	// fmt.Println("Where", w.tbl.name, "Select", cols, unpack(vals))
+	w.nsels++
 	w.Rewind()
 	w.selOrg, w.selEnd = "", ""
 	w.selSet = false
@@ -782,6 +785,7 @@ func (w *Where) addFixed(cols []string, vals []string) ([]string, []string) {
 }
 
 func (w *Where) Lookup(th *Thread, cols, vals []string) Row {
+	w.nlooks++
 	if conflictFixed(cols, vals, w.Fixed()) {
 		return nil
 	}

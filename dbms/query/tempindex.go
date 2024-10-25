@@ -85,6 +85,7 @@ func (ti *TempIndex) Rewind() {
 
 func (ti *TempIndex) Select(cols, vals []string) {
 	// similar to Where Select
+	ti.nsels++
 	ti.Rewind()
 	if cols == nil && vals == nil { // clear select
 		ti.selOrg, ti.selEnd = selMin, selMax
@@ -104,6 +105,7 @@ func (ti *TempIndex) Select(cols, vals []string) {
 }
 
 func (ti *TempIndex) Lookup(th *Thread, cols, vals []string) Row {
+	ti.nlooks++
 	if conflictFixed(cols, vals, ti.source.Fixed()) {
 		return nil
 	}
@@ -175,6 +177,7 @@ func (ti *TempIndex) Get(th *Thread, dir Dir) Row {
 	if row == nil || !ti.selected(row) {
 		return nil
 	}
+	ti.ngets++
 	return row
 }
 

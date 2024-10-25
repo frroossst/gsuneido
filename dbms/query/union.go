@@ -55,6 +55,7 @@ func NewUnion(src1, src2 Query) *Union {
 	u.indexes = u.getIndexes()
 	u.setNrows(u.getNrows())
 	u.rowSiz.Set((u.source1.rowSize() + u.source2.rowSize()) / 2)
+	u.lookCost.Set(src1.lookupCost() + src2.lookupCost())
 	return u
 }
 
@@ -375,13 +376,19 @@ func (u *Union) Rewind() {
 func (u *Union) Get(th *Thread, dir Dir) Row {
 	defer func(t uint64) { u.tget += tsc.Read() - t }(tsc.Read())
 	defer func() { u.rewound = false }()
+	var row Row
 	switch u.strat {
 	case unionLookup:
-		return u.getLookup(th, dir)
+		row = u.getLookup(th, dir)
 	case unionMerge:
-		return u.getMerge(th, dir)
+		row = u.getMerge(th, dir)
+	default:
+		panic(assert.ShouldNotReachHere())
 	}
-	panic(assert.ShouldNotReachHere())
+	if row != nil {
+		u.ngets++
+	}
+	return row
 }
 
 func (u *Union) getLookup(th *Thread, dir Dir) Row {
@@ -500,6 +507,7 @@ func nothing(*Thread, Dir) Row { return nil }
 
 func (u *Union) Select(cols, vals []string) {
 	// fmt.Println("Union Select", cols, unpack(vals))
+	u.nsels++
 	u.rewound = true
 	u.src1get = u.source1.Get
 	u.src2get = u.source2.Get
@@ -553,6 +561,7 @@ func selConflict(srcCols, cols, vals []string) bool {
 }
 
 func (u *Union) Lookup(th *Thread, cols, vals []string) Row {
+	u.nlooks++
 	u.Select(cols, vals)
 	defer u.Select(nil, nil) // clear select
 	return u.Get(th, Next)

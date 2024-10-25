@@ -146,8 +146,7 @@ type Query interface {
 	// or -1 if the index has not been added.
 	cacheGet(index []string, frac float64) (fixcost, varcost Cost, approach any)
 
-	cacheSetCost(frac float64, fixcost, varcost Cost)
-	cacheCost() (frac float64, fixcost, varcost Cost)
+	cacheClear()
 
 	// optimize determines the minimum cost strategy based on estimates.
 	//
@@ -180,12 +179,7 @@ type Query interface {
 	// It would be Get, but that is already used in Query.
 	ValueGet(key Value) Value
 
-	// tGet is the tsc/time taken by Get
-	tGet() uint64
-
-	setSelf(t uint64)
-
-	tGetSelf() uint64
+	Metrics() *metrics
 }
 
 // queryBase is embedded by almost all Query types
@@ -203,9 +197,31 @@ type queryBase struct {
 	fast1     opt.Bool
 	singleTbl opt.Bool
 	lookCost  opt.Int
-	tget      uint64
-	tgetself  uint64
 	cache
+	metrics
+}
+
+type metrics struct {
+	fixcost  Cost
+	varcost  Cost
+	costself Cost
+	frac     float64
+	ngets    int32
+	nsels    int32
+	nlooks   int32
+	tget     uint64
+	tgetself uint64
+}
+
+func (m *metrics) String() string {
+	return fmt.Sprintf("metrics{fixcost: %v varcost: %v costself: %v frac: %.2f ngets: %d nsels: %d nlooks: %d tget: %d tgetself: %d}",
+		m.fixcost, m.varcost, m.costself, m.frac, m.ngets, m.nsels, m.nlooks, m.tget, m.tgetself)
+}
+
+func (m *metrics) setCost(frac float64, fixcost, varcost Cost) {
+	m.frac = frac
+	m.fixcost = fixcost
+	m.varcost = varcost
 }
 
 func (q *queryBase) Columns() []string {
@@ -266,12 +282,8 @@ func (q *queryBase) tGet() uint64 {
 	return q.tget
 }
 
-func (q *queryBase) tGetSelf() uint64 {
-	return q.tgetself
-}
-
-func (q *queryBase) setSelf(t uint64) {
-	q.tgetself = t
+func (q *queryBase) Metrics() *metrics {
+	return &q.metrics
 }
 
 // Mode is the transaction context - cursor, read, or update.
@@ -337,7 +349,7 @@ func Setup1(q Query, mode Mode, t QueryTran) (Query, Cost, Cost) {
 func setup(q Query, mode Mode, frac float64, t QueryTran) (Query, Cost, Cost) {
 	fixcost, varcost := Optimize(q, mode, nil, frac)
 	if fixcost+varcost >= impossible {
-		panic("invalid query: " + q.String())
+		panic("invalid query: " + String(q))
 	}
 	q = SetApproach(q, nil, frac, t)
 	return q, fixcost, varcost
@@ -352,7 +364,7 @@ func SetupKey(q Query, mode Mode, t QueryTran) Query {
 		best.update(b.index, b.fixcost, b.varcost)
 	}
 	if best.fixcost+best.varcost >= impossible {
-		panic("invalid query: " + q.String())
+		panic("invalid query: " + String(q))
 	}
 	q = SetApproach(q, best.index, 1, t)
 	return q
@@ -392,6 +404,9 @@ func fastSingle(q Query, index []string) bool {
 	return q.fastSingle() && set.Subset(q.Columns(), index)
 }
 
+// optTempIndex determines if a TempIndex is a benefit
+// and if it is, returns a special tempIndex approach
+// that is processed by SetApproach which creates the actual TempIndex
 func optTempIndex(q Query, mode Mode, index []string, frac float64) (
 	fixcost, varcost Cost, approach any) {
 	traceQO := func(more ...any) {
@@ -401,58 +416,118 @@ func optTempIndex(q Query, mode Mode, index []string, frac float64) (
 			trace.Println(strategy(q, 1))
 		}
 	}
+	traceQO("optTempIndex", "----------------")
 	if !set.Subset(q.Columns(), index) {
 		traceQO("impossible index not a subset of columns")
 		return impossible, impossible, nil
 	}
-	if len(index) == 0 || !tempIndexable(mode) {
-		fixcost, varcost, approach = q.optimize(mode, index, frac)
-		traceQO(fixcost + varcost)
-		return fixcost, varcost, approach
-	}
-	noIndexFixCost, noIndexVarCost, noIndexApp := q.optimize(mode, nil, 1)
-	assert.That(noIndexFixCost >= 0)
-	assert.That(noIndexVarCost >= 0)
-	noIndexCost := noIndexFixCost + noIndexVarCost
-	if noIndexCost >= impossible {
-		traceQO("impossible even without index")
-		return impossible, impossible, nil
-	}
 
 	indexedFixCost, indexedVarCost, indexedApp := q.optimize(mode, index, frac)
-	assert.That(indexedFixCost >= 0)
-	assert.That(indexedVarCost >= 0)
-	indexedCost := indexedFixCost + indexedVarCost
+	assert.That(indexedFixCost >= 0 && indexedVarCost >= 0)
+
+	if len(index) == 0 || !tempIndexable(mode) {
+		traceQO(indexedFixCost + indexedVarCost)
+		return indexedFixCost, indexedVarCost, indexedApp
+	}
 
 	nrows, _ := q.Nrows()
 	assert.That(nrows >= 0)
-	tempindexFixCost := noIndexCost + 1000 // ???
-	tempindexFixCost += 100 * len(index)   // prefer fewer fields
-	if nrows > 0 {
-		fnrows := float64(nrows)
-		tempindexFixCost += Cost(265 * fnrows * math.Log(fnrows)) // empirical
-	}
-	tempindexVarCost := Cost(frac * float64(nrows*100)) // ???
-	if !q.SingleTable() {
-		tempindexVarCost *= 2 // ???
-	}
-	tempindexCost := tempindexFixCost + tempindexVarCost
+	best := newBestApp()
 
-	if indexedCost <= tempindexCost {
-		traceQO("indexed", indexedCost, "<=", tempindexCost)
+	// with no index
+	optTI(best, q, mode, nil, frac, nrows, factorNone)
+
+	// with required index
+	optTI(best, q, mode, index, frac, nrows, factorAll)
+
+	// with "best" index
+	if bestIndex := tempIndexBest(q, index); bestIndex != nil {
+		optTI(best, q, mode, bestIndex, frac, nrows, factorPre)
+	}
+
+	tempIndexCost := best.fixcost + best.varcost
+	indexedCost := indexedFixCost + indexedVarCost
+	if indexedCost <= tempIndexCost {
+		traceQO("indexed", indexedCost, "<=", tempIndexCost)
 		return indexedFixCost, indexedVarCost, indexedApp
 	}
-	traceQO("tempindex", tempindexCost, "<", indexedCost)
-	// trace.Println("    noIndex", noIndexFixCost, noIndexVarCost,
-	// 	"indexed", indexedFixCost, indexedVarCost)
-	return tempindexFixCost, tempindexVarCost,
-		&tempIndex{approach: noIndexApp, index: index,
-			srcfixcost: noIndexFixCost, srcvarcost: noIndexVarCost}
+	traceQO("tempindex", best.index, tempIndexCost, "<", indexedCost)
+	return best.fixcost, best.varcost,
+		&tempIndex{index: index, srcapp: best.srcapp, srcindex: best.index,
+			srcfixcost: best.srcfixcost, srcvarcost: best.srcvarcost}
 }
 
-type tempIndex struct {
-	approach   any
+const factorAll = 105  // ???
+const factorPre = 110  // ???
+const factorNone = 256 // ???
+
+func optTI(best *bestTI, q Query, mode Mode, index []string, frac float64,
+	nrows, factor int) {
+	srcfixcost, srcvarcost, srcapp := q.optimize(mode, index, 1) // frac=1
+	assert.That(srcfixcost >= 0 && srcvarcost >= 0)
+	fixcost, varcost := ticost(srcfixcost+srcvarcost, q, index, nrows, frac, factor)
+	if fixcost+varcost < best.fixcost+best.varcost {
+		best.index = index
+		best.srcfixcost = srcfixcost
+		best.srcvarcost = srcvarcost
+		best.srcapp = srcapp
+		best.fixcost = fixcost
+		best.varcost = varcost
+	}
+}
+
+func ticost(srccost int, q Query, index []string, nrows int, frac float64,
+	factor int) (Cost, Cost) {
+	fixcost := srccost + 1000   // ???
+	fixcost += 100 * len(index) // prefer fewer fields
+	if nrows > 0 {
+		fnrows := float64(nrows)
+		fixcost += factor * Cost(fnrows*math.Log(fnrows)) // empirical
+	}
+	varcost := Cost(frac * float64(nrows) * 100) // ???
+	if !q.SingleTable() {
+		varcost *= 2 // ???
+	}
+	return fixcost, varcost
+}
+
+// tempIndexBest finds the index that has the longest common prefix.
+// NOTE: it assumes that all indexes have the same cost
+// which is true for simple cases like a table
+// but not for more complex queries.
+func tempIndexBest(q Query, index []string) []string {
+	fixed := q.Fixed()
+	var bestIndex []string
+	var bestOn int
+	for _, ix := range q.Indexes() {
+		on := orderedn(ix, index, fixed)
+		if on > 0 && on < len(index) && on > bestOn {
+			bestOn = on
+			bestIndex = ix
+		}
+	}
+	return bestIndex
+}
+
+type bestTI struct {
 	index      []string
+	srcfixcost Cost
+	srcvarcost Cost
+	srcapp     any
+	fixcost    Cost
+	varcost    Cost
+}
+
+func newBestApp() *bestTI {
+	return &bestTI{fixcost: impossible, varcost: impossible}
+}
+
+// tempIndex is a special approach that is added by optTempIndex
+// to be used by SetApproach to insert a TempIndex when required
+type tempIndex struct {
+	index      []string
+	srcapp     any
+	srcindex   []string
 	srcfixcost Cost
 	srcvarcost Cost
 }
@@ -517,18 +592,19 @@ func SetApproach(q Query, index []string, frac float64, tran QueryTran) Query {
 		index = nil
 	}
 	fixcost, varcost, approach := q.cacheGet(index, frac)
+	q.cacheClear()
 	if fixcost == -1 {
 		panic("SetApproach: not found in cache")
 	}
 	assert.Msg("negative cost").That(fixcost >= 0 && varcost >= 0)
 	if app, ok := approach.(*tempIndex); ok {
-		q.cacheSetCost(1, app.srcfixcost, app.srcvarcost)
-		q.setApproach(nil, 1, app.approach, tran)
+		q.Metrics().setCost(1, app.srcfixcost, app.srcvarcost)
+		q.setApproach(app.srcindex, 1, app.srcapp, tran)
 		ti := NewTempIndex(q, app.index, tran)
-		ti.cacheSetCost(frac, fixcost, varcost)
+		ti.setCost(frac, fixcost, varcost)
 		return ti
 	}
-	q.cacheSetCost(frac, fixcost, varcost)
+	q.Metrics().setCost(frac, fixcost, varcost)
 	q.setApproach(index, frac, approach, tran)
 	return q
 }
@@ -714,6 +790,11 @@ func grouped(index []string, cols []string, nColsUnfixed int, fixed []Fixed) boo
 // taking fixed into consideration.
 // It is used by Where and Sort.
 func ordered(index []string, order []string, fixed []Fixed) bool {
+	return orderedn(index, order, fixed) >= len(order)
+}
+
+// orderedn returns the number of fields in order that are satisfied
+func orderedn(index []string, order []string, fixed []Fixed) int {
 	i := 0
 	o := 0
 	in := len(index)
@@ -727,13 +808,13 @@ func ordered(index []string, order []string, fixed []Fixed) bool {
 		} else if isSingleFixed(fixed, order[o]) {
 			o++
 		} else {
-			return false
+			return o
 		}
 	}
 	for o < on && isSingleFixed(fixed, order[o]) {
 		o++
 	}
-	return o >= on
+	return o
 }
 
 func withoutDupsOrSupersets(keys [][]string) [][]string {
@@ -828,17 +909,17 @@ const indent1 = "    "
 func strategy(q Query, indent int) string { // recursive
 	in := strings.Repeat(indent1, indent)
 	nrows, pop := q.Nrows()
-	frac, fixcost, varcost := q.cacheCost()
+	m := q.Metrics()
 	cost := "{"
-	if frac != 1 {
-		cost += fmt.Sprintf("%.3fx ", frac)
+	if m.frac != 1 {
+		cost += fmt.Sprintf("%.3fx ", m.frac)
 	}
 	cost += trace.Number(nrows)
 	if nrows != pop {
 		cost += "/" + trace.Number(pop)
 	}
-	if fixcost+varcost > 0 {
-		cost += " " + trace.Number(fixcost) + "+" + trace.Number(varcost)
+	if m.fixcost+m.varcost > 0 {
+		cost += " " + trace.Number(m.fixcost) + "+" + trace.Number(m.varcost)
 	}
 	cost += "} "
 	switch q := q.(type) {
@@ -855,19 +936,27 @@ func strategy(q Query, indent int) string { // recursive
 }
 
 func CalcSelf(q0 Query) { // recursive
-	if q0.tGetSelf() != 0 {
+	m := q0.Metrics()
+	if m.tgetself != 0 {
 		return // already calculated
 	}
 	switch q := q0.(type) {
 	case q2i:
-		q0.setSelf(q0.tGet() - q.Source().tGet() - q.Source2().tGet())
+		m1 := q.Source().Metrics()
+		m2 := q.Source2().Metrics()
+		m.tgetself = m.tget - (m1.tget + m2.tget)
+		m.costself = (m.fixcost + m.varcost) -
+			(m1.fixcost + m1.varcost + m2.fixcost + m2.varcost)
 		CalcSelf(q.Source())
 		CalcSelf(q.Source2())
 	case q1i:
-		q0.setSelf(q0.tGet() - q.Source().tGet())
+		sm := q.Source().Metrics()
+		m.tgetself = m.tget - sm.tget
+		m.costself = (m.fixcost + m.varcost) - (sm.fixcost + sm.varcost)
 		CalcSelf(q.Source())
 	default:
-		q0.setSelf(q0.tGet())
+		m.tgetself = q0.Metrics().tget
+		m.costself = q0.Metrics().fixcost + q0.Metrics().varcost
 	}
 }
 

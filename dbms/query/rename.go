@@ -182,14 +182,20 @@ func (r *Rename) setApproach(index []string, frac float64, _ any, tran QueryTran
 
 func (r *Rename) Get(th *Thread, dir Dir) Row {
 	defer func(t uint64) { r.tget += tsc.Read() - t }(tsc.Read())
-	return r.source.Get(th, dir)
+	row := r.source.Get(th, dir)
+	if row != nil {
+		r.ngets++
+	}
+	return row
 }
 
 func (r *Rename) Select(cols, vals []string) {
+	r.nsels++
 	r.source.Select(r.renameRev(cols), vals)
 }
 
 func (r *Rename) Lookup(th *Thread, cols, vals []string) Row {
+	r.nlooks++
 	return r.source.Lookup(th, r.renameRev(cols), vals)
 }
 

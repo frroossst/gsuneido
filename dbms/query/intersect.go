@@ -32,6 +32,7 @@ func NewIntersect(src1, src2 Query) *Intersect {
 	it.setNrows(it.getNrows())
 	it.rowSiz.Set(src1.rowSize())
 	it.fast1.Set(src1.fastSingle() && src2.fastSingle())
+	it.lookCost.Set(it.getLookupCost())
 	return &it
 }
 
@@ -134,13 +135,18 @@ func (it *Intersect) Get(th *Thread, dir Dir) Row {
 	defer func(t uint64) { it.tget += tsc.Read() - t }(tsc.Read())
 	for {
 		row := it.source1.Get(th, dir)
-		if row == nil || it.source2Has(th, row) {
+		if row == nil {
+			return nil
+		}
+		if it.source2Has(th, row) {
+			it.ngets++
 			return row
 		}
 	}
 }
 
 func (it *Intersect) Lookup(th *Thread, cols, vals []string) Row {
+	it.nlooks++
 	row := it.source1.Lookup(th, cols, vals)
 	if row == nil || it.source2Has(th, row) {
 		return row

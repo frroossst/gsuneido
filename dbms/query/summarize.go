@@ -320,7 +320,11 @@ func (su *Summarize) Rewind() {
 func (su *Summarize) Get(th *Thread, dir Dir) Row {
 	defer func(t uint64) { su.tget += tsc.Read() - t }(tsc.Read())
 	defer func() { su.rewound = false }()
-	return su.get(th, su, dir)
+	row := su.get(th, su, dir)
+	if row != nil {
+		su.ngets++
+	}
+	return row
 }
 
 func getTbl(_ *Thread, su *Summarize, _ Dir) Row {
@@ -356,6 +360,7 @@ func getIdx(th *Thread, su *Summarize, _ Dir) Row {
 }
 
 func (su *Summarize) Lookup(th *Thread, cols, vals []string) Row {
+	su.nlooks++
 	su.Select(cols, vals)
 	defer su.Select(nil, nil) // clear
 	return su.Get(th, Next)
@@ -557,6 +562,7 @@ func (su *Summarize) seqRow(th *Thread, curRow Row, sums []sumOp) Row {
 }
 
 func (su *Summarize) Select(cols, vals []string) {
+	su.nsels++
 	su.source.Select(cols, vals)
 	su.rewound = true
 }

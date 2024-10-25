@@ -146,7 +146,8 @@ func (tbl *Table) optimize(_ Mode, index []string, frac float64) (Cost, Cost, an
 		index = tbl.indexes[i]
 	}
 	varcost := tbl.info.Nrows * 250 // empirical
-	trace.QueryOpt.Println("optimize", tbl.name, index, frac, "=", Cost(frac*float64(varcost)))
+	trace.QueryOpt.Println("Table optimize", tbl.name, index, frac, "=",
+		Cost(frac*float64(varcost)))
 	return 0, Cost(frac * float64(varcost)), tableApproach{index: index}
 }
 
@@ -194,6 +195,7 @@ func (tbl *Table) lookupCost() Cost {
 func (tbl *Table) Lookup(_ *Thread, cols, vals []string) Row {
 	assert.That(tbl.hasKey(cols))
 	assert.That(!selConflict(tbl.header.Columns, cols, vals))
+	tbl.nlooks++
 	key := selOrg(tbl.indexEncode, tbl.index, cols, vals, true)
 	return tbl.lookup(key)
 }
@@ -242,10 +244,12 @@ func (tbl *Table) Get(_ *Thread, dir Dir) Row {
 	if tbl.singleton && !singletonFilter(tbl.header, row, tbl.selcols, tbl.selvals) {
 		return nil
 	}
+	tbl.ngets++
 	return row
 }
 
 func (tbl *Table) Select(cols, vals []string) {
+	tbl.nsels++
 	if tbl.singleton {
 		tbl.selcols, tbl.selvals = cols, vals
 		tbl.ensureIter().Range(iterator.All)

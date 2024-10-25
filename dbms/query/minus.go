@@ -27,6 +27,7 @@ func NewMinus(src1, src2 Query) *Minus {
 	m.setNrows(m.getNrows())
 	m.rowSiz.Set(src1.rowSize())
 	m.fast1.Set(src1.fastSingle())
+	m.lookCost.Set(m.getLookupCost())
 	return &m
 }
 
@@ -85,13 +86,18 @@ func (m *Minus) Get(th *Thread, dir Dir) Row {
 	defer func(t uint64) { m.tget += tsc.Read() - t }(tsc.Read())
 	for {
 		row := m.source1.Get(th, dir)
-		if row == nil || !m.source2Has(th, row) {
+		if row == nil {
+			return nil
+		}
+		if !m.source2Has(th, row) {
+			m.ngets++
 			return row
 		}
 	}
 }
 
 func (m *Minus) Lookup(th *Thread, cols, vals []string) Row {
+	m.nlooks++
 	row := m.source1.Lookup(th, cols, vals)
 	if row == nil || !m.source2Has(th, row) {
 		return row

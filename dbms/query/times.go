@@ -126,10 +126,12 @@ func (t *Times) Get(th *Thread, dir Dir) Row {
 		t.source2.Rewind()
 		row2 = t.source2.Get(th, dir)
 	}
+	t.ngets++
 	return JoinRows(t.row1, row2)
 }
 
 func (t *Times) Select(cols, vals []string) {
+	t.nsels++
 	t.Rewind()
 	t.select1(cols, vals)
 	if len(t.sel2cols) > 0 {
@@ -140,6 +142,7 @@ func (t *Times) Select(cols, vals []string) {
 func (t *Times) Lookup(th *Thread, cols, vals []string) Row {
 	// could use source1.Lookup like (Left)Join
 	// but Times isn't used much
+	t.nlooks++
 	t.select1(cols, vals)
 	if len(t.sel2cols) > 0 {
 		t.source2.Select(t.sel2cols, t.sel2vals)

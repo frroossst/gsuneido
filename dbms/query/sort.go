@@ -48,7 +48,7 @@ func (sort *Sort) String() string {
 	if sort.reverse {
 		r = "reverse"
 	}
-	if sort.index != nil {
+	if sort.index != nil { // optimized
 		return r
 	}
 	return "sort " + str.Opt(r, " ") + str.Join(", ", sort.order)
@@ -113,10 +113,15 @@ func (sort *Sort) Get(th *Thread, dir Dir) Row {
 	if sort.reverse {
 		dir = dir.Reverse()
 	}
-	return sort.source.Get(th, dir)
+	row := sort.source.Get(th, dir)
+	if row != nil {
+		sort.ngets++
+	}
+	return row
 }
 
 func (sort *Sort) Select(cols, vals []string) {
+	sort.nsels++
 	sort.source.Select(cols, vals)
 }
 

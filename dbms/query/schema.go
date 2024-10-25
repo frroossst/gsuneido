@@ -21,11 +21,10 @@ type schemaTable struct {
 	tran QueryTran
 	cache
 	state
-	tget     uint64
-	tgetself uint64
+	metrics
 }
 
-type state int
+type state byte
 
 const (
 	rewound state = iota
@@ -95,16 +94,8 @@ func (*schemaTable) Simple(*Thread) []Row {
 	panic("Simple not implemented for schema tables")
 }
 
-func (st *schemaTable) tGet() uint64 {
-	return st.tget
-}
-
-func (st *schemaTable) tGetSelf() uint64 {
-	return st.tgetself
-}
-
-func (st *schemaTable) setSelf(t uint64) {
-	st.tgetself = t
+func (st *schemaTable) Metrics() *metrics {
+	return &st.metrics
 }
 
 //-------------------------------------------------------------------
@@ -175,6 +166,7 @@ func (ts *Tables) Get(_ *Thread, dir Dir) Row {
 		return nil
 	}
 	ts.state = within
+	ts.ngets++
 	return ts.row(ts.info[ts.i])
 }
 
@@ -252,10 +244,12 @@ func (tl *TablesLookup) Get(*Thread, Dir) Row {
 			var rb RecordBuilder
 			rb.Add(SuStr(tl.table))
 			rec := rb.Build()
+			tl.ngets++
 			return Row{DbRec{Record: rec}}
 		default:
 			ti := tl.tran.GetInfo(tl.table)
 			if ti != nil {
+				tl.ngets++
 				return tl.row(ti)
 			}
 		}
@@ -372,6 +366,7 @@ func (cs *Columns) Get(_ *Thread, dir Dir) Row {
 	rb.Add(SuStr(col))
 	rb.Add(IntVal(fld))
 	rec := rb.Build()
+	cs.ngets++
 	return Row{DbRec{Record: rec}}
 }
 
@@ -513,6 +508,7 @@ func (is *Indexes) Get(_ *Thread, dir Dir) Row {
 		rb.Add(SuInt(int(idx.Fk.Mode)))
 	}
 	rec := rb.Build()
+	is.ngets++
 	return Row{DbRec{Record: rec}}
 }
 
@@ -685,5 +681,6 @@ func (his *History) Get(_ *Thread, dir Dir) Row {
 	var rb RecordBuilder
 	rb.Add(SuDateFromUnixMilli(state.Asof))
 	rec := rb.Build()
+	his.ngets++
 	return Row{DbRec{Record: rec}}
 }
