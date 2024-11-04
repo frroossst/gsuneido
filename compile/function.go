@@ -4,8 +4,6 @@
 package compile
 
 import (
-	"fmt"
-
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/core"
@@ -240,7 +238,6 @@ func (p *Parser) trailingExprN() []ast.Expr {
 
 	allExpressions = append(allExpressions, p.Expression())
 	// keep consuming expressions that are separated by a comma
-	fmt.Println("trailingExprN", allExpressions, p.Item, p.Token)
 
 	switch p.Token {
 	case tok.Comma:

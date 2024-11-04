@@ -129,6 +129,9 @@ func (ck *Check) statement(
 	case *ast.Return:
 		init, _ = ck.expr(stmt.E, init)
 		exit = true
+	case *ast.ReturnMultiple:
+		exit = true
+		panic("TODO: ReturnMultiple not supported")
 	case *ast.Throw:
 		init, _ = ck.expr(stmt.E, init)
 		exit = true

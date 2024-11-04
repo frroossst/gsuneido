@@ -221,7 +221,7 @@ const (
 	Return
 	// ReturnNil returns nil i.e. no return value
 	ReturnNil
-	// ReturnMultiple returns multiple suneido values
+	// ReturnMultiple <uint8> returns multiple values
 	ReturnMultiple
 	// ReturnThrow, forces caller to check value
 	ReturnThrow

@@ -110,6 +110,8 @@ func (b *bloks) statement(stmt Statement, vars strset) {
 			b.cur.hasRet = true
 		}
 		b.expr(stmt.E, vars)
+	case *ReturnMultiple:
+		panic("TODO: ReturnMultiple not impled yet")
 	case *Throw:
 		b.expr(stmt.E, vars)
 	case *TryCatch:

@@ -260,9 +260,11 @@ func TestParseStatements(t *testing.T) {
 
 	test("return throw 123", "ReturnThrow(123)")
 
-	test("x = 123", "-1")
 	// test("x, y = foo()", "-1")
-	test("return x, y", "ReturnMultiple(x y)")
+	test("return a, b", "ReturnMultiple(a b)")
+	test("return x, y, z", "ReturnMultiple(x y z)")
+
+	test("x = 123", "-1")
 
 	test("forever\na", "Forever(a)")
 

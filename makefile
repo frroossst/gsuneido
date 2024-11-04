@@ -68,6 +68,9 @@ clean:
 	rm -f $(OUTPUT)
 	$(GO) clean -cache -testcache
 
+repl: build
+	rlwrap ./gs_linux_amd64
+
 # need 64 bit windres e.g. from mingw64
 # if this fails with: 'c:\Program' is not recognized
 # copy the command line and run it manually
