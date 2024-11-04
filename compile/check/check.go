@@ -131,7 +131,10 @@ func (ck *Check) statement(
 		exit = true
 	case *ast.ReturnMultiple:
 		exit = true
-		panic("TODO: ReturnMultiple not supported")
+		for _, e := range stmt.Exprs {
+			init, _ = ck.expr(e, init)
+		}	
+		// panic("TODO: ReturnMultiple not supported")
 	case *ast.Throw:
 		init, _ = ck.expr(stmt.E, init)
 		exit = true
