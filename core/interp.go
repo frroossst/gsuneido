@@ -102,6 +102,7 @@ func (th *Thread) interp(catchJump, catchSp *int) (ret Value) {
 	super := 0
 	catchPat := ""
 	var oc op.Opcode
+	var numResults int
 
 	fetchUint8 := func() int {
 		fr.ip++
@@ -127,6 +128,7 @@ func (th *Thread) interp(catchJump, catchSp *int) (ret Value) {
 			fallthrough
 		case op.CallFuncNilOk, op.CallMethNilOk:
 			th.Push(result)
+			numResults++
 		default:
 			// discard result
 		}
