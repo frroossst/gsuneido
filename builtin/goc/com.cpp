@@ -5,15 +5,17 @@
 #include <windows.h>
 #include <objbase.h>
 #include <malloc.h>
+extern "C" {
 #include "cside.h"
+}
 
-extern "C" long release(uintptr iunk) {
+long release(uintptr iunk) {
 	if (iunk)
 		return ((IUnknown*) iunk)->Release();
 	return 0;
 }
 
-extern "C" uintptr queryIDispatch(uintptr iunk) {
+uintptr queryIDispatch(uintptr iunk) {
 	if (iunk == 0) {
 		return 0;
 	}
@@ -26,7 +28,7 @@ extern "C" uintptr queryIDispatch(uintptr iunk) {
 	return (uintptr) idisp;
 }
 
-extern "C" uintptr createInstance(char* progid) {
+uintptr createInstance(char* progid) {
 	CLSID clsid;
 	int n = MultiByteToWideChar(CP_ACP, 0, progid, -1, NULL, 0);
 	LPWSTR wprogid = (LPWSTR) _alloca(n * 2);
@@ -40,7 +42,7 @@ extern "C" uintptr createInstance(char* progid) {
 	return (SUCCEEDED(hr) && idisp) ? (uintptr) idisp : 0;
 }
 
-static uintptr invoke2(IDispatch* idisp, char* name, WORD flags,
+static long invoke2(IDispatch* idisp, char* name, WORD flags,
 	DISPPARAMS* args, VARIANT* result) {
 	if (idisp == 0)
 		return -1;
@@ -79,8 +81,8 @@ static uintptr invoke2(IDispatch* idisp, char* name, WORD flags,
 	return hr;
 }
 
-extern "C" uintptr invoke(
-	uintptr idisp, uintptr name, uintptr flags, uintptr args, uintptr result) {
-	return invoke2((IDispatch*) idisp, (char*) name, (WORD) flags,
-		(DISPPARAMS*) args, (VARIANT*) result);
+long invoke(
+	uintptr idisp, char* name, uintptr flags, void* params, void* result) {
+	return invoke2((IDispatch*) idisp, name, (WORD) flags,
+		(DISPPARAMS*) params, (VARIANT*) result);
 }

@@ -48,7 +48,8 @@ func (db *Database) GetState() *DbState {
 
 // Persist forces a persist and returns a persisted state,
 // with all ixbuf layer entries merged into the btree.
-// This is used by dump, load, and checkdb.
+// Dump and checkdb use this to get a save-able state.
+// Load uses this to force a persist.
 func (db *Database) Persist() *DbState {
 	if db.ck == nil { // for tests
 		return db.GetState()
@@ -64,7 +65,7 @@ func (db *Database) Persist() *DbState {
 //
 // UpdateState is guarded by a mutex
 func (db *Database) UpdateState(fn func(*DbState)) {
-	assert.Msg("UpdateState called when database locked").That(!db.Corrupted())
+	assert.That(!db.IsCorrupted())
 	db.state.updateState(fn)
 }
 
@@ -113,7 +114,7 @@ func (db *Database) CommitMerge(ut *UpdateTran) {
 
 // persist writes index changes (and a new state) to the database file.
 // It is called from concur.go regularly e.g. once per minute and at shutdown.
-func (db *Database) persist(exec execPersist) *DbState {
+func (db *Database) persist(exec execPersist, flush bool) *DbState {
 	if db.corrupted.Load() {
 		return nil
 	}
@@ -121,23 +122,27 @@ func (db *Database) persist(exec execPersist) *DbState {
 	var newState *DbState
 	db.GetState().Meta.Persist(exec.Submit) // outside UpdateState
 	updates := exec.Results()
+	var off uint64
 	db.UpdateState(func(state *DbState) {
 		m := *state.Meta // copy
 		meta.Apply(&m, updates)
 		state.Meta = &m
 		// Write modifies schema/info offs,ages,clock
 		// so it must be inside UpdateState
-		state.Off = state.Write()
+		off = state.Write()
+		state.Off = off
 		newState = state
 	})
-	db.Store.Flush()
+	if flush {
+		db.Store.FlushTo(off)
+	}
 	return newState
 }
 
 // PersistSync is for tests
 func (db *Database) PersistSync() {
 	db.GetState().Meta.ResetClock() // prevent flattening
-	assert.That(db.persist(&execPersistSingle{}) != nil)
+	assert.That(db.persist(&execPersistSingle{}, false) != nil)
 }
 
 const magic1 = "\x01\x23\x45\x67\x89\xab\xcd\xef"
@@ -222,7 +227,7 @@ func stateAsof(args asofArgs) *DbState {
 	var t int64
 	off := store.Size()
 	for {
-		if off = store.LastOffset(off, magic1); off == 0 {
+		if off = store.LastOffset(off, magic1, nil); off == 0 {
 			break
 		}
 		if offSchema, offInfo, t = readState(store, off); t == 0 {
@@ -258,7 +263,7 @@ func PrevState(store *stor.Stor, off uint64) *DbState {
 		off = store.Size()
 	}
 	for {
-		off = store.LastOffset(off, magic1)
+		off = store.LastOffset(off, magic1, nil)
 		if off == 0 {
 			return nil
 		}

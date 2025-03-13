@@ -6,7 +6,6 @@ package tests
 import (
 	"fmt"
 	"hash/crc64"
-	"strings"
 	"testing"
 
 	"github.com/apmckinlay/gsuneido/compile"
@@ -17,10 +16,10 @@ import (
 	. "github.com/apmckinlay/gsuneido/dbms/query"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/exit"
-	"github.com/apmckinlay/gsuneido/util/generic/hmap"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/hacks"
 	"github.com/apmckinlay/gsuneido/util/hash"
+	"github.com/apmckinlay/gsuneido/util/shmap"
 )
 
 func TestQuery(t *testing.T) {
@@ -72,21 +71,21 @@ func TestQuery(t *testing.T) {
 	exit.RunFuncs()
 }
 
-func row2str(hdr *Header, row Row) string {
-	if row == nil {
-		return "nil"
-	}
-	var sb strings.Builder
-	sep := ""
-	for _, col := range hdr.Columns {
-		val := row.GetVal(hdr, col, nil, nil)
-		if val != EmptyStr {
-			fmt.Fprint(&sb, sep, col, "=", AsStr(val))
-			sep = " "
-		}
-	}
-	return sb.String()
-}
+// func row2str(hdr *Header, row Row) string {
+// 	if row == nil {
+// 		return "nil"
+// 	}
+// 	var sb strings.Builder
+// 	sep := ""
+// 	for _, col := range hdr.Columns {
+// 		val := row.GetVal(hdr, col, nil, nil)
+// 		if val != EmptyStr {
+// 			fmt.Fprint(&sb, sep, col, "=", AsStr(val))
+// 			sep = " "
+// 		}
+// 	}
+// 	return sb.String()
+// }
 
 func hashRow(hdr *Header, fields []string, row Row) uint64 {
 	hash := uint64(0)
@@ -99,7 +98,7 @@ func hashRow(hdr *Header, fields []string, row Row) uint64 {
 var ecma = crc64.MakeTable(crc64.ECMA)
 
 func hashPacked(p string) uint64 {
-	if len(p) > 0 && p[0] >= PackObject {
+	if len(p) > 0 && (p[0] == PackObject || p[0] == PackRecord) {
 		return hashObject(p)
 	}
 	return crc64.Checksum(hacks.Stobs(p), ecma)
@@ -107,7 +106,7 @@ func hashPacked(p string) uint64 {
 
 func hashObject(p string) uint64 {
 	hash := uint64(0)
-	for i := 0; i < len(p); i++ {
+	for i := range len(p) {
 		// use simple addition to be insensitive to member order
 		hash += uint64(p[i])
 	}
@@ -161,7 +160,7 @@ func BenchmarkProject_Old(b *testing.B) {
 	}
 	hdr := q.Header()
 	cols := []string{"gltran_currency", "gltran_date", "glacct_num"}
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		results := make(map[string]Row)
 		for _, row := range data {
 			key := ixkey.Make(row, hdr, cols, nil, nil)
@@ -202,12 +201,12 @@ func BenchmarkProject_Hmap(b *testing.B) {
 		return x.hash == y.hash &&
 			equalCols(x.row, y.row, hdr, cols, nil, nil)
 	}
-	for i := 0; i < b.N; i++ {
-		results := hmap.NewHmapFuncs[T, struct{}](hfn, eqfn)
+	for range b.N {
+		results := shmap.NewMapFuncs[T, struct{}](hfn, eqfn)
 		for _, row := range data {
 			hn++
 			t := T{row: row, hash: hashCols(row, hdr, cols, nil, nil)}
-			results.GetPut(t, struct{}{})
+			results.GetInit(t)
 		}
 	}
 	fmt.Println("rows", len(data), "hn", hn, "en", en)
@@ -258,7 +257,7 @@ func TestSimple(t *testing.T) {
 	MakeSuTran = func(QueryTran) *SuTran {
 		return nil
 	}
-	s := `(((cus extend r0 union cus) join ivc) join aln) union (((ivc where ik is '7' project ik,i2,i3,ck leftjoin cus) union (cus join (ivc where ik is '7'))) join (aln where ik is '7'))`
+	s := `cus extend r0 extend x1 = r0 where x1 is ""`
 	db, err := db19.OpenDb("../suneido.db", stor.Read, true)
 	if err != nil {
 		panic(err.Error())
@@ -269,5 +268,6 @@ func TestSimple(t *testing.T) {
 	fmt.Println("----------------")
 	q := ParseQuery(s, tran, nil)
 	th := &Thread{}
-	q.Simple(th)
+	rows := q.Simple(th)
+	assert.This(len(rows)).Is(10)
 }

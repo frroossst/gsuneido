@@ -73,7 +73,7 @@ func threadCallClass(th *Thread, args []Value) Value {
 	return nil
 }
 
-var threadMethods = methods()
+var threadMethods = methods("thread")
 
 var _ = staticMethod(thread_GC, "()")
 
@@ -160,25 +160,22 @@ func thread_Exit(th *Thread, _ []Value) Value {
 	return nil
 }
 
-func (d *suThreadGlobal) Get(_ *Thread, key Value) Value {
-	m := ToStr(key)
-	if fn, ok := threadMethods[m]; ok {
-		return fn.(Value)
-	}
-	if fn, ok := ParamsMethods[m]; ok {
-		return NewSuMethod(d, fn.(Value))
-	}
-	return nil
+var _ = staticMethod(thread_Members, "()")
+
+func thread_Members() Value {
+	return thread_members
 }
 
-func (d *suThreadGlobal) Lookup(th *Thread, method string) Callable {
+var thread_members = methodList(threadMethods)
+
+func (tg *suThreadGlobal) Lookup(th *Thread, method string) Value {
 	if f, ok := threadMethods[method]; ok {
 		return f
 	}
-	return d.SuBuiltin.Lookup(th, method) // for Params
+	return tg.SuBuiltin.Lookup(th, method) // for Params
 }
 
-func (d *suThreadGlobal) String() string {
+func (*suThreadGlobal) String() string {
 	return "Thread /* builtin class */"
 }
 

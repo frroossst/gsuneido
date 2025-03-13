@@ -7,7 +7,6 @@ import (
 	"github.com/apmckinlay/gsuneido/core/types"
 )
 
-//lint:ignore U1000 incorrect
 type suTransaction struct{}
 
 // SuTran is a database transaction
@@ -54,7 +53,7 @@ var TranMethods Methods
 
 var gnTrans = Global.Num("Transactions")
 
-func (st *SuTran) Lookup(th *Thread, method string) Callable {
+func (st *SuTran) Lookup(th *Thread, method string) Value {
 	return Lookup(th, TranMethods, gnTrans, method)
 }
 
@@ -71,7 +70,11 @@ func (st *SuTran) Asof(val Value) Value {
 	case MinusOne:
 		asof = -1
 	default:
-		asof = val.(SuDate).UnixMilli()
+		d, ok := AsDate(val)
+		if !ok {
+            panic("transaction.Asof requires a date")
+        }
+		asof = d.UnixMilli()
 	}
 	asof = st.itran.Asof(asof)
 	if asof == 0 {

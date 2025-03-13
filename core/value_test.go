@@ -31,7 +31,7 @@ func TestStringGet(t *testing.T) {
 
 func TestPanics(t *testing.T) {
 	v := SuInt(123)
-	assert.T(t).This(func() { v.Get(nil, v) }).Panics("number does not support get")
+	assert.T(t).This(v.Get(nil, v)).Is(nil)
 	ob := &SuObject{}
 	assert.T(t).This(func() { ToInt(ob) }).Panics("can't convert object to integer")
 }
@@ -155,4 +155,17 @@ func TestIntVal(t *testing.T) {
 	test(math.MinInt16-1, "SuDnum")
 	test(math.MaxInt32, "SuDnum")
 	test(math.MinInt32, "SuDnum")
+}
+
+func TestStringEquals(t *testing.T) {
+	sustr := SuStr("hello world")
+	suexcept := &SuExcept{SuStr: "hello world"}
+	suconcat := NewSuConcat().Add("hello").Add(" world")
+	for _, x := range []Value{sustr, suexcept, suconcat} {
+		for _, y := range []Value{sustr, suexcept, suconcat} {
+			assert.T(t).Msg(fmt.Sprintf("%T .Equal %T", x, y)).
+				That(x.Equal(y))
+        }
+	}
+	
 }

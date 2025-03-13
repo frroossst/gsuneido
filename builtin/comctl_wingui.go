@@ -6,10 +6,9 @@
 package builtin
 
 import (
+	"syscall"
 	"unsafe"
 
-	"github.com/apmckinlay/gsuneido/builtin/goc"
-	"github.com/apmckinlay/gsuneido/builtin/heap"
 	. "github.com/apmckinlay/gsuneido/core"
 )
 
@@ -19,14 +18,12 @@ var initCommonControlsEx = comctl32.MustFindProc("InitCommonControlsEx").Addr()
 var _ = builtin(InitCommonControlsEx, "(picce)")
 
 func InitCommonControlsEx(a Value) Value {
-	defer heap.FreeTo(heap.CurSize())
-	p := heap.Alloc(nInitCommonControlsEx)
-	*(*stInitCommonControlsEx)(p) = stInitCommonControlsEx{
+	p := &stInitCommonControlsEx{
 		dwSize: uint32(nInitCommonControlsEx),
-		dwICC:  int32(getInt(a, "dwICC")),
+		dwICC:  getInt32(a, "dwICC"),
 	}
-	rtn := goc.Syscall1(initCommonControlsEx,
-		uintptr(p))
+	rtn, _, _ := syscall.SyscallN(initCommonControlsEx,
+		uintptr(unsafe.Pointer(p)))
 	return boolRet(rtn)
 }
 
@@ -43,7 +40,7 @@ var imageList_Create = comctl32.MustFindProc("ImageList_Create").Addr()
 var _ = builtin(ImageList_Create, "(cx, cy, flags, cInitial, cGrow)")
 
 func ImageList_Create(a, b, c, d, e Value) Value {
-	rtn := goc.Syscall5(imageList_Create,
+	rtn, _, _ := syscall.SyscallN(imageList_Create,
 		intArg(a),
 		intArg(b),
 		intArg(c),
@@ -57,7 +54,7 @@ var imageList_Destroy = comctl32.MustFindProc("ImageList_Destroy").Addr()
 var _ = builtin(ImageList_Destroy, "(himl)")
 
 func ImageList_Destroy(a Value) Value {
-	rtn := goc.Syscall1(imageList_Destroy,
+	rtn, _, _ := syscall.SyscallN(imageList_Destroy,
 		intArg(a))
 	return boolRet(rtn)
 }
@@ -67,7 +64,7 @@ var imageList_ReplaceIcon = comctl32.MustFindProc("ImageList_ReplaceIcon").Addr(
 var _ = builtin(ImageList_ReplaceIcon, "(himl, i, hicon)")
 
 func ImageList_ReplaceIcon(a, b, c Value) Value {
-	rtn := goc.Syscall3(imageList_ReplaceIcon,
+	rtn, _, _ := syscall.SyscallN(imageList_ReplaceIcon,
 		intArg(a),
 		intArg(b),
 		intArg(c))
@@ -80,7 +77,7 @@ var imageList_BeginDrag = comctl32.MustFindProc("ImageList_BeginDrag").Addr()
 var _ = builtin(ImageList_BeginDrag, "(himlTrack, iTrack, dxHotspot, dyHotspot)")
 
 func ImageList_BeginDrag(a, b, c, d Value) Value {
-	rtn := goc.Syscall4(imageList_BeginDrag,
+	rtn, _, _ := syscall.SyscallN(imageList_BeginDrag,
 		intArg(a),
 		intArg(b),
 		intArg(c),
@@ -93,7 +90,7 @@ var imageList_DragEnter = comctl32.MustFindProc("ImageList_DragEnter").Addr()
 var _ = builtin(ImageList_DragEnter, "(hwnd, x, y)")
 
 func ImageList_DragEnter(a, b, c Value) Value {
-	rtn := goc.Syscall3(imageList_DragEnter,
+	rtn, _, _ := syscall.SyscallN(imageList_DragEnter,
 		intArg(a),
 		intArg(b),
 		intArg(c))
@@ -105,7 +102,7 @@ var imageList_DragLeave = comctl32.MustFindProc("ImageList_DragLeave").Addr()
 var _ = builtin(ImageList_DragLeave, "(hwnd)")
 
 func ImageList_DragLeave(a Value) Value {
-	rtn := goc.Syscall1(imageList_DragLeave,
+	rtn, _, _ := syscall.SyscallN(imageList_DragLeave,
 		intArg(a))
 	return boolRet(rtn)
 }
@@ -115,7 +112,7 @@ var imageList_DragMove = comctl32.MustFindProc("ImageList_DragMove").Addr()
 var _ = builtin(ImageList_DragMove, "(x, y)")
 
 func ImageList_DragMove(a, b Value) Value {
-	rtn := goc.Syscall2(imageList_DragMove,
+	rtn, _, _ := syscall.SyscallN(imageList_DragMove,
 		intArg(a),
 		intArg(b))
 	return boolRet(rtn)
@@ -126,7 +123,7 @@ var imageList_EndDrag = comctl32.MustFindProc("ImageList_EndDrag").Addr()
 var _ = builtin(ImageList_EndDrag, "()")
 
 func ImageList_EndDrag() Value {
-	goc.Syscall0(imageList_EndDrag)
+	syscall.SyscallN(imageList_EndDrag)
 	return nil
 }
 
@@ -136,7 +133,7 @@ var imageList_Merge = comctl32.MustFindProc("ImageList_Merge").Addr()
 var _ = builtin(ImageList_Merge, "(himl1, i1, himl2, i2, dx, dy)")
 
 func ImageList_Merge(a, b, c, d, e, f Value) Value {
-	rtn := goc.Syscall6(imageList_Merge,
+	rtn, _, _ := syscall.SyscallN(imageList_Merge,
 		intArg(a),
 		intArg(b),
 		intArg(c),
@@ -151,7 +148,7 @@ var imageList_Add = comctl32.MustFindProc("ImageList_Add").Addr()
 var _ = builtin(ImageList_Add, "(imagelist, image, mask)")
 
 func ImageList_Add(a, b, c Value) Value {
-	rtn := goc.Syscall3(imageList_Add,
+	rtn, _, _ := syscall.SyscallN(imageList_Add,
 		intArg(a),
 		intArg(b),
 		intArg(c))
@@ -164,7 +161,7 @@ var imageList_AddMasked = comctl32.MustFindProc("ImageList_AddMasked").Addr()
 var _ = builtin(ImageList_AddMasked, "(himl, hbmImage, crMask)")
 
 func ImageList_AddMasked(a, b, c Value) Value {
-	rtn := goc.Syscall3(imageList_AddMasked,
+	rtn, _, _ := syscall.SyscallN(imageList_AddMasked,
 		intArg(a),
 		intArg(b),
 		intArg(c))
@@ -177,12 +174,10 @@ var drawStatusText = comctl32.MustFindProc("DrawStatusTextA").Addr()
 var _ = builtin(DrawStatusText, "(himlTrack, iTrack, dxHotspot, dyHotspot)")
 
 func DrawStatusText(a, b, c, d Value) Value {
-	defer heap.FreeTo(heap.CurSize())
-	r := heap.Alloc(nRect)
-	goc.Syscall4(drawStatusText,
+	syscall.SyscallN(drawStatusText,
 		intArg(a),
-		uintptr(rectArg(b, r)),
-		uintptr(stringArg(c)),
+		uintptr(unsafe.Pointer(toRect(b))),
+		uintptr(zstrArg(c)),
 		intArg(d))
 	return nil
 }
@@ -193,17 +188,15 @@ var imageList_GetImageInfo = comctl32.MustFindProc("ImageList_GetImageInfo").Add
 var _ = builtin(ImageList_GetImageInfo, "(himl, imageindex, pImageInfo)")
 
 func ImageList_GetImageInfo(a, b, c Value) Value {
-	defer heap.FreeTo(heap.CurSize())
-	p := heap.Alloc(nImageInfo)
-	rtn := goc.Syscall3(imageList_GetImageInfo,
+	var ii stImageInfo
+	rtn, _, _ := syscall.SyscallN(imageList_GetImageInfo,
 		intArg(a),
 		intArg(b),
-		uintptr(p))
-	ii := *(*stImageInfo)(p)
+		uintptr(unsafe.Pointer(&ii)))
 	c.Put(nil, SuStr("hbmImage"), IntVal(int(ii.hbmImage)))
 	c.Put(nil, SuStr("hbmMask"), IntVal(int(ii.hbmMask)))
 	c.Put(nil, SuStr("rcImage"),
-		rectToOb(&ii.rcImage, c.Get(nil, SuStr("rcImage"))))
+		fromRect(&ii.rcImage, c.Get(nil, SuStr("rcImage"))))
 	return boolRet(rtn)
 }
 
@@ -213,7 +206,7 @@ var imageList_Draw = comctl32.MustFindProc("ImageList_Draw").Addr()
 var _ = builtin(ImageList_Draw, "(himl, imageindex, hdc, x, y, fStyle)")
 
 func ImageList_Draw(a, b, c, d, e, f Value) Value {
-	rtn := goc.Syscall6(imageList_Draw,
+	rtn, _, _ := syscall.SyscallN(imageList_Draw,
 		intArg(a),
 		intArg(b),
 		intArg(c),

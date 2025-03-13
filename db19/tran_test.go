@@ -36,11 +36,11 @@ func TestConcurrent(t *testing.T) {
 		ntrans = 100
 	}
 	var wg sync.WaitGroup
-	for i := 0; i < nclients; i++ {
+	for range nclients {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for j := 0; j < ntrans; j++ {
+			for range ntrans {
 				ut := output1(db)
 				ut.Commit()
 				// time.Sleep(time.Duration(rand.Intn(900)) * time.Microsecond)
@@ -69,12 +69,12 @@ func TestTran(t *testing.T) {
 	db.CheckerSync()
 
 	const nout = 4000
-	for i := 0; i < nout; i++ {
+	for i := range nout {
 		ut := output1(db)
 		db.CommitMerge(ut) // commit synchronously
 		if i%100 == 50 {
 			if i%500 != 250 {
-				db.persist(&execPersistSingle{})
+				db.persist(&execPersistSingle{}, false)
 			} else {
 				db.Close()
 				db, err = OpenDatabase("tmp.db")
@@ -84,7 +84,7 @@ func TestTran(t *testing.T) {
 			}
 		}
 	}
-	db.persist(&execPersistSingle{})
+	db.persist(&execPersistSingle{}, false)
 	db.MustCheck()
 	rt := db.NewReadTran()
 	ti := rt.meta.GetRoInfo("mytable")
@@ -144,20 +144,16 @@ func ck(err error) {
 	}
 }
 func TestTooMany(*testing.T) {
-	store := stor.HeapStor(8192)
-	db, err := CreateDb(store)
-	ck(err)
+	db := CreateDb(stor.HeapStor(8192))
 	db.CheckerSync()
-	for i := 0; i < MaxTrans; i++ {
+	for range MaxTrans {
 		assert.That(nil != db.NewUpdateTran())
 	}
 	assert.That(nil == db.NewUpdateTran())
 }
 
 func TestExclusive(*testing.T) {
-	store := stor.HeapStor(8192)
-	db, err := CreateDb(store)
-	ck(err)
+	db := CreateDb(stor.HeapStor(8192))
 	db.CheckerSync()
 
 	createTbl(db)
@@ -189,9 +185,7 @@ func TestRangeEnd(t *testing.T) {
 func TestOutputDupConflict(*testing.T) {
 	checkerAbortT1 = true
 	defer func() { checkerAbortT1 = false }()
-	store := stor.HeapStor(8192)
-	db, err := CreateDb(store)
-	ck(err)
+	db := CreateDb(stor.HeapStor(8192))
 	db.CheckerSync()
 	createTbl(db)
 	t1 := db.NewUpdateTran()
@@ -202,8 +196,7 @@ func TestOutputDupConflict(*testing.T) {
 }
 
 func TestGetIndexI(*testing.T) {
-	db, err := CreateDb(stor.HeapStor(8192))
-	ck(err)
+	db := CreateDb(stor.HeapStor(8192))
 	StartConcur(db, 50*time.Millisecond)
 	createTbl(db)
 
@@ -222,8 +215,7 @@ func TestGetIndexI(*testing.T) {
 }
 
 func TestGetIndexI2(t *testing.T) {
-	db, err := CreateDb(stor.HeapStor(8192))
-	ck(err)
+	db := CreateDb(stor.HeapStor(8192))
 	StartConcur(db, 50*time.Millisecond)
 	createTbl(db)
 

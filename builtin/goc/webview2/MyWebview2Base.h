@@ -2,13 +2,19 @@
 #define suneido_webview2_base
 
 #include "WebView2.h"
+extern "C" {
 #include "../cside.h"
+}
+
+const LPCWSTR suneidoPrefix = L"suneido:";
+const size_t suneidoPrefixSize = 8;
 
 enum CALLBACK_TYPE {
     ON_READY,
     ON_LOADED,
     ON_ACCEL_KEY_PRESSED,
     ON_CONTEXT_MENU_REQUESTED,
+    ON_NAVCOMPLETED,
 };
 
 enum webview2_ops {
@@ -77,6 +83,12 @@ public:
         }
     }
 
+    void onNavCompleted() {
+        if (onCallBackFn != nullptr) {
+            onCallBackFn(ON_NAVCOMPLETED, 0, 0, 0);
+        }
+    }
+
     bool onAccelPressed(UINT key) {
         if (onCallBackFn != nullptr) {
             return onCallBackFn(ON_ACCEL_KEY_PRESSED, key, 0, 0);
@@ -111,6 +123,11 @@ public:
             delete this;
         }
         return result;
+    }
+
+    long Close() {
+        onCallBackFn = nullptr;
+        return Release();
     }
 
 private:

@@ -16,9 +16,9 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/lexer"
 	"github.com/apmckinlay/gsuneido/core/types"
 	"github.com/apmckinlay/gsuneido/util/assert"
-	"github.com/apmckinlay/gsuneido/util/generic/hmap"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/pack"
+	"github.com/apmckinlay/gsuneido/util/shmap"
 	"github.com/apmckinlay/gsuneido/util/varint"
 )
 
@@ -30,7 +30,7 @@ The convention is that public methods should lock (if concurrent)
 and private methods should not lock
 */
 
-type HmapValue = hmap.Hmap[Value, Value, hmap.Meth[Value]]
+type HmapValue = shmap.Map[Value, Value, shmap.Meth[Value]]
 
 // EmptyObject is a readonly empty SuObject
 var EmptyObject = &SuObject{readonly: true}
@@ -186,7 +186,7 @@ func (ob *SuObject) HasKey(key Value) bool {
 }
 func (ob *SuObject) hasKey(key Value) bool {
 	i, ok := key.IfInt()
-	return (ok && 0 <= i && i < len(ob.list)) || ob.named.Get(key) != nil
+	return (ok && 0 <= i && i < len(ob.list)) || ob.named.Has(key)
 }
 
 // ListGet returns a value from the list, panics if index out of range
@@ -199,7 +199,8 @@ func (ob *SuObject) ListGet(i int) Value {
 
 // namedGet returns a named member or nil if it doesn't exist.
 func (ob *SuObject) namedGet(key Value) Value {
-	return ob.named.Get(key)
+	v, _ := ob.named.Get(key)
+	return v
 }
 
 // Put adds or updates the given key and value
@@ -216,16 +217,38 @@ func (ob *SuObject) GetPut(_ *Thread, m, v Value,
 	if ob.Lock() {
 		defer ob.Unlock()
 	}
-	orig := ob.get(m)
+	defer ob.endMutate(ob.startMutate())
+	p := ob.getPtr(m)
+	orig := *p
 	if orig == nil {
-		panic("uninitialized member: " + m.String())
+		if ob.defval != nil {
+			// GetPut is only used for math
+			// so we don't have to worry about copying object defaults
+			orig = ob.defval
+		} else {
+			MemberNotFound(m)
+		}
 	}
-	v = op(orig, v)
-	ob.set(m, v)
+	*p = op(orig, v)
 	if retOrig {
 		return orig
 	}
-	return v
+	return *p
+}
+func (ob *SuObject) getPtr(key Value) *Value {
+	if i, ok := key.IfInt(); ok {
+		if i == len(ob.list) {
+			ob.add(nil)
+			return &ob.list[i]
+		} else if 0 <= i && i < len(ob.list) {
+			return &ob.list[i]
+		}
+	}
+	return ob.named.GetPtr(key)
+}
+
+func MemberNotFound(m Value) {
+	panic("member not found: " + m.String())
 }
 
 // Set implements Put, doesn't require thread.
@@ -288,7 +311,8 @@ func (ob *SuObject) delete(key Value) bool {
 		ob.listDelete(i)
 		return true
 	}
-	return ob.named.Del(key) != nil
+	_, ok := ob.named.Del(key)
+	return ok
 }
 
 func (ob *SuObject) listDelete(i int) Value {
@@ -318,7 +342,8 @@ func (ob *SuObject) erase(key Value) bool {
 		ob.list = ob.list[:i]
 		return true
 	}
-	return ob.named.Del(key) != nil
+	_, ok := ob.named.Del(key)
+	return ok
 }
 
 func (ob *SuObject) PopFirst() Value {
@@ -496,8 +521,8 @@ func (ob *SuObject) mustBeMutable() {
 
 func (ob *SuObject) migrate() {
 	for {
-		x := ob.named.Del(IntVal(len(ob.list)))
-		if x == nil {
+		x, ok := ob.named.Del(IntVal(len(ob.list)))
+		if !ok {
 			break
 		}
 		ob.list = append(ob.list, x)
@@ -583,8 +608,7 @@ func valstr(th *Thread, buf *limitBuf, v Value, inProgress vstack) {
 }
 
 func Unquoted(k Value) string {
-	if ss, ok := k.(SuStr); ok {
-		s := string(ss)
+	if s, ok := k.ToStr(); ok {
 		// want true/false to be quoted to avoid ambiguity
 		if (s != "true" && s != "false") && lexer.IsIdentifier(s) {
 			return s
@@ -657,8 +681,8 @@ func (ob *SuObject) Hash() uint64 {
 	if 0 < ob.named.Size() && ob.named.Size() <= 4 {
 		iter := ob.named.Iter()
 		for {
-			k, v := iter()
-			if k == nil {
+			k, v, ok := iter()
+			if !ok {
 				break
 			}
 			hash = 31*hash + k.Hash2()
@@ -752,7 +776,7 @@ func (ob *SuObject) Call(th *Thread, _ Value, as *ArgSpec) Value {
 	args := th.Args(&ParamSpec1, as)
 	if x := ob.Get(th, args[0]); x != nil {
 		return x
-    }
+	}
 	return args[0]
 }
 
@@ -761,7 +785,7 @@ var ObjectMethods Methods
 
 var gnObjects = Global.Num("Objects")
 
-func (*SuObject) Lookup(th *Thread, method string) Callable {
+func (*SuObject) Lookup(th *Thread, method string) Value {
 	return Lookup(th, ObjectMethods, gnObjects, method)
 }
 
@@ -785,7 +809,7 @@ func (ob *SuObject) Find(val Value) Value {
 		}
 	}
 	named := ob.named.Iter()
-	for k, v := named(); k != nil; k, v = named() {
+	for k, v, ok := named(); ok; k, v, ok = named() {
 		if v.Equal(val) {
 			return k
 		}
@@ -811,8 +835,8 @@ func (ob *SuObject) ArgsIter() func() (Value, Value) {
 		if i < len(ob.list) {
 			return nil, ob.list[i]
 		}
-		key, val := named()
-		if key == nil {
+		key, val, ok := named()
+		if !ok {
 			return nil, nil
 		}
 		return key, val
@@ -851,8 +875,8 @@ func (ob *SuObject) iter2(list, named bool) func() (Value, Value) {
 				defer ob.RUnlock()
 			}
 			ob.versionCheck(version)
-			key, val := namedIter()
-			if key == nil {
+			key, val, ok := namedIter()
+			if !ok {
 				return nil, nil
 			}
 			return key, val
@@ -869,8 +893,8 @@ func (ob *SuObject) iter2(list, named bool) func() (Value, Value) {
 			next++
 			return IntVal(i), ob.list[i]
 		}
-		key, val := namedIter()
-		if key == nil {
+		key, val, ok := namedIter()
+		if !ok {
 			return nil, nil
 		}
 		return key, val
@@ -1007,11 +1031,11 @@ func (ob *SuObject) SetConcurrent() {
 
 func (ob *SuObject) SetChildConc() {
 	// recursive, deep
-	for i := 0; i < len(ob.list); i++ {
+	for i := range len(ob.list) {
 		ob.list[i].SetConcurrent()
 	}
 	iter := ob.named.Iter()
-	for k, v := iter(); k != nil; k, v = iter() {
+	for k, v, ok := iter(); ok; k, v, ok = iter() {
 		k.SetConcurrent()
 		v.SetConcurrent()
 	}
@@ -1137,7 +1161,7 @@ func (ob *SuObject) PackSize2(hash *uint64, stack packStack) int {
 	}
 	ps += varint.Len(uint64(ob.named.Size()))
 	iter := ob.named.Iter()
-	for k, v := iter(); k != nil; k, v = iter() {
+	for k, v, ok := iter(); ok; k, v, ok = iter() {
 		ps += packSize(k, hash, stack) + packSize(v, hash, stack)
 	}
 	return ps
@@ -1170,7 +1194,7 @@ func (ob *SuObject) pack(hash *uint64, buf *pack.Encoder, tag byte) {
 	}
 	buf.VarUint(uint64(ob.named.Size()))
 	iter := ob.named.Iter()
-	for k, v := iter(); k != nil; k, v = iter() {
+	for k, v, ok := iter(); ok; k, v, ok = iter() {
 		packValue(k, hash, buf)
 		packValue(v, hash, buf)
 	}
@@ -1200,11 +1224,11 @@ func unpackObject(s string, ob *SuObject) *SuObject {
 	buf := pack.NewDecoder(s[1:])
 	n := int(buf.VarUint())
 	ob.list = make([]Value, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		ob.list[i] = unpackValue(buf)
 	}
 	n = int(buf.VarUint())
-	for i := 0; i < n; i++ {
+	for range n {
 		k := unpackValue(buf)
 		v := unpackValue(buf)
 		ob.named.Put(k, v)

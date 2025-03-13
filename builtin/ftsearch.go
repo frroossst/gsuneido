@@ -28,11 +28,11 @@ func (sfs *suFtsearch) Equal(other any) bool {
 	return sfs == other
 }
 
-func (*suFtsearch) Lookup(_ *Thread, method string) Callable {
+func (*suFtsearch) Lookup(_ *Thread, method string) Value {
 	return ftsearchMethods[method]
 }
 
-var ftsearchMethods = methods()
+var ftsearchMethods = methods("ftsearch")
 
 var _ = staticMethod(ftsearch_Create, "()")
 
@@ -45,6 +45,14 @@ var _ = staticMethod(ftsearch_Load, "(data)")
 func ftsearch_Load(data Value) Value {
 	return newSuFtsIndex(ftsearch.Unpack(ToStr(data)))
 }
+
+var _ = staticMethod(ftsearch_Members, "()")
+
+func ftsearch_Members() Value {
+	return ftsearch_members
+}
+
+var ftsearch_members = methodList(ftsearchMethods)
 
 func newSuFtsIndex(idx *ftsearch.Index) *suFtsIndex {
 	var si suFtsIndex
@@ -67,11 +75,11 @@ func (sfb *suFtsBuilder) Equal(other any) bool {
 	return sfb == other
 }
 
-func (*suFtsBuilder) Lookup(_ *Thread, method string) Callable {
+func (*suFtsBuilder) Lookup(_ *Thread, method string) Value {
 	return ftsBuilderMethods[method]
 }
 
-var ftsBuilderMethods = methods()
+var ftsBuilderMethods = methods("ftsBuilder")
 
 var _ = method(ftsBuilder_Add, "(id, title, text)")
 
@@ -123,11 +131,11 @@ func (*suFtsIndex) SetConcurrent() {
 	// protected by atomic
 }
 
-func (*suFtsIndex) Lookup(_ *Thread, method string) Callable {
+func (*suFtsIndex) Lookup(_ *Thread, method string) Value {
 	return ftsIndexMethods[method]
 }
 
-var ftsIndexMethods = methods()
+var ftsIndexMethods = methods("ftsIndex")
 
 var _ = method(ftsIndex_Search, "(query, scores = false)")
 

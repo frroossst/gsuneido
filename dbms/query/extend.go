@@ -25,6 +25,7 @@ type Extend struct {
 	selCols  []string
 	selVals  []string
 	srcFlds  []string
+	fwd      map[int]string
 	Query1
 	hasExprs bool
 	conflict bool
@@ -56,9 +57,17 @@ func NewExtend(src Query, cols []string, exprs []ast.Expr) *Extend {
 	e.singleTbl.Set(!e.hasExprs && src.SingleTable())
 	e.lookCost.Set(src.lookupCost())
 
-	for _, expr := range e.exprs {
+	for i, expr := range e.exprs {
 		if c, ok := expr.(*ast.Constant); ok {
 			c.Packed = Pack(c.Val.(Packable))
+		}
+		if id, ok := expr.(*ast.Ident); ok && !e.header.HasField(id.Name) {
+			assert.That(id.Name != e.cols[i])
+			if e.fwd == nil {
+				e.fwd = make(map[int]string)
+			}
+			e.fwd[i] = string(rune(PackForward)) + id.Name
+			// fmt.Println("Extend: forward", e.cols[i], "=", id)
 		}
 	}
 	return e
@@ -182,7 +191,7 @@ func (e *Extend) needRule2(col string) bool {
 func (e *Extend) Fixed() []Fixed {
 	if e.fixed == nil {
 		e.fixed = append([]Fixed{}, e.source.Fixed()...) // non-nil copy
-		for i := 0; i < len(e.cols); i++ {
+		for i := range len(e.cols) {
 			if expr := e.exprs[i]; expr != nil {
 				switch expr := expr.(type) {
 				case *ast.Constant: // col = <Constant>
@@ -231,7 +240,7 @@ func (e *Extend) Get(th *Thread, dir Dir) Row {
 			return row
 		}
 		rec := e.extendRow(th, row)
-		if e.filter(rec) {
+		if e.filter(rec, th, row) {
 			e.ngets++
 			return append(row, DbRec{Record: rec})
 		}
@@ -245,13 +254,15 @@ func (e *Extend) extendRow(th *Thread, row Row) Record {
 		e.ctx.Tran = MakeSuTran(e.t)
 	}
 	var rb RecordBuilder
-	for _, expr := range e.exprs {
+	for i, expr := range e.exprs {
 		if expr != nil {
 			if c, ok := expr.(*ast.Constant); ok {
 				rb.AddRaw(c.Packed)
 			} else if ast.IsColumn(expr, e.srcFlds) {
 				fld := expr.(*ast.Ident).Name
 				rb.AddRaw(row.GetRawVal(e.header, fld, e.ctx.Th, e.ctx.Tran))
+			} else if f, ok := e.fwd[i]; ok {
+				rb.AddRaw(f)
 			} else {
 				// incrementally build record so extends can see previous ones
 				e.ctx.Row = append(row, DbRec{Record: rb.Build()})
@@ -263,11 +274,15 @@ func (e *Extend) extendRow(th *Thread, row Row) Record {
 	return rb.Trim().Build()
 }
 
-func (e *Extend) filter(rec Record) bool {
+func (e *Extend) filter(rec Record, th *Thread, row Row) bool {
 	for i, col := range e.selCols {
 		j := slices.Index(e.physical, col)
-		assert.That(j != -1)
+		assert.Msg(col).That(j != -1)
 		x := rec.GetRaw(j)
+		if len(x) > 0 && x[0] == PackForward {
+			row = append(row, DbRec{Record: rec})
+			x = row.GetRawVal(e.header, col, th, e.ctx.Tran)
+		}
 		if x != e.selVals[i] {
 			return false
 		}
@@ -311,7 +326,7 @@ func (e *Extend) Lookup(th *Thread, cols, vals []string) Row {
 		return row
 	}
 	rec := e.extendRow(th, row)
-	if !e.filter(rec) {
+	if !e.filter(rec, th, row) {
 		return nil
 	}
 	return append(row, DbRec{Record: rec})

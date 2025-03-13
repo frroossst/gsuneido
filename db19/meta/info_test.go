@@ -18,7 +18,10 @@ func TestInfo(t *testing.T) {
 	one := &Info{
 		Table:   "one",
 		Nrows:   100,
+		BtreeNrows: 100,
 		Size:    1000,
+		BtreeSize: 1000,
+		Deltas: []Delta{{}},
 		lastMod: -1,
 		Indexes: []*index.Overlay{index.OverlayStub()},
 	}
@@ -26,7 +29,10 @@ func TestInfo(t *testing.T) {
 	two := &Info{
 		Table:   "two",
 		Nrows:   200,
+		BtreeNrows: 200,
 		Size:    2000,
+		BtreeSize: 2000,
+		Deltas: []Delta{{}},
 		lastMod: -1,
 		Indexes: []*index.Overlay{index.OverlayStub()},
 	}
@@ -73,9 +79,9 @@ func TestInfo2(t *testing.T) {
 func mkdata(tbl InfoHamt, n int) []string {
 	data := make([]string, n)
 	randStr := str.UniqueRandom(4, 4)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		data[i] = randStr()
-		tbl.Put(&Info{Table: data[i], Nrows: i,
+		tbl.Put(&Info{Table: data[i], Nrows: i, BtreeNrows: i,
 			Indexes: []*index.Overlay{index.OverlayStub()}})
 	}
 	return data

@@ -24,6 +24,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/tools"
 	"github.com/apmckinlay/gsuneido/dbms"
 	"github.com/apmckinlay/gsuneido/options"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/exit"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/regex"
@@ -52,7 +53,9 @@ var help = `options:
 var dbmsLocal *dbms.DbmsLocal
 var mainThread Thread
 var sviews Sviews
+
 var errlog = "error.log"
+var _ = AddInfo("windows.errlog", &errlog)
 
 func main() {
 	options.BuiltDate = builtDate
@@ -172,6 +175,12 @@ func main() {
 			startHttpStatus()
 		}
 		dbms.VersionMismatch = versionMismatch
+	case "printstates":
+		db19.PrintStates("suneido.db", false)
+		os.Exit(0)
+	case "checkstates":
+		db19.PrintStates("suneido.db", true)
+		os.Exit(0)
 	case "error":
 		Fatal(options.Error)
 	default:
@@ -181,6 +190,7 @@ func main() {
 	defer func() {
 		if e := recover(); e != nil {
 			log.Println("ERROR:", e, "(exiting)")
+			dbg.PrintStack()
 			Exit(1)
 		}
 		Exit(0)
@@ -204,7 +214,8 @@ func main() {
 	}
 	if mode == "gui" {
 		run("Init()")
-		builtin.Run()
+		exitcode := builtin.Run()
+		Exit(exitcode)
 	} else {
 		run("Init.Repl()")
 		repl()
@@ -270,6 +281,7 @@ func ck(err error) {
 // when the server was not connected.
 func clientErrorLog() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmsgprefix)
+	mainThread.Dbms() // so we can get session id
 	sid := mainThread.SessionId("") + " "
 	log.SetPrefix(sid)
 
@@ -316,13 +328,13 @@ func runServer() {
 
 func stopServer() {
 	exit.Progress("server stopping")
-	defer exit.Progress("server stopped")
 	httpServer.Close()
 	dbms.StopServer()
 	heap := builtin.HeapSys()
 	log.Println("server stopped, heap:", heap/(1024*1024), "mb,",
 		"in use:", heapInUse()/(1024*1024), "mb,",
 		"goroutines:", runtime.NumGoroutine())
+	exit.Progress("server stopped")
 }
 
 func heapInUse() uint64 {
@@ -367,8 +379,8 @@ func openDbms() {
 	GetDbms = getDbms
 	exit.Add("close database", func() {
 		exit.Progress("database closing")
-		defer exit.Progress("database closed")
 		db.CloseKeepMapped()
+		exit.Progress("database closed")
 	}) // keep mapped to avoid errors during shutdown
 	// go checkState()
 }
@@ -441,7 +453,7 @@ func repl() {
 	}
 
 	builtin.DefDef()
-	builtin.DefConcat()
+	// builtin.DefConcat()
 
 	built := options.BuiltStr()
 	if options.Action == "client" {

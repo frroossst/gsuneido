@@ -17,6 +17,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/cksum"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
+	"github.com/apmckinlay/gsuneido/util/hacks"
 	"github.com/apmckinlay/gsuneido/util/sortlist"
 	"github.com/apmckinlay/gsuneido/util/system"
 )
@@ -46,12 +47,12 @@ func Compact(dbfile string) (nTables, nViews int, oldSize, newSize uint64, err e
 	nViews = copyViews(state, dst)
 
 	schemas := make([]schemaSize, 0, 128)
-	state.Meta.ForEachSchema(func(sc *meta.Schema) {
+	for sc := range state.Meta.Tables() {
 		ti := state.Meta.GetRoInfo(sc.Table)
 		ss := schemaSize{sc: sc, nrows: ti.Nrows}
 		schemas = append(schemas, ss)
 		nTables++
-	})
+	}
 	// sort reverse to start largest first
 	sort.Slice(schemas, func(i, j int) bool {
 		return schemas[i].nrows > schemas[j].nrows
@@ -64,7 +65,7 @@ func Compact(dbfile string) (nTables, nViews int, oldSize, newSize uint64, err e
 	}
 	var wg sync.WaitGroup
 	channel := make(chan compactJob)
-	for i := 0; i < options.Nworkers; i++ {
+	for range options.Nworkers {
 		wg.Add(1)
 		go func() {
 			for job := range channel {
@@ -98,10 +99,10 @@ func tmpdb() (*Database, string) {
 
 func copyViews(state *DbState, dst *Database) int {
 	n := 0
-	state.Meta.ForEachView(func(name, def string) {
+	for name, def := range state.Meta.Views() {
 		dst.AddView(name, def)
 		n++
-	})
+	}
 	return n
 }
 
@@ -113,42 +114,45 @@ func compactTable(state *DbState, src *Database, ts *meta.Schema, dst *Database)
 	}()
 	hasdel := ts.HasDeleted()
 	info := state.Meta.GetRoInfo(ts.Table)
-	sc := state.Meta.GetRoSchema(ts.Table)
 	sum := uint64(0)
-	size := uint64(0)
+	size := int64(0)
 	list := sortlist.NewUnsorted(func(x uint64) bool { return x == 0 })
 	var off2 uint64
-	var buf []byte
-	var n int
-	count := info.Indexes[0].Check(func(off uint64) {
+	var dstbuf []byte
+	nrows := info.Indexes[0].Check(func(off uint64) {
 		sum += off // addition so order doesn't matter
-		if hasdel {
-			rec := OffToRecCk(src.Store, off) // verify data checksums
+		buf := src.Store.Data(off)
+		n := core.RecLen(buf)
+		buf = buf[:n+cksum.Len]
+		cksum.MustCheck(buf)
+		rec := core.Record(hacks.BStoS(buf[:n]))
+		if hasdel || hasTrailingEmpty(rec) {
 			rec = squeeze(rec, ts.Columns)
 			n = len(rec)
-			off2, buf = dst.Store.Alloc(n + cksum.Len)
-			copy(buf, rec)
-			cksum.Update(buf)
+			off2, dstbuf = dst.Store.Alloc(n + cksum.Len)
+			copy(dstbuf, rec)
+			cksum.Update(dstbuf)
 		} else {
-			rec := src.Store.Data(off)
-			n = core.RecLen(rec)
-			rec = rec[:n+cksum.Len]
-			cksum.MustCheck(rec)
-			off2, buf = dst.Store.Alloc(len(rec))
-			copy(buf, rec)
+			off2, dstbuf = dst.Store.Alloc(len(buf))
+			copy(dstbuf, buf)
 		}
 		list.Add(off2)
-		size += uint64(n)
+		size += int64(n)
 	})
 	list.Finish()
-	assert.This(count).Is(info.Nrows)
+	assert.This(nrows).Is(info.Nrows)
 	for i := 1; i < len(info.Indexes); i++ {
-		CheckOtherIndex(sc.Indexes[i].Columns, info.Indexes[i], count, sum)
+		CheckOtherIndex(ts.Indexes[i].Columns, info.Indexes[i], nrows, sum)
 	}
 	if hasdel {
 		ts.Columns = slc.Without(ts.Columns, "-")
 	}
-	ovs := buildIndexes(ts, list, dst.Store, count) // same as load
-	ti := &meta.Info{Table: ts.Table, Nrows: count, Size: size, Indexes: ovs}
+	indexes := buildIndexes(ts, list, dst.Store, nrows) // same as load
+	ti := meta.NewInfo(ts.Table, indexes, nrows, size)
 	dst.AddNewTable(ts, ti)
+}
+
+func hasTrailingEmpty(r core.Record) bool {
+	n := r.Count()
+	return n > 0 && r.GetRaw(n-1) == ""
 }

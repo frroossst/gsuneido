@@ -19,7 +19,7 @@ import (
 func TestClientServer(*testing.T) {
 	// trace.Set(int(trace.ClientServer))
 	options.BuiltDate = "Dec 29 2020 12:34"
-	db, _ := db19.CreateDb(stor.HeapStor(8192))
+	db := db19.CreateDb(stor.HeapStor(8192))
 	dbmsLocal := NewDbmsLocal(db)
 	p1, p2 := net.Pipe()
 	workers = mux.NewWorkers(doRequest)
@@ -29,10 +29,10 @@ func TestClientServer(*testing.T) {
 	p2.Write(hello())
 	c := NewDbmsClient(p2)
 	ses := c.NewSession()
-	ses.Get(nil, "tables", core.Next)
+	ses.Get(nil, "tables sort table", core.Next)
 
 	ses2 := c.NewSession()
-	ses2.Get(nil, "tables", core.Prev)
+	ses2.Get(nil, "tables sort table", core.Prev)
 	ses2.Close()
 
 	time.Sleep(25 * time.Millisecond)

@@ -62,7 +62,7 @@ func (*suSocketClient) SetConcurrent() {
 	// panic("SocketClient cannot be set to concurrent")
 }
 
-func (*suSocketClient) Lookup(_ *Thread, method string) Callable {
+func (*suSocketClient) Lookup(_ *Thread, method string) Value {
 	return suSocketClientMethods[method]
 }
 
@@ -70,7 +70,9 @@ var crnl = []byte{'\r', '\n'}
 
 var noDeadline time.Time
 
-var suSocketClientMethods = methods()
+// socket client methods are also used by SocketServer
+
+var suSocketClientMethods = methods("sock")
 
 var _ = method(sock_Close, "()")
 
@@ -80,21 +82,15 @@ func sock_Close(this Value) Value {
 	return nil
 }
 
-var _ = method(sock_Read, "(n)")
+var _ = method(sock_Read, "(nbytes=false)")
 
 func sock_Read(this, arg Value) Value {
 	sc := scOpen(this)
-	n := ToInt(arg)
-	buf := make([]byte, n)
 	if sc.timeout > 0 {
 		sc.conn.SetDeadline(time.Now().Add(sc.timeout))
 		defer sc.conn.SetDeadline(noDeadline)
 	}
-	n, e := io.ReadFull(sc.rdr, buf)
-	if e != nil && e != io.ErrUnexpectedEOF {
-		panic("socketClient.Read: " + e.Error())
-	}
-	return SuStr(string(buf[:n]))
+	return limitedRead("socket.Read", sc.rdr, arg)
 }
 
 var _ = method(sock_Readline, "()")
@@ -105,11 +101,7 @@ func sock_Readline(this Value) Value {
 		sc.conn.SetDeadline(time.Now().Add(sc.timeout))
 		defer sc.conn.SetDeadline(noDeadline)
 	}
-	line := Readline(sc.rdr, "socket.Readline: ")
-	if line == False {
-		panic("socket Readline lost connection or timeout")
-	}
-	return line
+	return Readline(sc.rdr, "socket.Readline: ")
 }
 
 var _ = method(sock_SetTimeout, "(seconds)")
@@ -159,7 +151,7 @@ func sock_Writeline(this, arg Value) Value {
 var _ = method(sock_CopyTo, "(dest, nbytes = false)")
 
 func sock_CopyTo(th *Thread, this Value, args []Value) Value {
-	return CopyTo(th, scOpen(this).conn, args[0], args[1])
+	return CopyTo(th, scOpen(this).rdr, args[0], args[1])
 }
 
 func (sc *suSocketClient) writer() io.Writer {

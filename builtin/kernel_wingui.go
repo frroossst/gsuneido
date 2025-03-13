@@ -6,28 +6,14 @@
 package builtin
 
 import (
-	"bytes"
 	"syscall"
 	"unsafe"
 
-	"github.com/apmckinlay/gsuneido/builtin/goc"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/str"
+	"golang.org/x/sys/windows"
 )
-
-// NOTE: We want these functions to be available on secondary threads.
-// Therefore we can't use goc.Syscall or heap.
-
-// zstr returns an SuStr from up to the first zero byte in buf,
-// or all of buf if there is no zero byte.
-func zstr(buf []byte) SuStr {
-	i := bytes.IndexByte(buf, 0)
-	if i == -1 {
-		i = len(buf)
-	}
-	return SuStr(string(buf[:i]))
-}
 
 // dll Kernel32:GetComputerName(buffer lpBuffer, LONG* lpnSize) bool
 var getComputerName = kernel32.MustFindProc("GetComputerNameA").Addr()
@@ -75,10 +61,9 @@ var getProcAddress = kernel32.MustFindProc("GetProcAddress").Addr()
 var _ = builtin(GetProcAddress, "(hModule, procName)")
 
 func GetProcAddress(a, b Value) Value {
-	procName := zbuf(b)
 	rtn, _, _ := syscall.SyscallN(getProcAddress,
 		intArg(a),
-		uintptr(unsafe.Pointer(&procName[0])))
+		uintptr(zstrArg(b)))
 	return intRet(rtn)
 }
 
@@ -146,7 +131,9 @@ func GlobalAllocData(a Value) Value {
 		p := globallock(handle)
 		assert.That(p != nil)
 		defer globalunlock(handle)
-		bufToPtr(s, p)
+		for i := range len(s) {
+			*(*byte)(unsafe.Pointer(uintptr(p) + uintptr(i))) = s[i]
+		}
 	}
 	return intRet(handle) // caller must GlobalFree
 }
@@ -160,7 +147,10 @@ func GlobalAllocString(a Value) Value {
 	p := globallock(handle)
 	assert.That(p != nil)
 	defer globalunlock(handle)
-	strToPtr(s, p)
+	for i := range len(s) {
+		*(*byte)(unsafe.Pointer(uintptr(p) + uintptr(i))) = s[i]
+	}
+	*(*byte)(unsafe.Pointer(uintptr(p) + uintptr(len(s)))) = 0
 	return intRet(handle) // caller must GlobalFree
 }
 
@@ -175,7 +165,7 @@ func GlobalData(a Value) Value {
 	p := globallock(hm)
 	assert.That(p != nil)
 	defer globalunlock(hm)
-	return bufStrN(p, n)
+	return ptrNstr(p, n)
 }
 
 // dll Kernel32:GlobalUnlock(pointer handle) bool
@@ -239,7 +229,7 @@ func CopyMemory(a, b, c Value) Value {
 	dst := uintptr(ToInt(a))
 	src := ToStr(b)
 	n := ToInt(c)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		*(*byte)(unsafe.Pointer(dst + uintptr(i))) = src[i]
 	}
 	return nil
@@ -275,8 +265,7 @@ func GetCurrentProcessId() Value {
 var _ = builtin(GetCurrentThreadId, "()")
 
 func GetCurrentThreadId() Value {
-	// NOTE: always returns cside thread id
-	return intRet(goc.CThreadId()) // thread safe
+	return intRet(uintptr(windows.GetCurrentThreadId()))
 }
 
 // dll pointer Kernel32:GetStdHandle(long nStdHandle)
@@ -302,9 +291,8 @@ var loadLibrary = kernel32.MustFindProc("LoadLibraryA").Addr()
 var _ = builtin(LoadLibrary, "(library)")
 
 func LoadLibrary(a Value) Value {
-	lib := zbuf(a)
 	rtn, _, _ := syscall.SyscallN(loadLibrary,
-		uintptr(unsafe.Pointer(&lib[0])))
+		uintptr(zstrArg(a)))
 	return intRet(rtn)
 }
 
@@ -324,9 +312,8 @@ var setCurrentDirectory = kernel32.MustFindProc("SetCurrentDirectoryA").Addr()
 var _ = builtin(SetCurrentDirectory, "(lpPathName)")
 
 func SetCurrentDirectory(a Value) Value {
-	name := zbuf(a)
 	rtn, _, _ := syscall.SyscallN(setCurrentDirectory,
-		uintptr(unsafe.Pointer(&name[0])))
+		uintptr(zstrArg(a)))
 	return boolRet(rtn)
 }
 
@@ -340,9 +327,8 @@ var _ = builtin(CreateFile, "(lpFileName, dwDesiredAccess, dwShareMode, "+
 	"hTemplateFile)")
 
 func CreateFile(a, b, c, d, e, f, g Value) Value {
-	name := zbuf(a)
 	rtn, _, _ := syscall.SyscallN(createFile,
-		uintptr(unsafe.Pointer(&name[0])),
+		uintptr(zstrArg(a)),
 		intArg(b),
 		intArg(c),
 		intArg(d),
@@ -401,11 +387,10 @@ var getVolumeInformation = kernel32.MustFindProc("GetVolumeInformationA").Addr()
 var _ = builtin(GetVolumeName, "(vol = `c:\\`)")
 
 func GetVolumeName(a Value) Value {
-	vol := zbuf(a)
 	const bufsize = 255
 	buf := make([]byte, bufsize+1)
 	rtn, _, _ := syscall.SyscallN(getVolumeInformation,
-		uintptr(unsafe.Pointer(&vol[0])),
+		uintptr(zstrArg(a)),
 		uintptr(unsafe.Pointer(&buf[0])),
 		uintptr(bufsize),
 		0,
@@ -416,5 +401,5 @@ func GetVolumeName(a Value) Value {
 	if rtn == 0 {
 		return EmptyStr
 	}
-	return zstr(buf)
+	return bufZstr(buf)
 }

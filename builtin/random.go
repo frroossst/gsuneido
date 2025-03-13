@@ -36,7 +36,7 @@ func initRand(th *Thread) {
 	}
 }
 
-var randomMethods = methods()
+var randomMethods = methods("rnd")
 
 var _ = staticMethod(rnd_Seed, "(seed)")
 
@@ -47,21 +47,29 @@ func rnd_Seed(th *Thread, args []Value) Value {
 	return nil
 }
 
-func (d *suRandomGlobal) Lookup(th *Thread, method string) Callable {
-	if f, ok := randomMethods[method]; ok {
-		return f
-	}
-	return d.SuBuiltin.Lookup(th, method) // for Params
-}
+var _ = staticMethod(rnd_Bytes, "(nbytes)")
 
-var _ = builtin(RandomBytes, "(nbytes)")
-
-func RandomBytes(arg Value) Value {
+func rnd_Bytes(arg Value) Value {
 	n := ToInt(arg)
 	if n < 0 || 128 < n {
-		panic("RandomBytes: allowed range is 0 to 128")
+		panic("Random.Bytes: allowed range is 0 to 128")
 	}
 	buf := make([]byte, n)
 	crypto.Read(buf)
 	return SuStr(hacks.BStoS(buf))
+}
+
+var _ = staticMethod(rnd_Members, "()")
+
+func rnd_Members() Value {
+	return rnd_members
+}
+
+var rnd_members = methodList(randomMethods)
+
+func (r *suRandomGlobal) Lookup(th *Thread, method string) Value {
+	if f, ok := randomMethods[method]; ok {
+		return f
+	}
+	return r.SuBuiltin.Lookup(th, method) // for Params
 }

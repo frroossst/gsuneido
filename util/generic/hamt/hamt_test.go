@@ -4,11 +4,9 @@
 package hamt
 
 import (
-	"fmt"
 	"math/rand"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -70,7 +68,7 @@ func TestRandom(t *testing.T) {
 	}
 	seed := time.Now().UnixNano()
 	r := rand.New(rand.NewSource(seed))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		f := int(r.Int31())
 		ht.Put(&Foo{f, strconv.Itoa(f)})
 		// ht.check()
@@ -79,7 +77,7 @@ func TestRandom(t *testing.T) {
 		}
 	}
 	r.Seed(seed)
-	for i := 0; i < n; i++ {
+	for range n {
 		f := int(r.Int31())
 		ht.Put(&Foo{f, strconv.Itoa(f)})
 		// ht.check()
@@ -87,7 +85,7 @@ func TestRandom(t *testing.T) {
 	nums := map[int]bool{}
 	ht = ht.Freeze()
 	r.Seed(seed)
-	for i := 0; i < n; i++ {
+	for range n {
 		f := int(r.Int31())
 		foo, ok := ht.Get(f)
 		assert.True(ok)
@@ -104,7 +102,9 @@ func TestRandom(t *testing.T) {
 		// ht.check()
 		// ht.print()
 	}
-	ht.ForEach(func(*Foo) { panic("should be empty") })
+	for range ht.All() {
+		panic("should be empty")
+	}
 }
 
 func TestPersistent(t *testing.T) {
@@ -129,9 +129,9 @@ func TestPersistent(t *testing.T) {
 
 func tostr(ht FooHamt) string {
 	var list []string
-	ht.ForEach(func(f *Foo) {
+	for f := range ht.All() {
 		list = append(list, f.data)
-	})
+	}
 	sort.Strings(list)
 	return str.Join("{,}", list)
 }
@@ -147,7 +147,7 @@ func TestDelete(*testing.T) {
 	if testing.Short() {
 		nShuffles = 1000
 	}
-	for i := 0; i < nShuffles; i++ {
+	for range nShuffles {
 		rand.Shuffle(len(data), func(i, j int) { data[i], data[j] = data[j], data[i] })
 		ht := FooHamt{}.Mutable()
 		for _, d := range data {
@@ -186,45 +186,43 @@ func TestDeleteInsertBug(*testing.T) {
 	check(ht)
 }
 
-//lint:ignore U1000 for debugging
-func print(ht FooHamt) {
-	print1(0, ht.root)
-}
+// func print(ht FooHamt) {
+// 	print1(0, ht.root)
+// }
 
-//lint:ignore U1000 for debugging
-func print1(depth int, nd *FooNode) {
-	indent := strings.Repeat("    ", depth)
+// func print1(depth int, nd *FooNode) {
+// 	indent := strings.Repeat("    ", depth)
 
-	if depth > 6 {
-		fmt.Print(indent + "overflow")
-		for i := range nd.vals {
-			fmt.Printf(" %#x", nd.vals[i].key)
-		}
-		fmt.Println()
-		return
-	}
+// 	if depth > 6 {
+// 		fmt.Print(indent + "overflow")
+// 		for i := range nd.vals {
+// 			fmt.Printf(" %#x", nd.vals[i].key)
+// 		}
+// 		fmt.Println()
+// 		return
+// 	}
 
-	if nd.bmVal != 0 {
-		fmt.Printf(indent+"vals %032b ", nd.bmVal)
-		for i := range nd.vals {
-			fmt.Printf("%#x ", nd.vals[i].key)
-		}
-		fmt.Println()
-	}
-	if nd.bmPtr != 0 {
-		fmt.Printf(indent+"ptrs %032b\n", nd.bmPtr)
-		for _, p := range nd.ptrs {
-			print1(depth+1, p)
-		}
-	}
-}
+// 	if nd.bmVal != 0 {
+// 		fmt.Printf(indent+"vals %032b ", nd.bmVal)
+// 		for i := range nd.vals {
+// 			fmt.Printf("%#x ", nd.vals[i].key)
+// 		}
+// 		fmt.Println()
+// 	}
+// 	if nd.bmPtr != 0 {
+// 		fmt.Printf(indent+"ptrs %032b\n", nd.bmPtr)
+// 		for _, p := range nd.ptrs {
+// 			print1(depth+1, p)
+// 		}
+// 	}
+// }
 
 func check(ht FooHamt) {
 	keys := make(map[int]bool)
-	ht.ForEach(func(foo *Foo) {
+	for foo := range ht.All() {
 		if _, ok := keys[foo.key]; ok {
 			panic("duplicate key")
 		}
 		keys[foo.key] = true
-	})
+	}
 }

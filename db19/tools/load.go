@@ -38,7 +38,7 @@ type loadJob struct {
 	list   *slBuilder
 	schema string
 	nrecs  int
-	size   uint64
+	size   int64
 }
 
 // LoadDatabase imports a dumped database from a file using a worker pool.
@@ -61,7 +61,7 @@ func LoadDatabase(from, dbfile, privateKey, passphrase string) (
 	// start the workers that build the indexes
 	var wg sync.WaitGroup
 	channel := make(chan *loadJob)
-	for i := 0; i < options.Nworkers; i++ {
+	for range options.Nworkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -107,7 +107,7 @@ func LoadDatabase(from, dbfile, privateKey, passphrase string) (
 	return nTables, nViews, nil
 }
 
-// LoadTable is used by -load <table>.
+// LoadTable is used by -load <table>
 func LoadTable(table, dbfile string) (int, error) {
 	var db *Database
 	var err error
@@ -120,15 +120,29 @@ func LoadTable(table, dbfile string) (int, error) {
 		return 0, fmt.Errorf("error loading %s: %w", table, err)
 	}
 	defer db.Close()
-	return LoadDbTable(table, table+".su", "", "", db)
+	nrecs, err := loadDbTable(table, table+".su", "", "", db)
+	if err != nil {
+		return 0, err
+	}
+	db.GetState().Write()
+	return nrecs, nil
 }
 
-// LoadDbTable loads a single table. It is use by dbms.Load / Database.Load
-// It will replace an already existing table.
-// It returns the number of records loaded.
+// LoadDbTable is used by dbms.Load / Database.Load
+// i.e. on an already open database
 func LoadDbTable(table, from, privateKey, passphrase string,
 	db *Database) (n int, err error) {
-	if db.Corrupted() {
+	nrecs, err := loadDbTable(table, from, privateKey, passphrase, db)
+	if err != nil {
+		return 0, err
+	}
+	db.Persist() // for safety, not strictly required
+	return nrecs, nil
+}
+
+func loadDbTable(table, from, privateKey, passphrase string,
+	db *Database) (n int, err error) {
+	if db.IsCorrupted() {
 		return 0, fmt.Errorf("load not allowed when database is locked")
 	}
 	db.AddExclusive(table)
@@ -143,7 +157,6 @@ func LoadDbTable(table, from, privateKey, passphrase string,
 	schem := table + " " + readLinePrefixed(r, "====== ")
 	nrecs, size, list := loadTable1(db, r, schem)
 	loadTable2(db, schem, nrecs, size, list, true)
-	db.Persist() // for safety, not strictly required
 	return nrecs, nil
 }
 
@@ -182,27 +195,27 @@ func decryptor(privateKey, passphrase string, src io.Reader) io.Reader {
 
 // loadTable1 reads the data
 func loadTable1(db *Database, r *bufio.Reader, schema string) (
-	nrecs int, size uint64, list *sortlist.Builder[uint64]) {
+	nrows int, size int64, list *sortlist.Builder[uint64]) {
 	trace(schema)
 	if strings.HasPrefix(schema, "views ") {
 		return loadViews(db, r, schema), 0, nil
 	}
 	store := db.Store
 	list = sortlist.NewUnsorted(func(x uint64) bool { return x == 0 })
-	nrecs, size = readRecords(r, store, list)
-	trace("nrecs", nrecs, "data size", size)
+	nrows, size = readRecords(r, store, list)
+	trace("nrecs", nrows, "data size", size)
 	list.Finish()
-	return nrecs, size, list
+	return nrows, size, list
 }
 
 // loadTable2 builds the indexes.
 // It is multi-threaded when loading an entire database
 func loadTable2(db *Database, schema string,
-	nrecs int, size uint64, list *slBuilder, overwrite bool) {
+	nrows int, size int64, list *slBuilder, overwrite bool) {
 	sch := query.NewAdminParser(schema).Schema()
 	ts := &meta.Schema{Schema: sch}
-	ovs := buildIndexes(ts, list, db.Store, nrecs)
-	ti := &meta.Info{Table: sch.Table, Nrows: nrecs, Size: size, Indexes: ovs}
+	indexes := buildIndexes(ts, list, db.Store, nrows)
+	ti := meta.NewInfo(sch.Table, indexes, nrows, size)
 	if overwrite {
 		if ts.HasFkey() {
 			panic("can't load single table with foreign keys")
@@ -226,7 +239,7 @@ func readLinePrefixed(r *bufio.Reader, pre string) string {
 }
 
 func readRecords(in *bufio.Reader, store *stor.Stor, list *slBuilder) (
-	nrecs int, size uint64) {
+	nrecs int, size int64) {
 	intbuf := make([]byte, 4)
 	for { // each record
 		_, err := io.ReadFull(in, intbuf)
@@ -244,7 +257,7 @@ func readRecords(in *bufio.Reader, store *stor.Stor, list *slBuilder) (
 		cksum.Update(buf)
 		list.Add(off)
 		nrecs++
-		size += uint64(n)
+		size += int64(n)
 	}
 	return nrecs, size
 }

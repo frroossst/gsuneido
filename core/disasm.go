@@ -98,8 +98,20 @@ func Disasm(fn *SuFunc, out outfn) {
 func disasm(nest int, fn *SuFunc, out outfn) {
 	d := &dasm{fn: fn, out: out, nest: nest}
 	for d.i < len(fn.Code) {
-		d.next()
+		nestedfn := d.next()
+		if nestedfn != nil && nestedfn.SrcBase > 0 {
+			disasm(d.nest+1, nestedfn, d.out) // recursive
+		}
 	}
+}
+
+func Disasm1(fn *SuFunc, ip int) string {
+	var output string
+	d := &dasm{fn: fn, i: ip, out: func(_ *SuFunc, _, i int, s string, _ int) {
+		output = fmt.Sprintf("%5d: %s", i, s)
+	}}
+	d.next()
+	return output
 }
 
 type dasm struct {
@@ -109,7 +121,7 @@ type dasm struct {
 	nest int
 }
 
-func (d *dasm) next() {
+func (d *dasm) next() *SuFunc {
 	fetchUint8 := func() uint8 {
 		d.i++
 		return d.fn.Code[d.i-1]
@@ -166,6 +178,11 @@ func (d *dasm) next() {
 		idx := fetchUint8()
 		j := fetchInt16()
 		s += " " + d.fn.Names[idx] + fmt.Sprint(" ", d.i+j)
+	case op.ForIn2:
+		v1 := fetchUint8()
+		v2 := fetchUint8()
+		j := fetchInt16()
+		s += " " + d.fn.Names[v1] + " " + d.fn.Names[v2] + fmt.Sprint(" ", d.i+j)
 	case op.ForRange:
 		j := fetchInt16()
 		s += fmt.Sprint(" ", d.i+j)
@@ -192,15 +209,16 @@ func (d *dasm) next() {
 		endTok := tokens.Token(fetchUint8())
 		end := d.fn.Values[fetchUint8()]
 		s += fmt.Sprint(" ", orgTok, " ", org, " ", endTok, " ", end)
+	case op.ReturnMulti, op.PushReturn:
+		n := fetchUint8()
+		s += fmt.Sprint(" ", n)
 	}
 	srcLim := math.MaxInt
 	if nestedfn != nil && nestedfn.SrcBase > 0 {
 		srcLim = nestedfn.SrcBase
 	}
 	d.out(d.fn, d.nest, ip, s, srcLim)
-	if nestedfn != nil && nestedfn.SrcBase > 0 {
-		disasm(d.nest+1, nestedfn, d.out) // recursive
-	}
+	return nestedfn
 }
 
 func DisasmRaw(code string, fn func(i int)) {
@@ -209,7 +227,8 @@ func DisasmRaw(code string, fn func(i int)) {
 		switch op.Opcode(code[i]) {
 		case op.Value, op.Closure, op.Load, op.Store, op.Dyload,
 			op.GetPut, op.CallFuncDiscard, op.CallFuncNoNil, op.CallFuncNilOk,
-			op.CallMethDiscard, op.CallMethNoNil, op.CallMethNilOk:
+			op.CallMethDiscard, op.CallMethNoNil, op.CallMethNilOk,
+			op.ReturnMulti, op.PushReturn:
 			i++
 		case op.Int, op.LoadStore, op.Global, op.Super,
 			op.Jump, op.JumpTrue, op.JumpFalse, op.JumpIs, op.JumpIsnt,
@@ -217,6 +236,8 @@ func DisasmRaw(code string, fn func(i int)) {
 			i += 2
 		case op.ForIn, op.Try:
 			i += 3
+		case op.ForIn2:
+			i += 4
 		}
 	}
 }

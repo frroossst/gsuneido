@@ -28,16 +28,16 @@ const (
 	maxcols         = 211
 	maxidxs         = 11
 	maxidxcols      = 5
-	nrows           = 1_000_000
-	nthreads        = 4 // must divide evenly into nrows
+	nrows           = 2_000_000
+	nthreads        = 8 // must divide evenly into nrows
 	tablesPerTran   = 7
 	rowsPerTable    = 7
 	persistInterval = 500 * time.Millisecond
 )
 
-func TestBig(*testing.T) {
+func TestBig(t *testing.T) {
 	if testing.Short() {
-		return
+		t.SkipNow()
 	}
 	assert.That(nrows%nthreads == 0)
 	fmt.Println("create tables")
@@ -50,7 +50,7 @@ func TestBig(*testing.T) {
 	count := nrows / nthreads
 	start := 0
 	var wg sync.WaitGroup
-	for i := 0; i < nthreads; i++ {
+	for range nthreads {
 		wg.Add(1)
 		go func(start int) {
 			createData(db, tables, start, count)
@@ -69,14 +69,15 @@ func TestBig(*testing.T) {
 	nr := 0
 	state := db.GetState()
 	state.Meta.CheckAllMerged()
-	state.Meta.ForEachInfo(func(ti *meta.Info) {
+	for ti := range state.Meta.Infos() {
 		nr += ti.Nrows
-	})
+	}
 	assert.This(nr).Is(nrows)
 	db.MustCheck()
 
 	db.Close()
 	ck(CheckDatabase(dbfile))
+	PrintStates(dbfile, true)
 }
 
 func createTables() []string {
@@ -84,19 +85,19 @@ func createTables() []string {
 	ck(err)
 	tables := make([]string, ntables)
 	randTable := str.UniqueRandom(4, 16)
-	for i := 0; i < ntables; i++ {
+	for i := range ntables {
 		table := randTable()
 		tables[i] = table
 		randCol := str.UniqueRandom(4, 16)
 		ncols := fromHash(table, maxcols)
 		cols := make([]string, ncols)
-		for j := 0; j < ncols; j++ {
+		for j := range ncols {
 			cols[j] = randCol()
 		}
 		nidxs := fromHash(table, maxidxs)
 		idxSchema := make([]schema.Index, nidxs)
 		idxInfo := make([]*index.Overlay, nidxs)
-		for j := 0; j < nidxs; j++ {
+		for j := range nidxs {
 			var idxcols []string
 			var mode byte
 			if j == 0 {
@@ -105,7 +106,7 @@ func createTables() []string {
 			} else {
 				nidxcols := fromHash(table, (maxidxcols))
 				idxcols := make([]string, nidxcols)
-				for k := 0; k < nidxcols; k++ {
+				for k := range nidxcols {
 					f := fromHash(table, ncols) - 1
 					idxcols[k] = cols[f]
 				}
@@ -121,7 +122,7 @@ func createTables() []string {
 		ti := &meta.Info{Table: table, Indexes: idxInfo}
 		db.AddNewTable(ts, ti)
 	}
-	db.Close()
+	db.PersistClose()
 	return tables
 }
 
@@ -135,7 +136,7 @@ func createData(db *Database, tables []string, i, n int) {
 	for i < n {
 		ut := db.NewUpdateTran()
 		nt := 1 + rand.Intn(tablesPerTran)
-		for j := 0; j < nt && i < n; j++ {
+		for range min(nt, n) {
 			table := tables[rand.Intn(ntables)]
 			nr := 1 + rand.Intn(rowsPerTable)
 			for k := 0; k <= nr && i < n; k++ {

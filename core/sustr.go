@@ -184,7 +184,10 @@ func (ss SuStr) Get(_ *Thread, key Value) Value {
 
 // strGet is used by SuStr and SuConcat .Get
 func strGet(s string, key Value) Value {
-	i := ToIndex(key)
+	i, ok := key.IfInt()
+	if ! ok {
+		return nil
+	}
 	n := len(s)
 	if i < -n || n <= i {
 		return EmptyStr
@@ -276,7 +279,7 @@ var StringMethods Methods
 
 var gnStrings = Global.Num("Strings")
 
-func (SuStr) Lookup(th *Thread, method string) Callable {
+func (SuStr) Lookup(th *Thread, method string) Value {
 	return Lookup(th, StringMethods, gnStrings, method)
 }
 
@@ -339,7 +342,7 @@ func (si *stringIter) Infinite() bool {
 func (si *stringIter) Instantiate() *SuObject {
 	InstantiateMax(len(si.s))
 	list := make([]Value, len(si.s))
-	for i := 0; i < len(si.s); i++ {
+	for i := range len(si.s) {
 		list[i] = SuStr1s[si.s[i]]
 	}
 	return NewSuObject(list)

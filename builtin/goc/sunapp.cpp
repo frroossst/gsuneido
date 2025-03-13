@@ -6,7 +6,9 @@
 #include <windows.h>
 #include <wininet.h>
 #include <malloc.h>
+extern "C" {
 #include "cside.h"
+}
 
 extern "C" buf_t suneidoAPP(char* s);
 
@@ -139,7 +141,7 @@ HRESULT STDMETHODCALLTYPE CSuneidoAPP::Start(
 	USES_CONVERSION;
 	const char* url = W2CA(szUrl);
 	buf_t result = suneidoAPP((char*) url);
-	str = result.buf;
+	str = result.data;
 	len = result.size;
 	pos = 0;
 

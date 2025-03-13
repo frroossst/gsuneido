@@ -19,8 +19,7 @@ type heapdb struct {
 
 func heapDb() heapdb {
 	stor := stor.HeapStor(8192)
-	db, err := db19.CreateDb(stor)
-	ck(err)
+	db := db19.CreateDb(stor)
 	db19.StartConcur(db, 50*time.Millisecond)
 	db19.MakeSuTran = func(ut *db19.UpdateTran) *SuTran {
 		return NewSuTran(nil, true)
@@ -146,6 +145,6 @@ func (t sizeTran) GetInfo(table string) *meta.Info {
 	if table == "trans" || table == "hist" || table == "hist2" {
 		ti.Nrows = 10_000
 	}
-	ti.Size = uint64(ti.Nrows) * 100
+	ti.Size = int64(ti.Nrows) * 100
 	return &ti
 }

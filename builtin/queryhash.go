@@ -9,9 +9,9 @@ import (
 	"slices"
 
 	. "github.com/apmckinlay/gsuneido/core"
-	"github.com/apmckinlay/gsuneido/util/generic/hmap"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/hash"
+	"github.com/apmckinlay/gsuneido/util/shmap"
 )
 
 var _ = builtin(QueryHash, "(query, details=false)")
@@ -36,11 +36,11 @@ func QueryHash(th *Thread, args []Value) Value {
 	eqfn := func(x, y rowHash) bool {
 		return x.hash == y.hash && equalRow(x.row, y.row, qh.hdr, qh.fields)
 	}
-	rows := hmap.NewHmapFuncs[rowHash, struct{}](hfn, eqfn)
+	rows := shmap.NewMapFuncs[rowHash, struct{}](hfn, eqfn)
 
 	for row, _ := q.Get(th, Next); row != nil; row, _ = q.Get(th, Next) {
 		rh := rowHash{row: row, hash: qh.Row(row)}
-		if _, _, exists := rows.GetPut(rh, struct{}{}); exists {
+		if _, exists := rows.GetInit(rh); exists {
 			panic("QueryHash: duplicate row")
 		}
 	}
@@ -59,6 +59,7 @@ func equalRow(x, y Row, hdr *Header, cols []string) bool {
 //-------------------------------------------------------------------
 
 type queryHasher struct {
+	thread   Thread
 	hdr      *Header
 	fields   []string
 	ncols    int
@@ -87,7 +88,8 @@ func NewQueryHasher(hdr *Header) *queryHasher {
 func (qh *queryHasher) Row(row Row) uint64 {
 	hash := uint64(17)
 	for _, fld := range qh.fields {
-		hash = hash*31 + hashPacked(row.GetRaw(qh.hdr, fld))
+		s := row.GetRawVal(qh.hdr, fld, &qh.thread, nil)
+		hash = hash*31 + hashPacked(s)
 	}
 	//TODO order sensitive if sorted
 	qh.hash += hash // '+' to ignore order
@@ -96,7 +98,7 @@ func (qh *queryHasher) Row(row Row) uint64 {
 }
 
 func hashPacked(p string) uint64 {
-	if len(p) > 0 && p[0] >= PackObject {
+	if len(p) > 0 && (p[0] == PackObject || p[0] == PackRecord) {
 		return hashObject(p)
 	}
 	return hash.FullString(p)
@@ -104,7 +106,7 @@ func hashPacked(p string) uint64 {
 
 func hashObject(p string) uint64 {
 	hash := uint64(17)
-	for i := 0; i < len(p); i++ {
+	for i := range len(p) {
 		// use simple addition to be insensitive to member order
 		hash += uint64(p[i])
 	}

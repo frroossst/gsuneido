@@ -31,8 +31,7 @@ func TestCheckCoTimeout(t *testing.T) {
 }
 
 func TestCheckCoRandom(*testing.T) {
-	db, err := CreateDb(stor.HeapStor(8192))
-	assert.That(err == nil)
+	db := CreateDb(stor.HeapStor(8192))
 	db.ck = StartCheckCo(db, mergeSink(), nil)
 	nThreads := 8
 	nTrans := 10000
@@ -41,11 +40,11 @@ func TestCheckCoRandom(*testing.T) {
 		nTrans = 1000
 	}
 	var wg sync.WaitGroup
-	for i := 0; i < nThreads; i++ {
+	for range nThreads {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < nTrans; i++ {
+			for range nTrans {
 				randTran(db)
 			}
 		}()
@@ -70,7 +69,7 @@ var nCommit, nConflict atomic.Int32
 func randTran(db *Database) {
 	t := db.NewUpdateTran()
 	nActions := rand.Intn(20)
-	for i := 0; i < nActions; i++ {
+	for range nActions {
 		randAction(db.ck, t.ct)
 	}
 	if rand.Intn(2) == 1 {

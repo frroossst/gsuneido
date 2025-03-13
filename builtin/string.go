@@ -6,6 +6,7 @@ package builtin
 import (
 	"encoding/hex"
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/apmckinlay/gsuneido/compile/lexer"
@@ -33,7 +34,7 @@ func sameStr(x Value, s string) Value {
 	return SuStr(s)
 }
 
-var _ = exportMethods(&StringMethods)
+var _ = exportMethods(&StringMethods, "string")
 
 var _ = method(string_AlphaQ, "()")
 
@@ -124,6 +125,10 @@ func string_Eval2(th *Thread, this Value, args []Value) Value {
 	ob := &SuObject{}
 	if result := compile.EvalString(th, ToStr(this)); result != nil {
 		ob.Add(result)
+	} else if len(th.ReturnMulti) > 1 {
+		for _, val := range slices.Backward(th.ReturnMulti) {
+			ob.Add(val)
+		}
 	}
 	return ob
 }
@@ -165,24 +170,12 @@ func string_Find(this, arg1, arg2 Value) Value {
 	return IntVal(pos + i)
 }
 
-var _ = method(string_Find1of, "(string, pos=0)")
+var _ = method(string_Find1of, "(chars, pos=0)")
 
 func string_Find1of(this, arg1, arg2 Value) Value {
 	s := ToStr(this)
 	pos := position(arg2, len(s))
-	i := strings.IndexAny(s[pos:], ToStr(arg1))
-	if i == -1 {
-		return IntVal(len(s))
-	}
-	return IntVal(pos + i)
-}
-
-var _ = method(string_Findnot1of, "(string, pos=0)")
-
-func string_Findnot1of(this, arg1, arg2 Value) Value {
-	s := ToStr(this)
-	pos := position(arg2, len(s))
-	i := str.IndexNotAny(s[pos:], ToStr(arg1))
+	i := str.Find1of(s[pos:], ToStr(arg1))
 	if i == -1 {
 		return IntVal(len(s))
 	}
@@ -210,7 +203,7 @@ func string_FindLast(this, arg1, arg2 Value) Value {
 	return intOrFalse(strings.LastIndex(s[:end], substr))
 }
 
-var _ = method(string_FindLast1of, "(string, pos=false)")
+var _ = method(string_FindLast1of, "(chars, pos=false)")
 
 func string_FindLast1of(this, arg1, arg2 Value) Value {
 	set := ToStr(arg1)
@@ -222,19 +215,7 @@ func string_FindLast1of(this, arg1, arg2 Value) Value {
 	if end < 0 {
 		return False
 	}
-	return intOrFalse(strings.LastIndexAny(s[:end], set))
-}
-
-var _ = method(string_FindLastnot1of, "(string, pos=false)")
-
-func string_FindLastnot1of(this, arg1, arg2 Value) Value {
-	s := ToStr(this)
-	set := ToStr(arg1)
-	end := last1ofEnd(s, arg2)
-	if end < 0 || set == "" {
-		return False
-	}
-	return intOrFalse(str.LastIndexNotAny(s[:end], set))
+	return intOrFalse(str.FindLast1of(s[:end], set))
 }
 
 var _ = method(string_FromUtf8, "()")
@@ -379,7 +360,7 @@ func string_NumericQ(this Value) Value {
 	if len(s) == 0 {
 		return False
 	}
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if !ascii.IsDigit(s[i]) {
 			return False
 		}
@@ -401,7 +382,7 @@ var _ = method(string_Repeat, "(count)")
 func string_Repeat(this, arg Value) Value {
 	s := ToStr(this)
 	n := max(0, ToInt(arg))
-	CheckStringSize("Repeat", len(s) * n)
+	CheckStringSize("Repeat", len(s)*n)
 	return SuStr(strings.Repeat(s, n))
 }
 
@@ -443,14 +424,20 @@ func string_Size(this Value) Value {
 	// "this" should always have Len
 }
 
-var _ = method(string_Split, "(separator)")
+var _ = method(string_Split, "(separator = '')")
 
 func string_Split(this, arg Value) Value {
+	s := ToStr(this)
 	sep := ToStr(arg)
 	if sep == "" {
-		panic("string.Split separator must not be empty string")
+		// split bytes
+		v := make([]Value, len(s))
+		for i := range len(s) {
+			v[i] = SuStr1s[s[i]]
+		}
+		return SuObjectOf(v...)
 	}
-	strs := strings.Split(ToStr(this), sep)
+	strs := strings.Split(s, sep)
 	if strs[len(strs)-1] == "" {
 		strs = strs[:len(strs)-1]
 	}
@@ -559,7 +546,7 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) string
 	from := 0
 	nreps := 0
 	var buf strings.Builder
-	pat.ForEachMatch(s, func(cap *regex.Captures) bool {
+	for cap := range pat.All(s) {
 		if buf.Cap() == 0 {
 			buf.Grow(len(s)) // ???
 		}
@@ -579,8 +566,10 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) string
 		}
 		from = int(end)
 		nreps++
-		return nreps < count
-	})
+		if nreps >= count {
+			break
+		}
+	}
 	if nreps == 0 {
 		// avoid copy if no replacements
 		return s

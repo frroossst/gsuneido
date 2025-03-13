@@ -274,8 +274,12 @@ func (r *SuRecord) toObject() *SuObject {
 				if f != "-" && !strings.HasSuffix(f, "_deps") {
 					key := SuStr(f)
 					if !r.ob.hasKey(key) {
-						if val := r.row[ri].GetRaw(fi); val != "" {
-							r.ob.set(key, Unpack(val))
+						if raw := r.row[ri].GetRaw(fi); raw != "" {
+							if len(raw) > 0 && raw[0] == PackForward {
+								r.attachRule(f, makeFwdRule(raw[1:]))
+							} else {
+								r.ob.set(key, Unpack(raw))
+							}
 						}
 					}
 				}
@@ -486,7 +490,7 @@ func (r *SuRecord) GetPut(th *Thread, m, v Value,
 	defer r.Unlock()
 	orig := r.get(th, m)
 	if orig == nil {
-		panic("uninitialized member: " + m.String())
+		MemberNotFound(m)
 	}
 	v = op(orig, v)
 	r.put(th, m, v)
@@ -626,6 +630,10 @@ func (r *SuRecord) getIfPresent(th *Thread, keyval Value) Value {
 
 func (r *SuRecord) getFromRow(key string) Value {
 	if raw := r.row.GetRaw(r.hdr, key); raw != "" {
+		if len(raw) > 0 && raw[0] == PackForward {
+			r.attachRule(key, makeFwdRule(raw[1:]))
+			return nil
+		}
 		val := Unpack(raw)
 		if !r.ob.readonly {
 			r.ob.set(SuStr(key), val) // cache unpacked value
@@ -815,10 +823,14 @@ func (r *SuRecord) AttachRule(key, callable Value) {
 		defer r.Unlock()
 		callable.SetConcurrent()
 	}
+	r.attachRule(AsStr(key), callable)
+}
+
+func (r *SuRecord) attachRule(key string, callable Value) {
 	if r.attachedRules == nil {
 		r.attachedRules = make(map[string]Value)
 	}
-	r.attachedRules[AsStr(key)] = callable
+	r.attachedRules[key] = callable
 }
 
 func (r *SuRecord) GetDeps(key string) Value {
@@ -922,7 +934,7 @@ var RecordMethods Methods
 
 var gnRecords = Global.Num("Records")
 
-func (*SuRecord) Lookup(th *Thread, method string) Callable {
+func (*SuRecord) Lookup(th *Thread, method string) Value {
 	if m := Lookup(th, RecordMethods, gnRecords, method); m != nil {
 		return m
 	}
@@ -995,4 +1007,27 @@ func (r *forAddress) String() string {
 
 func (r *SuRecord) trace(args ...any) {
 	trace.Records.Println((*forAddress)(r), args...)
+}
+
+//-------------------------------------------------------------------
+
+func makeFwdRule(f string) Value {
+	return fwdrule{field: SuStr(f)}
+}
+
+type fwdrule struct {
+	ValueBase[fwdrule]
+	field SuStr
+}
+
+func (r fwdrule) Call(th *Thread, this Value, _ *ArgSpec) Value {
+	return this.Get(th, r.field)
+}
+
+func (r fwdrule) Equal(other any) bool {
+	return r == other
+}
+
+func (fwdrule) SetConcurrent() {
+	// ok for concurrent use
 }

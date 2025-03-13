@@ -9,12 +9,10 @@ import (
 	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
-var RunOnGoSide func()    // injected
 var Interrupt func() bool // injected
 
 const opInterval = 4001 // ???
 var opCount int = opInterval
-var InRunUI = false // no synchronization since only accessed by main thread
 
 var BlockBreak = BuiltinSuExcept("block:break")
 var BlockContinue = BuiltinSuExcept("block:continue")
@@ -35,7 +33,7 @@ func (th *Thread) invoke(fn *SuFunc, this Value) Value {
 // run is needed in addition to interp
 // because we can only recover panic on the way out of a function
 // so if the exception is caught we have to re-enter interp
-// Called by Thread.Invoke and SuClosure.Call
+// Called by Thread.Invoke (above) and SuClosure.Call
 func (th *Thread) run(frame Frame) Value {
 	if th.fp >= len(th.frames) {
 		panic("function call overflow")
@@ -51,7 +49,7 @@ func (th *Thread) run(frame Frame) Value {
 	fp := th.fp
 	if th.fp > th.fpMax {
 		th.fpMax = th.fp // track high water mark
-	} else if th.fpMax > th.fp {
+	} else if th.fp < th.fpMax {
 		// clear the frames up to the high water mark
 		for i := th.fp; i < th.fpMax; i++ {
 			th.frames[i] = Frame{}
@@ -60,7 +58,7 @@ func (th *Thread) run(frame Frame) Value {
 	}
 	if th.sp > th.spMax {
 		th.spMax = th.sp
-	} else if th.spMax > th.sp {
+	} else if th.sp < th.spMax {
 		// clear the value stack to high water mark
 		// and following non-nil (expression temporaries)
 		for i := th.sp; i < th.spMax || (i < maxStack && th.stack[i] != nil); i++ {
@@ -171,15 +169,13 @@ func (th *Thread) interp(catchJump, catchSp *int) (ret Value) {
 
 loop:
 	for fr.ip < len(code) {
-		// fmt.Println("stack:", t.sp, t.stack[max(0, t.sp-3):t.sp])
-		// _, da := Disasm1(fr.fn, fr.ip)
-		// fmt.Printf("%d: %d: %s\n", t.fp, fr.ip, da)
+		// fmt.Println("stack:", th.sp, th.stack[:th.sp])
+		// fmt.Println(Disasm1(fr.fn, fr.ip))
 		if wingui { // const so should be compiled away
-			if th == MainThread && !InRunUI {
+			if th == MainThread {
 				opCount--
 				if opCount <= 0 {
 					opCount = opInterval // reset counter
-					RunOnGoSide()
 					if Interrupt() {
 						panic("interrupt")
 					}
@@ -277,7 +273,15 @@ loop:
 			ob := th.Pop()
 			val := ob.Get(th, m)
 			if val == nil {
-				panic("uninitialized member: " + m.String())
+				if ss, ok := m.(SuStr); ok {
+					val = ob.Lookup(th, string(ss))
+					if val != nil {
+						val = NewSuMethod(ob, val)
+					}
+				}
+				if val == nil {
+					MemberNotFound(m)
+				}
 			}
 			th.Push(val)
 		case op.Put:
@@ -456,6 +460,17 @@ loop:
 			} else {
 				fr.ip += 3
 			}
+		case op.Iter2:
+			th.stack[th.sp-1] = OpIter2(th.stack[th.sp-1])
+		case op.ForIn2:
+			m, v := th.Top().(SuIter2).iter2()
+			if m != nil {
+				fr.locals.v[fetchUint8()] = m
+				fr.locals.v[fetchUint8()] = v
+				jump()
+			} else {
+				fr.ip += 4
+			}
 		case op.ForRange:
 			th.stack[th.sp-1] = OpAdd1(th.stack[th.sp-1])
 			if strictCompare(th.stack[th.sp-1], th.stack[th.sp-2]) < 0 {
@@ -479,6 +494,24 @@ loop:
 		case op.ReturnThrow:
 			th.ReturnThrow = true
 			break loop
+		case op.ReturnMulti:
+			th.ReturnMulti = th.ReturnMulti[:0]
+			n := fetchUint8()
+			for range n {
+				th.ReturnMulti = append(th.ReturnMulti, th.Pop())
+			}
+			th.Pop() // discard the normal nil return value
+		case op.PushReturn:
+			n := fetchUint8()
+			rm := th.ReturnMulti
+			th.ReturnMulti = th.ReturnMulti[:0]
+			if n != len(rm) {
+				panic("argument mismatch")
+			}
+			for i := range n {
+				th.Push(rm[i])
+			}
+			clear(th.ReturnMulti[:cap(th.ReturnMulti)])
 		case op.Try:
 			*catchJump = fr.ip + fetchInt16()
 			*catchSp = th.sp
@@ -551,7 +584,7 @@ loop:
 			base := th.sp - int(argSpec.Nargs) - 1
 			this := th.stack[base]
 			if methstr, ok := method.ToStr(); ok {
-				var f Callable
+				var f Value
 				ob := this
 				if super > 0 {
 					if instance, ok := this.(*SuInstance); ok {

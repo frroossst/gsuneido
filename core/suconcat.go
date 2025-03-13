@@ -54,14 +54,17 @@ func (c SuConcat) Len() int {
 const StringLimit = 32_000_000 // ???
 
 func CheckStringSize(op string, n int) {
+	if n < 0 {
+		panic(fmt.Sprint(op, ": invalid negative size ", n))
+	}
 	if n > StringLimit {
-		panic(fmt.Sprint("ERROR: ", op + ": string > ", StringLimit))
+		panic(fmt.Sprint(op, ": string > ", StringLimit))
 	}
 }
 
 // Add appends a string to an SuConcat
 func (c SuConcat) Add(s string) SuConcat {
-	CheckStringSize("concatenate", c.n + len(s))
+	CheckStringSize("concatenate", c.n+len(s))
 	buf := c.buf
 	if buf.concurrent || // shared between threads
 		len(buf.bs) != c.n { // another SuConcat has appended their own stuff
@@ -142,6 +145,9 @@ func (c SuConcat) Equal(other any) bool {
 	if c2, ok := other.(SuConcat); ok {
 		return c.n == c2.n && bytes.Equal(c.buf.bs[:c.n], c2.buf.bs[:c.n])
 	}
+	if se, ok := other.(*SuExcept); ok {
+        return c.toStr() == string(se.SuStr)
+    }
 	return false
 }
 
@@ -162,7 +168,7 @@ func (c SuConcat) Call(th *Thread, this Value, as *ArgSpec) Value {
 	return ss.Call(th, this, as)
 }
 
-func (SuConcat) Lookup(th *Thread, method string) Callable {
+func (SuConcat) Lookup(th *Thread, method string) Value {
 	return Lookup(th, StringMethods, gnStrings, method)
 }
 

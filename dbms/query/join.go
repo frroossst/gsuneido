@@ -4,9 +4,6 @@
 package query
 
 import (
-	"fmt"
-	"strings"
-
 	"slices"
 
 	"github.com/apmckinlay/gsuneido/compile/ast"
@@ -436,30 +433,6 @@ func (jb *joinBase) projectRow1(th *Thread, row Row) []string {
 	return key
 }
 
-func (jb *joinBase) projectRow2(th *Thread, row Row) []string {
-	key := make([]string, len(jb.by))
-	for i, col := range jb.by {
-		key[i] = row.GetRawVal(jb.source2.Header(), col, th, jb.st)
-	}
-	return key
-}
-
-func rowstr(hdr *Header, row Row) string {
-	if row == nil {
-		return "nil"
-	}
-	var sb strings.Builder
-	sep := ""
-	for _, col := range hdr.Columns {
-		val := row.GetVal(hdr, col, nil, nil)
-		if val != EmptyStr {
-			fmt.Fprint(&sb, sep, col, "=", AsStr(val))
-			sep = " "
-		}
-	}
-	return sb.String()
-}
-
 func (jn *Join) Select(cols, vals []string) {
 	// fmt.Println(jn.strategy(), "Select", cols, unpack(vals))
 	jn.nsels++
@@ -762,7 +735,9 @@ func (lj *LeftJoin) Get(th *Thread, dir Dir) (r Row) {
 func (lj *LeftJoin) filter2(row2 Row) bool {
 	// fmt.Println(lj.strategy(), "filter", lj.sel2cols, unpack(lj.sel2vals))
 	for i, col := range lj.sel2cols {
-		if row2.GetRaw(lj.source2.Header(), col) != lj.sel2vals[i] {
+		x := row2.GetRaw(lj.source2.Header(), col)
+		assert.That(len(x) == 0 || x[0] != PackForward)
+		if x != lj.sel2vals[i] {
 			return false
 		}
 	}
@@ -813,9 +788,9 @@ func (lj *LeftJoin) Simple(th *Thread) []Row {
 	rows1 := lj.source1.Simple(th)
 	rows2 := lj.source2.Simple(th)
 	rows := make([]Row, 0, len(rows1))
-	for i1 := 0; i1 < len(rows1); i1++ {
+	for i1 := range len(rows1) {
 		row1out := false
-		for i2 := 0; i2 < len(rows2); i2++ {
+		for i2 := range len(rows2) {
 			if lj.equalBy(th, lj.st, rows1[i1], rows2[i2]) {
 				rows = append(rows, JoinRows(rows1[i1], rows2[i2]))
 				row1out = true

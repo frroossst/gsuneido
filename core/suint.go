@@ -90,7 +90,7 @@ func (si *smi) String() string {
 }
 
 func (*smi) Get(*Thread, Value) Value {
-	panic("number does not support get")
+	return nil
 }
 
 func (*smi) Put(*Thread, Value, Value) {
@@ -151,7 +151,7 @@ var IntMethods Methods
 
 var anSuDnum = SuDnum{}
 
-func (*smi) Lookup(th *Thread, method string) Callable {
+func (*smi) Lookup(th *Thread, method string) Value {
 	if m := IntMethods[method]; m != nil {
 		return m
 	}

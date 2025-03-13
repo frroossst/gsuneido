@@ -13,6 +13,7 @@ import (
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/options"
+	"github.com/apmckinlay/gsuneido/util/ascii"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -38,6 +39,9 @@ func (a *Constant) Columns() []string {
 }
 
 func (a *Ident) Eval(c *Context) Value {
+	if ascii.IsUpper(a.Name[0]) && !slices.Contains(c.Hdr.Columns, a.Name) {
+		return Global.GetName(c.Th, a.Name)
+	}
 	return c.Row.GetVal(c.Hdr, a.Name, c.Th, c.Tran)
 }
 
@@ -46,6 +50,13 @@ func (a *Ident) Columns() []string {
 		return nil
 	}
 	return []string{a.Name}
+}
+
+func (a *Unary) CanEvalRaw(flds []string) bool {
+	if a.Tok == tok.LParen {
+		return a.E.CanEvalRaw(flds)
+	}
+	return false
 }
 
 func (a *Unary) Eval(c *Context) Value {
@@ -132,7 +143,8 @@ func (a *Binary) Eval(c *Context) Value {
 
 func (a *Binary) rawEval(c *Context) Value {
 	name := a.Lhs.(*Ident).Name
-	lhs := c.Row.GetRaw(c.Hdr, name)
+	// need GetRawVal to handle PackForward
+	lhs := c.Row.GetRawVal(c.Hdr, name, c.Th, c.Tran)
 	rhs := a.Rhs.(*Constant).Packed
 	switch a.Tok {
 	case tok.Is:
@@ -440,7 +452,7 @@ func (a *Mem) Eval(c *Context) Value {
 	m := a.M.Eval(c)
 	result := e.Get(nil, m)
 	if result == nil {
-		panic("uninitialized member: " + m.String())
+		MemberNotFound(m)
 	}
 	return result
 }
@@ -477,11 +489,9 @@ func (a *Call) Eval(c *Context) Value {
 	for i, a := range a.Args {
 		args[i] = a.E.Eval(c)
 	}
-	var fn Callable
+	var fn Value
 	var this Value
 	switch f := a.Fn.(type) {
-	case *Ident:
-		fn = Global.GetName(c.Th, f.Name)
 	case *Mem:
 		this = f.E.Eval(c)
 		meth := f.M.Eval(c)

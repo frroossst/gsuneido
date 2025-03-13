@@ -112,7 +112,7 @@ func codegenClosureBlock(ast *ast.Function, outercg *cgen) (*SuFunc, []string) {
 	assert.That(base <= math.MaxUint8)
 	f.Offset = uint8(base)
 	copy(f.Names, outerNames)
-	for i := 0; i < int(f.Nparams); i++ {
+	for i := range int(f.Nparams) {
 		outerNames[base+i] += "|" + strconv.Itoa(base+i)
 	}
 	return f, outerNames
@@ -311,6 +311,8 @@ func (cg *cgen) statement(node ast.Statement, labels *Labels, lastStmt bool) {
 		cg.continueStmt(labels)
 	case *ast.ExprStmt:
 		cg.exprStmt(node.E, lastStmt)
+	case *ast.MultiAssign:
+		cg.multiAssign(node)
 	default:
 		panic("unexpected statement type " + fmt.Sprintf("%T", node))
 	}
@@ -323,8 +325,20 @@ func (cg *cgen) statements(stmts []ast.Statement, labels *Labels) {
 }
 
 func (cg *cgen) returnStmt(node *ast.Return, lastStmt bool) {
-	expr := node.E
-	if expr != nil {
+	if len(node.Exprs) > 1 {
+		if cg.isBlock {
+			panic("multiple return values not allowed from a block")
+		}
+		assert.That(!node.ReturnThrow)
+		for _, e := range node.Exprs {
+			cg.expr2(e, callNoNil)
+		}
+		cg.emit(op.ReturnMulti, byte(len(node.Exprs)))
+		return
+	}
+	var expr ast.Expr
+	if len(node.Exprs) == 1 {
+		expr = node.Exprs[0]
 		cg.expr2(expr, callNilOk)
 	}
 	if cg.isBlock {
@@ -467,7 +481,11 @@ func (cg *cgen) forInStmt(node *ast.ForIn) {
 		return
 	}
 	cg.expr(node.E)
-	cg.emit(op.Iter)
+	if node.Var2.Name == "" {
+		cg.emit(op.Iter)
+	} else {
+		cg.emit(op.Iter2)
+	}
 	labels := &Labels{brk: -1, cont: -1}
 	start := cg.emitJump(op.Jump, -1)
 	loop := cg.label()
@@ -476,17 +494,17 @@ func (cg *cgen) forInStmt(node *ast.ForIn) {
 	cg.placeLabel(labels.cont)
 	cg.placeLabel(start)
 	label := loop - len(cg.code) - 4
-	cg.emit(op.ForIn, byte(cg.name(node.Var.Name)),
-		byte(label>>8), byte(label))
+	if node.Var2.Name == "" {
+		cg.emit(op.ForIn, byte(cg.name(node.Var.Name)),
+			byte(label>>8), byte(label))
+	} else {
+		label--
+		cg.emit(op.ForIn2,
+			byte(cg.name(node.Var.Name)), byte(cg.name(node.Var2.Name)),
+			byte(label>>8), byte(label))
+	}
 	cg.placeLabel(labels.brk)
 	cg.emit(op.Pop)
-}
-
-func (cg *cgen) emitForIn(name string, labels *Labels) {
-	i := cg.name(name)
-	adr := len(cg.code)
-	cg.emit(op.ForIn, byte(labels.brk>>8), byte(labels.brk), byte(i))
-	labels.brk = adr
 }
 
 var fldr ast.Folder
@@ -552,6 +570,19 @@ func (cg *cgen) exprStmt(expr ast.Expr, lastStmt bool) {
 				cg.emit(op.Pop)
 			}
 		}
+	}
+}
+
+func (cg *cgen) multiAssign(node *ast.MultiAssign) {
+	refs := make([]int, len(node.Lhs))
+	for i, expr := range node.Lhs {
+		refs[i] = cg.lvalue(expr)
+	}
+	cg.call(node.Rhs.(*ast.Call), callNilOk)
+	cg.emit(op.PushReturn, byte(len(refs)))
+	for _, ref := range refs {
+		cg.store(ref)
+		cg.emit(op.Pop)
 	}
 }
 

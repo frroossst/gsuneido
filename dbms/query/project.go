@@ -11,10 +11,10 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
-	"github.com/apmckinlay/gsuneido/util/generic/hmap"
 	"github.com/apmckinlay/gsuneido/util/generic/set"
 	"github.com/apmckinlay/gsuneido/util/generic/slc"
 	"github.com/apmckinlay/gsuneido/util/hash"
+	"github.com/apmckinlay/gsuneido/util/shmap"
 	"github.com/apmckinlay/gsuneido/util/str"
 	"github.com/apmckinlay/gsuneido/util/tsc"
 )
@@ -37,7 +37,7 @@ type Project struct {
 	th            *Thread
 }
 
-type mapType = hmap.Hmap[rowHash, struct{}, hmap.Funcs[rowHash]]
+type mapType = shmap.Map[rowHash, struct{}, shmap.Funcs[rowHash]]
 
 type projectApproach struct {
 	index []string
@@ -540,7 +540,7 @@ func (p *Project) getMap(th *Thread, dir Dir) Row {
 				return x.hash == y.hash &&
 					equalCols(x.row, y.row, p.source.Header(), p.columns, p.th, p.st)
 			}
-			p.results = hmap.NewHmapFuncs[rowHash, struct{}](hfn, eqfn)
+			p.results = shmap.NewMapFuncs[rowHash, struct{}](hfn, eqfn)
 		}
 		if dir == Prev && !p.indexed {
 			p.buildMap(th)
@@ -596,7 +596,7 @@ func (p *Project) buildMap(th *Thread) {
 func (p *Project) addResult(th *Thread, row Row) (Row, bool) {
 	rh := rowHash{row: row,
 		hash: hashCols(row, p.source.Header(), p.columns, th, p.st)}
-	k, _, existed := p.results.GetPut(rh, struct{}{})
+	k, existed := p.results.GetInit(rh)
 	if existed {
 		return k.row, true
 	} else {
@@ -654,7 +654,7 @@ func (p *Project) Simple(th *Thread) []Row {
 	rows := p.source.Simple(th)
 outer:
 	for i := range rows {
-		for j := 0; j < i; j++ {
+		for j := range i {
 			if hdr.EqualRows(rows[i], rows[j], th, nil) {
 				continue outer
 			}

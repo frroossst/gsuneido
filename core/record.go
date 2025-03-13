@@ -140,7 +140,7 @@ func (r Record) String() string {
 	}
 	var sb strings.Builder
 	sep := "{"
-	for i := 0; i < r.Count(); i++ {
+	for i := range r.Count() {
 		sb.WriteString(sep)
 		sep = ", "
 		sb.WriteString(r.GetVal(i).String())
@@ -149,15 +149,17 @@ func (r Record) String() string {
 	return sb.String()
 }
 
-// Truncate shortens records to n fields and removes empty trailing fields.
+// Truncate shortens records to n fields.
 // If the record has n or less fields it is returned unchanged.
+// Otherwise it builds a new record (and trims it)
+// It is used by UpdateTran output and update.
 func (r Record) Truncate(n int) Record {
-	rn := r.Len()
+	rn := r.Count()
 	if rn <= n {
 		return r
 	}
 	var rb RecordBuilder
-	for i := 0; i < n; i++ {
+	for i := range n {
 		rb.AddRaw(r.GetRaw(i))
 	}
 	return rb.Trim().Build()
@@ -287,19 +289,19 @@ func (b *RecordBuilder) buildOffsets(dst *pack.Encoder, length int, sizes []int)
 	switch mode(length) {
 	case type8:
 		dst.Put1(byte(offset))
-		for i := 0; i < nfields; i++ {
+		for i := range nfields {
 			offset -= sizes[i]
 			dst.Put1(byte(offset))
 		}
 	case type16:
 		dst.Uint16(uint16(offset))
-		for i := 0; i < nfields; i++ {
+		for i := range nfields {
 			offset -= sizes[i]
 			dst.Uint16(uint16(offset))
 		}
 	case type32:
 		dst.Uint32(uint32(offset))
-		for i := 0; i < nfields; i++ {
+		for i := range nfields {
 			offset -= sizes[i]
 			dst.Uint32(uint32(offset))
 		}

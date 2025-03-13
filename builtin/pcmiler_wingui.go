@@ -6,10 +6,11 @@
 package builtin
 
 import (
-	"github.com/apmckinlay/gsuneido/builtin/goc"
-	"github.com/apmckinlay/gsuneido/builtin/heap"
+	"bytes"
+	"syscall"
+	"unsafe"
+
 	. "github.com/apmckinlay/gsuneido/core"
-	"github.com/apmckinlay/gsuneido/util/str"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sys/windows"
 )
@@ -30,11 +31,11 @@ func (sp *suPcmsrv64) Equal(other any) bool {
 	return sp == other
 }
 
-func (*suPcmsrv64) Lookup(_ *Thread, method string) Callable {
+func (*suPcmsrv64) Lookup(_ *Thread, method string) Value {
 	return pcmMethods[method]
 }
 
-var pcmMethods = methods()
+var pcmMethods = methods("pcm")
 
 var _ = staticMethod(pcm_Members, "()")
 
@@ -52,15 +53,17 @@ func pcm_Version() Value {
 	if pcmsrv.Load() != nil {
 		return False
 	}
-	defer heap.FreeTo(heap.CurSize())
+	which := []byte("ProductVersion\x00")
 	const buflen = 200
-	buf := heap.Alloc(buflen)
-	goc.Syscall3(pcmsAbout.Addr(),
-		uintptr(heap.CopyStr("ProductVersion")),
-		uintptr(buf),
+	buf := make([]byte, buflen)
+	syscall.SyscallN(pcmsAbout.Addr(),
+		uintptr(unsafe.Pointer(&which[0])),
+		uintptr(unsafe.Pointer(&buf[0])),
 		buflen)
-	s := heap.GetStrZ(buf, int(buflen))
-	return SuStr(str.BeforeFirst(s, "."))
+	if i := bytes.IndexAny(buf, ".\x00"); i >= 0 {
+		buf = buf[:i]
+	}
+	return SuStr(string(buf))
 }
 
 // dll long pcmsrv32:PCMSAddStop(long tripId, [in] string stop)
@@ -68,10 +71,9 @@ var pcmsAddStop = pcmsrv.NewProc("PCMSAddStop")
 var _ = staticMethod(pcm_PCMAddStop, "(tripId, stop)")
 
 func pcm_PCMAddStop(a, b Value) Value {
-	defer heap.FreeTo(heap.CurSize())
-	rtn := goc.Syscall2(pcmsAddStop.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsAddStop.Addr(),
 		intArg(a),
-		uintptr(stringArg(b)))
+		uintptr(zstrArg(b)))
 	return int32Ret(rtn)
 }
 
@@ -80,7 +82,7 @@ var pcmsCalculate = pcmsrv.NewProc("PCMSCalculate")
 var _ = staticMethod(pcm_PCMCalculate, "(tripId)")
 
 func pcm_PCMCalculate(a Value) Value {
-	rtn := goc.Syscall1(pcmsCalculate.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsCalculate.Addr(),
 		intArg(a))
 	return int32Ret(rtn)
 }
@@ -90,11 +92,10 @@ var pcmsCalcTrip = pcmsrv.NewProc("PCMSCalcTrip")
 var _ = staticMethod(pcm_PCMCalcTrip, "(tripId, orig, dest)")
 
 func pcm_PCMCalcTrip(a, b, c Value) Value {
-	defer heap.FreeTo(heap.CurSize())
-	rtn := goc.Syscall3(pcmsCalcTrip.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsCalcTrip.Addr(),
 		intArg(a),
-		uintptr(stringArg(b)),
-		uintptr(stringArg(c)))
+		uintptr(zstrArg(b)),
+		uintptr(zstrArg(c)))
 	return int32Ret(rtn)
 }
 
@@ -104,7 +105,7 @@ var pcmsCloseServer = pcmsrv.NewProc("PCMSCloseServer")
 var _ = staticMethod(pcm_PCMCloseServer, "(server)")
 
 func pcm_PCMCloseServer(a Value) Value {
-	rtn := goc.Syscall1(pcmsCloseServer.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsCloseServer.Addr(),
 		intArg(a))
 	return int32Ret(rtn)
 }
@@ -114,7 +115,7 @@ var pcmsDeleteTrip = pcmsrv.NewProc("PCMSDeleteTrip")
 var _ = staticMethod(pcm_PCMDeleteTrip, "(tripId)")
 
 func pcm_PCMDeleteTrip(a Value) Value {
-	rtn := goc.Syscall1(pcmsDeleteTrip.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsDeleteTrip.Addr(),
 		intArg(a))
 	return int32Ret(rtn)
 }
@@ -125,15 +126,14 @@ var pcmsGetMatch = pcmsrv.NewProc("PCMSGetMatch")
 var _ = staticMethod(pcm_GetMatch, "(tripId, i)")
 
 func pcm_GetMatch(a, b Value) Value {
-	defer heap.FreeTo(heap.CurSize())
 	const buflen = 200
-	buf := heap.Alloc(buflen)
-	goc.Syscall4(pcmsGetMatch.Addr(),
+	buf := make([]byte, buflen)
+	syscall.SyscallN(pcmsGetMatch.Addr(),
 		intArg(a),
 		intArg(b),
-		uintptr(buf),
+		uintptr(unsafe.Pointer(&buf[0])),
 		buflen)
-	return SuStr(heap.GetStrZ(buf, int(buflen)))
+	return bufZstr(buf)
 }
 
 // dll long pcmsrv32:PCMSGetRpt(long tripId, long rpt, string buffer, long bufLen)
@@ -147,20 +147,19 @@ const PCM_RPT_STATE = 1
 var _ = staticMethod(pcm_GetRpt, "(tripId, rpt)")
 
 func pcm_GetRpt(a, b Value) Value {
-	size := goc.Syscall2(pcmsNumRptBytes.Addr(),
+	size, _, _ := syscall.SyscallN(pcmsNumRptBytes.Addr(),
 		intArg(a),
 		PCM_RPT_STATE)
 	if size <= 0 {
 		return False
 	}
-	defer heap.FreeTo(heap.CurSize())
-	buf := heap.Alloc(size)
-	goc.Syscall4(pcmsGetRpt.Addr(),
+	buf := make([]byte, size)
+	syscall.SyscallN(pcmsGetRpt.Addr(),
 		intArg(a),
 		intArg(b),
-		uintptr(buf),
+		uintptr(unsafe.Pointer(&buf[0])),
 		size)
-	return SuStr(heap.GetStrZ(buf, int(size)))
+	return bufZstr(buf)
 }
 
 // dll long pcmsrv32:PCMSNewTrip(long serverId)
@@ -168,7 +167,7 @@ var pcmsNewTrip = pcmsrv.NewProc("PCMSNewTrip")
 var _ = staticMethod(pcm_PCMNewTrip, "(tripId)")
 
 func pcm_PCMNewTrip(a Value) Value {
-	rtn := goc.Syscall1(pcmsNewTrip.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsNewTrip.Addr(),
 		intArg(a))
 	return int32Ret(rtn)
 }
@@ -178,7 +177,7 @@ var pcmsNumMatches = pcmsrv.NewProc("PCMSNumMatches")
 var _ = staticMethod(pcm_PCMNumMatches, "(tripId)")
 
 func pcm_PCMNumMatches(a Value) Value {
-	rtn := goc.Syscall1(pcmsNumMatches.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsNumMatches.Addr(),
 		intArg(a))
 	return int32Ret(rtn)
 }
@@ -188,7 +187,7 @@ var pcmsOpenServer = pcmsrv.NewProc("PCMSOpenServer")
 var _ = staticMethod(pcm_PCMOpenServer, "(tripId, hwnd)")
 
 func pcm_PCMOpenServer(a, b Value) Value {
-	rtn := goc.Syscall2(pcmsOpenServer.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsOpenServer.Addr(),
 		intArg(a),
 		intArg(b))
 	return int32Ret(rtn)
@@ -199,7 +198,7 @@ var pcmsIsValid = pcmsrv.NewProc("PCMSIsValid")
 var _ = staticMethod(pcm_PCMIsValid, "(serverId)")
 
 func pcm_PCMIsValid(a Value) Value {
-	rtn := goc.Syscall1(pcmsIsValid.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsIsValid.Addr(),
 		intArg(a))
 	return int32Ret(rtn)
 }
@@ -209,7 +208,7 @@ var pcmsSetBordersOpen = pcmsrv.NewProc("PCMSSetBordersOpen")
 var _ = staticMethod(pcm_PCMSetBordersOpen, "(tripId, open)")
 
 func pcm_PCMSetBordersOpen(a, b Value) Value {
-	goc.Syscall2(pcmsSetBordersOpen.Addr(),
+	syscall.SyscallN(pcmsSetBordersOpen.Addr(),
 		intArg(a),
 		boolArg(b))
 	return nil
@@ -220,7 +219,7 @@ var pcmsSetCalcType = pcmsrv.NewProc("PCMSSetCalcType")
 var _ = staticMethod(pcm_PCMSetCalcType, "(tripId, routeType)")
 
 func pcm_PCMSetCalcType(a, b Value) Value {
-	goc.Syscall2(pcmsSetCalcType.Addr(),
+	syscall.SyscallN(pcmsSetCalcType.Addr(),
 		intArg(a),
 		intArg(b))
 	return nil
@@ -231,10 +230,9 @@ var pcmsLookup = pcmsrv.NewProc("PCMSLookup")
 var _ = staticMethod(pcm_PCMLookup, "(tripId, placeName, easyMatch)")
 
 func pcm_PCMLookup(a, b, c Value) Value {
-	defer heap.FreeTo(heap.CurSize())
-	rtn := goc.Syscall3(pcmsLookup.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsLookup.Addr(),
 		intArg(a),
-		uintptr(stringArg(b)),
+		uintptr(zstrArg(b)),
 		intArg(c))
 	return int32Ret(rtn)
 }
@@ -244,7 +242,7 @@ var pcmsSetMiles = pcmsrv.NewProc("PCMSSetMiles")
 var _ = staticMethod(pcm_PCMSetMiles, "(tripId)")
 
 func pcm_PCMSetMiles(a Value) Value {
-	rtn := goc.Syscall1(pcmsSetMiles.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsSetMiles.Addr(),
 		intArg(a))
 	return int32Ret(rtn)
 }
@@ -254,7 +252,7 @@ var pcmsSetCustomMode = pcmsrv.NewProc("PCMSSetCustomMode")
 var _ = staticMethod(pcm_PCMSetCustomMode, "(tripId, onOff)")
 
 func pcm_PCMSetCustomMode(a, b Value) Value {
-	goc.Syscall2(pcmsSetCustomMode.Addr(),
+	syscall.SyscallN(pcmsSetCustomMode.Addr(),
 		intArg(a),
 		boolArg(b))
 	return nil
@@ -266,7 +264,7 @@ var pcmsSetCalcTypeEx = pcmsrv.NewProc("PCMSSetCalcTypeEx")
 var _ = staticMethod(pcm_PCMSetCalcTypeEx, "(tripId, routeType, optFlags, vehType)")
 
 func pcm_PCMSetCalcTypeEx(a, b, c, d Value) Value {
-	rtn := goc.Syscall4(pcmsSetCalcTypeEx.Addr(),
+	rtn, _, _ := syscall.SyscallN(pcmsSetCalcTypeEx.Addr(),
 		intArg(a),
 		intArg(b),
 		intArg(c),
@@ -279,7 +277,7 @@ var pcmsSetVehicleType = pcmsrv.NewProc("PCMSSetVehicleType")
 var _ = staticMethod(pcm_PCMSetVehicleType, "(tripId, onOff)")
 
 func pcm_PCMSetVehicleType(a, b Value) Value {
-	goc.Syscall2(pcmsSetVehicleType.Addr(),
+	syscall.SyscallN(pcmsSetVehicleType.Addr(),
 		intArg(a),
 		boolArg(b))
 	return nil
@@ -290,7 +288,7 @@ var pcmsSetRouteLevel = pcmsrv.NewProc("PCMSSetRouteLevel")
 var _ = staticMethod(pcm_PCMSetRouteLevel, "(tripId, onOff)")
 
 func pcm_PCMSetRouteLevel(a, b Value) Value {
-	goc.Syscall2(pcmsSetRouteLevel.Addr(),
+	syscall.SyscallN(pcmsSetRouteLevel.Addr(),
 		intArg(a),
 		boolArg(b))
 	return nil

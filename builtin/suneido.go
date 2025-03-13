@@ -17,7 +17,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/regex"
 )
 
-var _ = exportMethods(&SuneidoObjectMethods)
+var _ = exportMethods(&SuneidoObjectMethods, "suneido")
 
 var _ = staticMethod(suneido_Compile, "(source, errob = false)")
 
@@ -155,4 +155,22 @@ func suneido_Info(x Value) Value {
 		return SuObjectOfStrs(InfoList())
 	}
 	return InfoStr(ToStr(x))
+}
+
+var _ = method(suneido_Members, "(all = false)")
+
+func suneido_Members(this Value, all Value) Value {
+	if !ToBool(all) {
+		return NewSuSequence(IterMembers(ToContainer(this), true, true))
+	}
+	suneido := this.(*SuneidoObject)
+	mems := make([]Value, 0, suneido.Size()+len(SuneidoObjectMethods))
+	iter := IterMembers(suneido, true, true)
+	for v := iter.Next(); v != nil; v = iter.Next() {
+		mems = append(mems, v)
+	}
+	for k := range SuneidoObjectMethods {
+		mems = append(mems, SuStr(k))
+	}
+	return SuObjectOf(mems...)
 }

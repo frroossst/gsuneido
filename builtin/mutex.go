@@ -18,7 +18,7 @@ func Mutex() Value {
 	return &suMutex{mut: MakeMutexT()}
 }
 
-var suMutexMethods = methods()
+var suMutexMethods = methods("mu")
 
 var _ = method(mu_Do, "(block)")
 
@@ -37,7 +37,7 @@ func (sm *suMutex) Equal(other any) bool {
 	return sm == other
 }
 
-func (*suMutex) Lookup(_ *Thread, method string) Callable {
+func (*suMutex) Lookup(_ *Thread, method string) Value {
 	return suMutexMethods[method]
 }
 

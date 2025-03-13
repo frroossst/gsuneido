@@ -24,7 +24,7 @@ func Channel(size Value) Value {
 	return &suChannel{ch: make(chan Value, IfInt(size))}
 }
 
-var suChannelMethods = methods()
+var suChannelMethods = methods("chan")
 
 var _ = method(chan_Send, "(value)")
 
@@ -50,8 +50,8 @@ var _ = method(chan_Recv, "()")
 func chan_Recv(this Value) Value {
 	sc := this.(*suChannel)
 	select {
-	case val := <-sc.ch:
-		if val == nil {
+	case val, ok := <-sc.ch:
+		if !ok {
 			return this // closed
 		}
 		if sc.concurrent {
@@ -70,17 +70,17 @@ func chan_Recv2(this, arg Value) Value {
 	sc2 := arg.(*suChannel)
 	ob := &SuObject{}
 	select {
-	case val := <-sc.ch:
+	case val, ok := <-sc.ch:
 		ob.Add(Zero)
-		if val != nil {
+		if ok {
 			if sc.concurrent {
 				val.SetConcurrent()
 			}
 			ob.Add(val)
 		}
-	case val := <-sc2.ch:
+	case val, ok := <-sc2.ch:
 		ob.Add(One)
-		if val != nil {
+		if ok {
 			if sc2.concurrent {
 				val.SetConcurrent()
 			}
@@ -115,7 +115,7 @@ func (sc *suChannel) Equal(other any) bool {
 	return sc == other
 }
 
-func (*suChannel) Lookup(_ *Thread, method string) Callable {
+func (*suChannel) Lookup(_ *Thread, method string) Value {
 	return suChannelMethods[method]
 }
 

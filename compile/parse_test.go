@@ -129,6 +129,7 @@ func TestParseExpression(t *testing.T) {
 	test("a and b and c", "Nary(And a b c)")
 	test("a or b", "Nary(Or a b)")
 	test("a or b or c", "Nary(Or a b c)")
+	test("(a or b) and c", "Nary(And Unary(LParen Nary(Or a b)) c)")
 
 	test("a ? b : c", "Trinary(a b c)")
 	test("a \n ? b \n : c", "Trinary(a b c)")
@@ -249,6 +250,7 @@ func TestParseStatements(t *testing.T) {
 		assert.T(t).This(s).Like(expected)
 	}
 	test("x=123;;", "Binary(Eq x 123)\n{}")
+	test("a, b, c = f()", "MultiAssign(a b c Call(f))")
 
 	// return
 	test("return", "Return()")
@@ -257,6 +259,7 @@ func TestParseStatements(t *testing.T) {
 	test("return; 123", "Return()\n123")
 	test("return a + \n b", "Return(Nary(Add a b))")
 	test("return \n while b \n c", "Return()\nWhile(b c)")
+	test("return 1, 2, 3", "Return(1 2 3)")
 
 	test("return throw 123", "ReturnThrow(123)")
 
@@ -304,11 +307,16 @@ func TestParseStatements(t *testing.T) {
 	test("for (x in ob) stmt", "ForIn(x ob\nstmt)")
 	test("for x in 0..10 \n stmt", "ForIn(x 0 10\nstmt)")
 	test("for ..10 \n stmt", "ForIn(0 10\nstmt)")
+	test("for m,v in ob \n stmt", "ForIn(m v ob\nstmt)")
 
 	// for
 	test("for (;;) stmt", "For(; ; \n stmt)")
 	test("for (i = 0; i < 9; ++i) stmt",
 		"For(Binary(Eq i 0); Binary(Lt i 9); Unary(Inc i) \n stmt)")
+	test("for (i = 0, j = 1; i < 9; ++i, ++j) stmt",
+		"For(Binary(Eq i 0),Binary(Eq j 1); Binary(Lt i 9); Unary(Inc i),Unary(Inc j) \n stmt)")
+	test("for (x, i = 0; i < 9; ++i) stmt",
+		"For(x,Binary(Eq i 0); Binary(Lt i 9); Unary(Inc i) \n stmt)")
 
 	// try-catch
 	test("try stmt", "Try(stmt)")
@@ -343,4 +351,5 @@ func TestParseStatements(t *testing.T) {
 	xtest("return 1+2 3+4", "syntax error")
 	xtest("throw 1+2 3+4", "syntax error")
 	xtest("return throw", "syntax error")
+	xtest("return throw 1, 2, 3", "syntax error")
 }

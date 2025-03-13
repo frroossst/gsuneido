@@ -5,6 +5,7 @@ package tools
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -32,8 +33,7 @@ const dumpVersion = "Suneido dump 3\n"
 const dumpVersionPrev = "Suneido dump 2\n"
 const dumpVersionBase = "Suneido dump"
 
-// DumpDatabase exports the entire database to a file.
-// In the process it concurrently does a full check of the database.
+// DumpDatabase exports the entire database to a file
 func DumpDatabase(dbfile, to string) (nTables, nViews int, err error) {
 	db, err := OpenDb(dbfile, stor.Read, false)
 	if err != nil {
@@ -43,9 +43,10 @@ func DumpDatabase(dbfile, to string) (nTables, nViews int, err error) {
 	return Dump(db, to, "")
 }
 
-// Dump checks and exports the entire database to a file
+// Dump exports an entire open database to a file
+// If checks as it dumps and could mark the database as corrupted.
 func Dump(db *Database, to, publicKey string) (nTables, nViews int, err error) {
-	if db.Corrupted() {
+	if db.IsCorrupted() {
 		return 0, 0, fmt.Errorf("dump not allowed when database is locked")
 	}
 	defer func() {
@@ -80,9 +81,9 @@ func dump(db *Database, w WriterPlus) (nTables, nViews int) {
 	state := db.Persist()
 	nViews = dumpViews(state, w)
 	tables := make([]string, 0, 512)
-	state.Meta.ForEachSchema(func(sc *meta.Schema) {
+	for sc := range state.Meta.Tables() {
 		tables = append(tables, sc.Table)
-	})
+	}
 	sort.Strings(tables)
 	for _, table := range tables {
 		dumpTable2(db, state, table, true, w, ics)
@@ -90,8 +91,7 @@ func dump(db *Database, w WriterPlus) (nTables, nViews int) {
 	return len(tables), nViews
 }
 
-// DumpTable exports a dumped table to a file.
-// It returns the number of records dumped or panics on error.
+// DumpTable exports a table to a binary file
 func DumpTable(dbfile, table, to string) (nrecs int, err error) {
 	db, err := OpenDb(dbfile, stor.Read, false)
 	if err != nil {
@@ -101,8 +101,11 @@ func DumpTable(dbfile, table, to string) (nrecs int, err error) {
 	return DumpDbTable(db, table, to, "")
 }
 
+// DumpDbTable exports a table to a binary file from an open database.
+// It returns the number of records dumped or panics on error.
+// If checks as it dumps and could mark the database as corrupted.
 func DumpDbTable(db *Database, table, to, publicKey string) (nrecs int, err error) {
-	if db.Corrupted() {
+	if db.IsCorrupted() {
 		return 0, fmt.Errorf("dump not allowed when database is locked")
 	}
 	defer func() {
@@ -121,6 +124,9 @@ func DumpDbTable(db *Database, table, to, publicKey string) (nrecs int, err erro
 	tmpfile := f.Name()
 	defer func() { f.Close(); os.Remove(tmpfile) }()
 	nrecs = dumpDbTable(db, table, w)
+	if nrecs == -1 {
+		return 0, errors.New("can't find " + table)
+	}
 	if err := w.Flush(); err != nil {
 		return 0, err
 	}
@@ -194,7 +200,7 @@ func dumpTable2(db *Database, state *DbState, table string, multi bool,
 	w.WriteString("====== ")
 	sc := state.Meta.GetRoSchema(table)
 	if sc == nil {
-		panic("can't find " + table)
+		return -1
 	}
 	hasdel := sc.HasDeleted()
 	schema := sc.DumpString()
@@ -204,7 +210,7 @@ func dumpTable2(db *Database, state *DbState, table string, multi bool,
 	w.WriteString(schema + "\n")
 	info := state.Meta.GetRoInfo(table)
 	sum := uint64(0)
-	count := info.Indexes[0].Check(func(off uint64) {
+	nrows := info.Indexes[0].Check(func(off uint64) {
 		sum += off                       // addition so order doesn't matter
 		rec := OffToRecCk(db.Store, off) // verify data checksums
 		if hasdel {
@@ -214,14 +220,15 @@ func dumpTable2(db *Database, state *DbState, table string, multi bool,
 		w.WriteString(string(rec))
 	})
 	writeInt(w, 0) // end of table records
-	if count != info.Nrows {
+	if nrows != info.Nrows {
 		panic(fmt.Sprintln("dump", table, sc.Indexes[0].Columns,
-			"count", count, "should equal info", info.Nrows))
+			"count", nrows, "should equal info", info.Nrows))
 	}
-	ics.checkOtherIndexes(sc, info, count, sum) // concurrent
-	return count
+	ics.checkOtherIndexes(sc, info, nrows, sum) // concurrent
+	return nrows
 }
 
+// squeeze removes deleted fields. It is used by dump and compact.
 func squeeze(rec core.Record, cols []string) core.Record {
 	var rb core.RecordBuilder
 	for i, col := range cols {
@@ -229,7 +236,7 @@ func squeeze(rec core.Record, cols []string) core.Record {
 			rb.AddRaw(rec.GetRaw(i))
 		}
 	}
-	return rb.Build()
+	return rb.Trim().Build()
 }
 
 func writeInt(w WriterPlus, n int) {
@@ -243,7 +250,13 @@ func writeInt(w WriterPlus, n int) {
 func dumpViews(state *DbState, w WriterPlus) int {
 	w.WriteString("====== views (view_name,view_definition) key(view_name)\n")
 	nrecs := 0
-	state.Meta.ForEachView(func(name, def string) {
+	views := make([]string, 0, 32)
+	for name := range state.Meta.Views() {
+		views = append(views, name)
+	}
+	sort.Strings(views)
+	for _, name := range views {
+		def := state.Meta.GetView(name)
 		var b core.RecordBuilder
 		b.Add(core.SuStr(name))
 		b.Add(core.SuStr(def))
@@ -251,7 +264,7 @@ func dumpViews(state *DbState, w WriterPlus) int {
 		writeInt(w, len(rec))
 		w.WriteString(string(rec))
 		nrecs++
-	})
+	}
 	writeInt(w, 0) // end of table records
 	return nrecs
 }
@@ -264,7 +277,7 @@ func newIndexCheckers() *indexCheckers {
 		stop: make(chan void)}
 	nw := options.Nworkers
 	ics.wg.Add(nw)
-	for i := 0; i < nw; i++ {
+	for range nw {
 		go ics.worker()
 	}
 	return &ics

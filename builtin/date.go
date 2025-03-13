@@ -65,16 +65,6 @@ func toDate(v Value) SuDate {
 	return v.(SuTimestamp).SuDate
 }
 
-func asDate(v Value) (SuDate, bool) {
-	if d, ok := v.(SuDate); ok {
-		return d, true
-	}
-	if t, ok := v.(SuTimestamp); ok {
-		return t.SuDate, true
-	}
-	return NilDate, false
-}
-
 func hasFields(args []Value) bool {
 	for i := 2; i <= 8; i++ {
 		if args[i] != nil {
@@ -85,14 +75,13 @@ func hasFields(args []Value) bool {
 }
 
 func named(args []Value) Value {
-	now := Now()
-	year := now.Year()
-	month := now.Month()
-	day := now.Day()
-	hour := now.Hour()
-	minute := now.Minute()
-	second := now.Second()
-	millisecond := now.Millisecond()
+	year := 1700
+	month := 1
+	day := 1
+	hour := 0
+	minute := 0
+	second := 0
+	millisecond := 0
 	if args[2] != nil {
 		year = ToInt(args[2])
 	}
@@ -121,18 +110,7 @@ func named(args []Value) Value {
 	return d
 }
 
-func (d *suDateGlobal) Get(th *Thread, key Value) Value {
-	m := ToStr(key)
-	if fn, ok := dateStaticMethods[m]; ok {
-		return fn.(Value)
-	}
-	if fn, ok := ParamsMethods[m]; ok {
-		return NewSuMethod(d, fn.(Value))
-	}
-	return nil
-}
-
-func (d *suDateGlobal) Lookup(th *Thread, method string) Callable {
+func (d *suDateGlobal) Lookup(th *Thread, method string) Value {
 	if fn, ok := dateStaticMethods[method]; ok {
 		return fn
 	}
@@ -145,27 +123,35 @@ func (d *suDateGlobal) String() string {
 
 var msFactor = dnum.FromStr(".001")
 
-var dateStaticMethods = methods()
+var dateStaticMethods = methods("dateStatic")
 
-var _ = staticMethod(date_Begin, "()")
+var _ = staticMethod(dateStatic_Begin, "()")
 
-func date_Begin() Value {
+func dateStatic_Begin() Value {
 	return DateBegin
 }
 
-var _ = staticMethod(date_End, "()")
+var _ = staticMethod(dateStatic_End, "()")
 
-func date_End() Value {
+func dateStatic_End() Value {
 	return DateEnd
 }
 
-var _ = exportMethods(&DateMethods)
+var _ = staticMethod(dateStatic_Members, "()")
+
+func dateStatic_Members() Value {
+	return date_members
+}
+
+var date_members = methodList(dateStaticMethods)
+
+var _ = exportMethods(&DateMethods, "date")
 
 var _ = method(date_MinusDays, "(date)")
 
 func date_MinusDays(this Value, val Value) Value {
 	t1 := toDate(this)
-	if t2, ok := asDate(val); ok {
+	if t2, ok := AsDate(val); ok {
 		return IntVal(t1.MinusDays(t2))
 	}
 	panic("date.MinusDays requires date")
@@ -175,7 +161,7 @@ var _ = method(date_MinusSeconds, "(date)")
 
 func date_MinusSeconds(this Value, val Value) Value {
 	t1 := toDate(this)
-	if t2, ok := asDate(val); ok {
+	if t2, ok := AsDate(val); ok {
 		if t1.Year()-t2.Year() >= 50 {
 			panic("date.MinusSeconds interval too large")
 		}

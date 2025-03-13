@@ -38,14 +38,13 @@ func (c *Captures) Print(s string) {
 	}
 }
 
-func TestForEachMatch(t *testing.T) {
+func TestAll(t *testing.T) {
 	test := func(pat, s string, expected ...int32) {
 		var matches []int32
-		Compile(pat).ForEachMatch(s, func(cap *Captures) bool {
+		for cap := range Compile(pat).All(s) {
 			matches = append(matches, cap[0])
 			//fmt.Println(cap[0], str.BeforeFirst(s[cap[0]:], "\n"))
-			return true
-		})
+		}
 		assert.T(t).This(matches).Is(expected)
 	}
 	test("^", "one\ntwo\r\nthree", 0, 4, 9)
@@ -303,7 +302,7 @@ var M bool
 
 func BenchmarkOnePass(b *testing.B) {
 	pat := Compile("^a+b")
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		M = pat.Match("aaab", nil)
 	}
 }
@@ -512,7 +511,7 @@ func BenchmarkMatch(b *testing.B) {
 	s := strings.Repeat("helloworld", 1000)
 	pat := Compile("x|y|z")
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		pat.match(s, 0, &Captures{}, false)
 	}
 }

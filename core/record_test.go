@@ -52,12 +52,37 @@ func TestLength(t *testing.T) {
 }
 
 func BenchmarkRecordBuilder(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-        b := RecordBuilder{}
-        for j := 0; j < 10; j++ {
-            b.Add(SuStr("hello"))
-            b.AddRaw("world")
+	for range b.N {
+		b := RecordBuilder{}
+		for range 10 {
+			b.Add(SuStr("hello"))
+			b.AddRaw("world")
 			b.Build()
-        }
-    }
+		}
+	}
+}
+
+func TestTruncate(t *testing.T) {
+    b := RecordBuilder{}
+	r := b.Build()
+	assert.That(r == "\x00")
+	r2 := r.Truncate(99)
+	assert.That(r2 == r)
+	r2 = r.Truncate(0)
+	assert.That(r2 == r)
+	
+    b.Add(SuInt(123))
+    b.Add(SuStr("hello world"))
+	b.Add(SuBool(true))
+	r = b.Build()
+	r2 = r.Truncate(99)
+	assert.That(r2 == r)
+	r2 = r.Truncate(2)
+	assert.This(r2.String()).Is(`{123, "hello world"}`)
+	
+	b.Add(SuStr(""))
+	b.Add(SuStr(""))
+	r = b.Build()
+	r2 = r.Truncate(4)
+	assert.This(r2.String()).Is(`{123, "hello world", true}`)
 }

@@ -7,7 +7,6 @@ package builtin
 
 import (
 	"github.com/apmckinlay/gsuneido/builtin/goc"
-	"github.com/apmckinlay/gsuneido/builtin/heap"
 	. "github.com/apmckinlay/gsuneido/core"
 )
 
@@ -24,24 +23,17 @@ func (*suWebBrowser) String() string {
 var _ = builtin(WebBrowser, "(hwnd)")
 
 func WebBrowser(a Value) Value {
-	defer heap.FreeTo(heap.CurSize())
-	iunk := heap.Alloc(int64Size)
-	pPtr := heap.Alloc(int64Size)
-	rtn := goc.EmbedBrowserObject(
-		intArg(a),
-		uintptr(iunk),
-		uintptr(pPtr))
+	rtn, iunk, ptr := goc.EmbedBrowserObject(intArg(a))
 	if rtn != 0 {
 		return intRet(rtn)
 	}
-	iOleObject := *(*uintptr)(iunk)
-	swb := &suWebBrowser{iOleObject: iOleObject, ptr: *(*uintptr)(pPtr)}
-	idisp := goc.QueryIDispatch(iOleObject)
+	swb := &suWebBrowser{iOleObject: iunk, ptr: ptr}
+	idisp := goc.QueryIDispatch(iunk)
 	swb.suCOMObject = suCOMObject{ptr: idisp, idisp: true}
 	return swb
 }
 
-var suWebBrowserMethods = methods()
+var suWebBrowserMethods = methods("web")
 
 var _ = method(web_Release, "()")
 
@@ -58,7 +50,7 @@ func web_GetIOleObject(this Value) Value {
 	return IntVal((int)(this.(*suWebBrowser).iOleObject))
 }
 
-func (swb *suWebBrowser) Lookup(th *Thread, method string) Callable {
+func (swb *suWebBrowser) Lookup(th *Thread, method string) Value {
 	if f, ok := suWebBrowserMethods[method]; ok {
 		return f
 	}

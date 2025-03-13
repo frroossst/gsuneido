@@ -10,6 +10,7 @@ import (
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	. "github.com/apmckinlay/gsuneido/util/ascii"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/intern"
 )
 
 // Lexer implements the lexical scanner for Suneido
@@ -117,7 +118,7 @@ func (lxr *Lexer) next() Item {
 	case '#':
 		if p := lxr.peek(); p == '_' || IsLetter(p) {
 			lxr.matchIdentTail()
-			val := lxr.src[start+1 : lxr.si]
+			val := intern.String(lxr.src[start+1 : lxr.si])
 			return Item{Text: val, Pos: int32(start), Token: tok.Symbol}
 		}
 		return it(tok.Hash)
@@ -319,7 +320,7 @@ func (lxr *Lexer) rawString(start int) Item {
 		}
 		if lxr.src[lxr.si] == '`' {
 			lxr.si++
-			return it(tok.String, start, lxr.src[start+1:lxr.si-1])
+			return it(tok.String, start, strings.Clone(lxr.src[start+1:lxr.si-1]))
 		}
 	}
 }
@@ -464,12 +465,19 @@ func (lxr *Lexer) identifier(start int) Item {
 	val := lxr.src[start:lxr.si]
 	token := tok.Identifier
 	if lxr.peek() != ':' || val == "default" || val == "true" || val == "false" {
-		token, val = lxr.keyword(val)
+		if t, v := lxr.keyword(val); t != tok.Nil {
+			return Item{Text: v, Pos: int32(start), Token: t}
+		}
+	}
+	if val == "_" {
+		val = "unused"
+	} else {
+		val = intern.String(val)
 	}
 	return Item{Text: val, Pos: int32(start), Token: token}
 }
 
-// keyword returns the token for a string it is a keyword
+// keyword returns the token for a string if it is a keyword
 // otherwise Identifier and a copy of the string
 func keyword(s string) (tok.Token, string) {
 	switch len(s) {
@@ -565,7 +573,7 @@ func keyword(s string) (tok.Token, string) {
 			return tok.Continue, "continue"
 		}
 	}
-	return tok.Identifier, strings.Clone(s)
+	return tok.Nil, ""
 }
 
 func (lxr *Lexer) matchIdentTail() {

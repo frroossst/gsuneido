@@ -25,7 +25,7 @@ func Database(th *Thread, args []Value) Value {
 	return nil
 }
 
-var databaseMethods = methods()
+var databaseMethods = methods("db")
 
 var _ = staticMethod(db_Auth, "(data)")
 
@@ -145,20 +145,17 @@ func db_CorruptedQ(th *Thread, args []Value) Value {
 	return th.Dbms().Exec(th, SuObjectOf(SuStr("Database.Corrupted?")))
 }
 
-//-------------------------------------------------------------------
+var _ = staticMethod(db_Members, "()")
 
-func (d *suDatabaseGlobal) Get(th *Thread, key Value) Value {
-	m := ToStr(key)
-	if fn, ok := databaseMethods[m]; ok {
-		return fn.(Value)
-	}
-	if fn, ok := ParamsMethods[m]; ok {
-		return NewSuMethod(d, fn.(Value))
-	}
-	return nil
+func db_Members() Value {
+	return db_members
 }
 
-func (d *suDatabaseGlobal) Lookup(th *Thread, method string) Callable {
+var db_members = methodList(databaseMethods)
+
+//-------------------------------------------------------------------
+
+func (d *suDatabaseGlobal) Lookup(th *Thread, method string) Value {
 	if f, ok := databaseMethods[method]; ok {
 		return f
 	}

@@ -35,9 +35,11 @@ func TestTools(t *testing.T) {
 	}
 	createDb()
 	defer os.Remove(dbName)
-	tools.DumpDatabase(dbName, "dump_"+dbName)
+	_, _, err := tools.DumpDatabase(dbName, "dump_"+dbName)
+	ck(err)
 	defer os.Remove("dump_" + dbName)
-	tools.LoadDatabase("dump_"+dbName, "loaded_"+dbName, "", "")
+	_, _, err = tools.LoadDatabase("dump_"+dbName, "loaded_"+dbName, "", "")
+	ck(err)
 	defer os.Remove("loaded" + dbName)
 	ck(db19.CheckDatabase("loaded_" + dbName))
 	defer os.Remove("loaded_" + dbName)
@@ -57,8 +59,7 @@ func createDb() {
 	store, err := stor.MmapStor(dbName, stor.Create)
 	ck(err)
 	defer store.Close(true)
-	db, err := db19.CreateDb(store)
-	ck(err)
+	db := db19.CreateDb(store)
 	db19.StartConcur(db, 50*time.Millisecond)
 	db19.MakeSuTran = func(ut *db19.UpdateTran) *core.SuTran {
 		return core.NewSuTran(nil, true)

@@ -4,6 +4,7 @@
 package meta
 
 import (
+	"iter"
 	"log"
 
 	"slices"
@@ -68,16 +69,6 @@ func (m *Meta) GetRoInfo(table string) *Info {
 	return nil
 }
 
-//lint:ignore U1000 for debugging
-func copyInfo(ti *Info) *Info {
-	cp := *ti
-	cp.Indexes = slc.Clone(cp.Indexes)
-	for i, ov := range cp.Indexes {
-		cp.Indexes[i] = ov.Copy()
-	}
-	return &cp
-}
-
 func (m *Meta) GetRwInfo(table string) *Info {
 	if pti, ok := m.difInfo[table]; ok {
 		return pti // already have mutable
@@ -113,28 +104,28 @@ func (m *Meta) GetView(name string) string {
 	return ts.Columns[0]
 }
 
-func (m *Meta) ForEachSchema(fn func(*Schema)) {
-	m.schema.ForEach(func(schema *Schema) {
-		if schema.isTable() {
-			fn(schema)
-		}
-	})
+func (m *Meta) Tables() iter.Seq[*Schema] {
+	return func(yield func(*Schema) bool) {
+		m.schema.All()(func(schema *Schema) bool {
+			return !schema.isTable() || yield(schema)
+		})
+	}
 }
 
-func (m *Meta) ForEachView(fn func(name, def string)) {
-	m.schema.ForEach(func(schema *Schema) {
-		if schema.isView() {
-			fn(schema.Table[1:], schema.Columns[0])
-		}
-	})
+func (m *Meta) Views() iter.Seq2[string, string] {
+	return func(yield func(string, string) bool) {
+		m.schema.All()(func(schema *Schema) bool {
+			return !schema.isView() || yield(schema.Table[1:], schema.Columns[0])
+		})
+	}
 }
 
-func (m *Meta) ForEachInfo(fn func(*Info)) {
-	m.info.ForEach(func(info *Info) {
-		if !info.IsTomb() {
-			fn(info)
-		}
-	})
+func (m *Meta) Infos() iter.Seq[*Info] {
+	return func(yield func(*Info) bool) {
+		m.info.All()(func(info *Info) bool {
+			return info.IsTomb() || yield(info)
+		})
+	}
 }
 
 // Put is used by Database.LoadedTable and admin schema changes
@@ -712,7 +703,6 @@ func (m *Meta) dropFkeys(mu *metaUpdate, drop *schema.Schema) {
 		for j := range target.Indexes {
 			ix := &target.Indexes[j]
 			if slices.Equal(fkCols, ix.Columns) {
-				fk.IIndex = j
 				fkToHere := make([]Fkey, 0, len(ix.FkToHere))
 				for k := range ix.FkToHere {
 					fk2 := &ix.FkToHere[k]
@@ -771,14 +761,19 @@ func (m *Meta) LayeredOnto(latest *Meta) *Meta {
 		if !ok || lti.IsTomb() {
 			continue
 		}
-		ti.Nrows = lti.Nrows + (ti.Nrows - tiOrig.Nrows)
+		dNrows := ti.Nrows - tiOrig.Nrows
+		ti.Nrows = lti.Nrows + dNrows
+		ti.BtreeNrows = lti.BtreeNrows
 		assert.That(ti.Nrows >= 0)
-		d := int64(ti.Size) - int64(tiOrig.Size)
-		ti.Size = uint64(int64(lti.Size) + d)
+		dSize := ti.Size - tiOrig.Size
+		ti.Size = lti.Size + dSize
+		ti.BtreeSize = lti.BtreeSize
+		ti.Deltas = slc.With(lti.Deltas, Delta{Nrows: dNrows, Size: dSize})
 		for i := range ti.Indexes {
 			ti.Indexes[i].UpdateWith(lti.Indexes[i])
 		}
 		ti.lastMod = m.info.Clock
+		// ti.Check()
 		info.Put(ti)
 	}
 	result := *latest // copy
@@ -801,15 +796,15 @@ func ReadMeta(store *stor.Stor, offSchema, offInfo uint64) *Meta {
 		info:   hamt.ReadChain[string](store, offInfo, ReadInfo)}
 	// copy Ixspec to Info from Schema (constructed by ReadSchema)
 	// Ok to modify since it's not in use yet.
-	m.info.ForEach(func(ti *Info) {
+	for ti := range m.info.All() {
 		if ti.IsTomb() {
-			return
+			continue
 		}
 		ts := m.schema.MustGet(ti.Table)
 		for i := range ti.Indexes {
 			ti.Indexes[i].SetIxspec(&ts.Indexes[i].Ixspec)
 		}
-	})
+	}
 	linkFkeys(&m)
 	return &m
 }
@@ -818,9 +813,9 @@ type Fkey = schema.Fkey
 
 // linkFkeys links foreign keys to targets (Fk and FkToHere[])
 func linkFkeys(m *Meta) {
-	m.schema.ForEach(func(s *Schema) {
+	for s := range m.schema.All() {
 		if s.IsTomb() {
-			return
+			continue
 		}
 		for i := range s.Indexes {
 			fk := &s.Indexes[i].Fk
@@ -846,17 +841,20 @@ func linkFkeys(m *Meta) {
 				}
 			}
 		}
-	})
+	}
 }
 
 //-------------------------------------------------------------------
 
 func (m *Meta) CheckAllMerged() {
-	m.info.ForEach(func(ti *Info) {
+	for ti := range m.info.All() {
+		assert.This(len(ti.Deltas)).Is(1)
+		assert.This(ti.Deltas[0].Nrows).Is(0)
+		assert.This(ti.BtreeNrows).Is(ti.Nrows)
 		for _, ov := range ti.Indexes {
 			ov.CheckMerged()
 		}
-	})
+	}
 }
 
 func (m *Meta) Offsets() (schemaOff, infoOff uint64) {

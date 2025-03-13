@@ -25,7 +25,7 @@ import (
 	"github.com/apmckinlay/gsuneido/util/tr"
 )
 
-// MainThread is injected by gsuneido.go to use for debugging
+// MainThread is injected by gsuneido.go
 var MainThread *Thread
 
 // See interp.go and args.go for the rest of the Thread methods
@@ -92,6 +92,9 @@ type thread1 struct {
 	sv *Sviews
 
 	Rand *rand.Rand
+
+	// ReturnMulti is used by op.ReturnMulti and op.PushReturn
+	ReturnMulti []Value
 }
 
 // thread2 is the non-reset-able part of Thread
@@ -196,7 +199,7 @@ func (th *Thread) Swap() {
 	th.stack[th.sp-1], th.stack[th.sp-2] = th.stack[th.sp-2], th.stack[th.sp-1]
 }
 
-// Get/Check/RestoreState are used by callbacks_windows.go and updateui_wingui.go
+// Get/Check/RestoreState are used by callbacks_windows.go and defer_wingui.go
 
 type ThreadState struct {
 	fp          int
@@ -246,6 +249,12 @@ func (th *Thread) locals(i int) *SuObject {
 	}
 	for i, v := range fr.locals.v {
 		if v != nil && fr.fn != nil && i < len(fr.fn.Names) {
+			if se, ok := v.(*SuExcept); ok {
+				// only capture exception string to avoid chaining
+				// the string is probably all we'd look at anyway
+				// type assertion to concrete type should be fast
+				v = se.SuStr
+			}
 			locals.Set(SuStr(fr.fn.Names[i]), v)
 		}
 	}
@@ -274,7 +283,7 @@ func PrintStack(cs *SuObject) {
 	if cs == nil {
 		return
 	}
-	for i := 0; i < cs.ListSize(); i++ {
+	for i := range cs.ListSize() {
 		frame := cs.ListGet(i)
 		fn := frame.Get(nil, SuStr("fn"))
 		fmt.Fprintln(os.Stderr, fn)
@@ -332,12 +341,6 @@ func (th *Thread) SessionId(id string) string {
 		return th.Session()
 	}
 	return th.dbms.SessionId(th, id)
-}
-
-func (th *Thread) RunWithMainSuneido(fn func() Value) Value {
-	defer th.Suneido.Store(th.Suneido.Load())
-	th.Suneido.Store(nil)
-	return fn()
 }
 
 func (th *Thread) Regex(x Value) regex.Pattern {

@@ -65,12 +65,12 @@ func (ValueBase[E]) ToStr() (string, bool) {
 	return "", false
 }
 
-func (ValueBase[E]) Lookup(*Thread, string) Callable {
+func (ValueBase[E]) Lookup(*Thread, string) Value {
 	return nil // no methods
 }
 
 func (ValueBase[E]) Get(*Thread, Value) Value {
-	panic(typeName[E]() + " does not support get")
+	return nil
 }
 
 func (ValueBase[E]) Put(*Thread, Value, Value) {

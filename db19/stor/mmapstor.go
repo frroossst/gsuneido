@@ -5,8 +5,6 @@ package stor
 
 import (
 	"os"
-	"sync/atomic"
-	"time"
 
 	"github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19/filelock"
@@ -23,10 +21,9 @@ const (
 )
 
 type mmapStor struct {
-	file     *os.File
-	ptrs     []uintptr //nolint:unused // for windows
-	mode     Mode
-	flushing atomic.Bool
+	file *os.File
+	ptrs []uintptr //nolint:unused // for windows
+	mode Mode
 }
 
 const mmapChunkSize = 64 * 1024 * 1024 // 64 mb
@@ -63,7 +60,7 @@ func MmapStor(filename string, mode Mode) (*Stor, error) {
 	chunks := make([][]byte, nchunks)
 
 	last := nchunks - 1
-	for i := 0; i < nchunks; i++ {
+	for i := range nchunks {
 		if i < last {
 			impl.mode = Read // map full chunks as READ
 		} else {
@@ -96,28 +93,6 @@ func (ms *mmapStor) Write(off uint64, data []byte) {
 	ms.file.WriteAt(data, int64(off))
 }
 
-// Flush is async, it runs the flush in a goroutine.
-// If a flush is already in progress, it returns immediately.
-func (ms *mmapStor) Flush(chunk []byte) {
-	// don't flush for Create because load and compact don't need it
-	if ms.mode != Update {
-		return
-	}
-	if ms.flushing.CompareAndSwap(false, true) {
-		go func() {
-			ms.flush(chunk)
-			ms.flushing.Store(false)
-		}()
-	}
-}
-
 func (ms *mmapStor) Close(size int64, unmap bool) {
-	// wait up to 10 milliseconds for flush to finish
-	for i := 0; i < 10; i++ {
-		if !ms.flushing.Load() {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
 	ms.close(size, unmap)
 }

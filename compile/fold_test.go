@@ -94,6 +94,10 @@ func TestPropFold(t *testing.T) {
 
 	test("return 123",
 		"Return(123)") // no change
+	test("return 1,2,3",
+		"Return(1 2 3)") // no change
+	test("x = 2; return 1, x, 3",
+        "2 \n Return(1 2 3)")
 	test("x = 5; F(x)",
 		"5 \n Call(F 5)") // propagate
 	test("x = 5; F(-x)",
@@ -110,6 +114,8 @@ func TestPropFold(t *testing.T) {
 		"Call(F 3)") // simple fold
 	test("F(1 + 2 * 3 / 6)",
 		"Call(F 2)") // simple fold
+	test("a,b = F(1 + 2)",
+		"MultiAssign(a b Call(F 3))") // simple fold
 	test("x = 2 * 4; F(x)",
 		"8 \n Call(F 8)") // fold & propagate
 	test("x = 2; y = 1 << x; F(y)",
@@ -143,9 +149,14 @@ func TestPropFold(t *testing.T) {
 	test("'hello' =~ 'lo'", "true")
 	test("s = 'hello'; s =~ 'lo'", "'hello'\ntrue")
 
+	// not binary
+	test("not (x is 123)", "Binary(Isnt x 123)")
+	test("not (x >= 123)", "Binary(Lt x 123)")
+	test("not (x =~ 123)", "Binary(MatchNot x 123)")
+
 	// in => is
 	test("x in (1)", "Binary(Is x 1)")
-	test("x not in (1)", "Unary(Not Binary(Is x 1))")
+	test("x not in (1)", "Binary(Isnt x 1)")
 
 	// or => in
 	test("a is 1 or a is 2", "In(a [1 2])")

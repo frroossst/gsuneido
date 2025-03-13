@@ -4,8 +4,6 @@
 #include <shlwapi.h>
 
 extern "C" buf_t suneidoAPP(char* s);
-LPCWSTR suneidoPrefix = L"suneido:";
-size_t suneidoPrefixSize = 8;
 
 class MyCustomSchemeHandler : public ICoreWebView2WebResourceRequestedEventHandler {
 public:
@@ -67,10 +65,7 @@ public:
             }
 
             char *converted = ConvertWcharToChar(uri);
-            char *decoded = new char[strlen(converted) + 1];
-            decodeURI(converted, decoded);
-            delete[] converted;
-            buf_t buf = suneidoAPP(decoded);
+            buf_t buf = suneidoAPP(converted);
 
             if (buf.size == 0) {
                 // Create a response
@@ -80,9 +75,9 @@ public:
                 args->put_Response(response);
                 response->Release();
             } else {
-                IStream* stream = SHCreateMemStream((BYTE*)buf.buf, (ULONG)(buf.size));
+                IStream* stream = SHCreateMemStream((BYTE*)buf.data, (ULONG)(buf.size));
                 if (stream) {
-                    std::wstring header = buildContentTypeHeader(decoded) + L"Content-Length: " + std::to_wstring(buf.size);
+                    std::wstring header = buildContentTypeHeader(converted) + L"Content-Length: " + std::to_wstring(buf.size);
 
                     // Create a response
                     ICoreWebView2WebResourceResponse* response = nullptr;
@@ -93,8 +88,8 @@ public:
                 }
             }
             
-            delete[] decoded;
-            delete buf.buf;
+            delete[] converted;
+            delete buf.data;
             environment->Release();
             webview2_2->Release();
         }

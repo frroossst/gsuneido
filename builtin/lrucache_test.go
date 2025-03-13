@@ -15,7 +15,7 @@ func TestLruCache(t *testing.T) {
 	const size = 20
 	get := func(key Value) Value { return key }
 	lc := newLruCache(size)
-	for i := 0; i < size; i++ {
+	for range size {
 		n := IntVal(int(rand.Uint32()))
 		n2 := lc.GetPut(n, get)
 		assert.This(n2).Is(n)
@@ -24,7 +24,7 @@ func TestLruCache(t *testing.T) {
 	}
 	assert.T(t).Msg("misses").This(lc.misses).Is(size)
 	assert.T(t).Msg("hits").This(lc.hits).Is(size)
-	for i := 0; i < size; i++ {
+	for range size {
 		n := IntVal(int(rand.Uint32()))
 		n2 := lc.GetPut(n, get)
 		assert.This(n2).Is(n)
@@ -35,7 +35,7 @@ func TestLruCache(t *testing.T) {
 	assert.T(t).Msg("hits").This(lc.hits).Is(size * 2)
 
 	lc = newLruCache(size)
-	for i := 0; i < 10000; i++ {
+	for range 10000 {
 		n := IntVal(rand.Intn(size + 5))
 		n2 := lc.GetPut(n, get)
 		assert.This(n2).Is(n)
@@ -57,3 +57,36 @@ func TestLruCache_concurrent(t *testing.T) {
 	lc.Insert(One, b)
 	assert.T(t).This(b.IsConcurrent()).Is(True)
 }
+
+// check is used by the test
+func (lc *lruCache) check() {
+	for _, ei := range lc.lru {
+		e := lc.entries[ei]
+		x, _ := lc.hm.Get(e.key)
+		assert.That(x != nil)
+		xi, _ := x.ToInt()
+		assert.That(xi == int(ei))
+	}
+	for ei, e := range lc.entries {
+		x, _ := lc.hm.Get(e.key)
+		assert.That(x != nil)
+		xi, _ := x.ToInt()
+		assert.That(xi == int(ei))
+	}
+}
+
+// func (lc *lruCache) print() {
+// 	fmt.Println("lru")
+// 	for li, ei := range lc.lru {
+// 		fmt.Println(li, ei)
+// 	}
+// 	fmt.Println("entries")
+// 	for ei, e := range lc.entries {
+// 		fmt.Println(ei, e.key, e.val)
+// 	}
+// 	fmt.Println("hmap")
+// 	it := lc.hm.Iter()
+// 	for k, x := it(); k != nil; k, x = it() {
+// 		fmt.Println(k, x)
+// 	}
+// }

@@ -192,7 +192,7 @@ func OpCat(th *Thread, x, y Value) Value {
 }
 
 func cat2(xs, ys string) Value {
-	const LARGE = 256
+	const LARGE = 256 // ??? exact value not critical
 
 	if len(xs)+len(ys) < LARGE {
 		return SuStr(xs + ys)
@@ -289,6 +289,19 @@ func OpIter(x Value) SuIter {
 		panic("can't iterate " + x.Type().String())
 	}
 	return SuIter{Iter: iterable.Iter()}
+}
+
+type iter2 = func() (Value, Value)
+type iter2able interface{ Iter2(bool, bool) iter2 }
+
+var _ iter2able = (*SuObject)(nil)
+
+func OpIter2(x Value) SuIter2 {
+	iterable, ok := x.(iter2able)
+	if !ok {
+		panic("can't iterate " + x.Type().String())
+	}
+	return SuIter2{iter2: iterable.Iter2(true, true)}
 }
 
 func OpCatch(th *Thread, e any, catchPat string) *SuExcept {

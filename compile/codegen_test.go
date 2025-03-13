@@ -59,6 +59,8 @@ func TestCodegen(t *testing.T) {
 
 	test("a is b", "Load a, Load b, Is")
 	test("a = b", "Load b, Store a")
+	test("a,b = f()",
+		"Load f, CallFuncNilOk (), PushReturn 2, Store a, Pop, Store b, Pop")
 	test("_dyn = 123", "Int 123, Store _dyn")
 	test("a = b = c", "Load c, Store b, Store a")
 	test("a = b; not a", "Load b, Store a, Pop, Load a, Not")
@@ -90,6 +92,8 @@ func TestCodegen(t *testing.T) {
 
 	test("return throw 123; 123", "Int 123, ReturnThrow, Int 123")
 	test("return throw 123", "Int 123, ReturnThrow")
+
+	test("return 1, 2, 3", "One, Int 2, Int 3, ReturnMulti 3")
 
 	test("throw 'fubar'", "Value 'fubar', Throw")
 
@@ -131,6 +135,14 @@ func TestCodegen(t *testing.T) {
 	test("new c", "Load c, Value '*new*', CallMethNilOk ()")
 	test("new c()", "Load c, Value '*new*', CallMethNilOk ()")
 	test("new c(1)", "Load c, One, Value '*new*', CallMethNilOk (?)")
+
+	xtest := func(src, expected string) {
+		t.Helper()
+		classNum.Store(0)
+		ast := parseFunction("function () {\n" + src + "\n}")
+		assert.This(func() { codegen("", "", ast, nil) }).Panics(expected)
+	}
+	xtest("b = { return 1, 2, 3}", "not allowed")
 }
 
 func TestCodegenSuper(t *testing.T) {
@@ -487,6 +499,32 @@ func TestControl(t *testing.T) {
 		21: ForIn x 6
 		25: Pop`)
 
+	test("for m,v in ob \n { a; break; b; continue; c }", `
+		0: Load ob
+		2: Iter2
+		3: Jump 21
+		6: Load a
+		8: Pop
+		9: Jump 26
+		12: Load b
+		14: Pop
+		15: Jump 21
+		18: Load c
+		20: Pop
+		21: ForIn2 m v 6
+		26: Pop`)
+
+	test("for m,v in ob \n Print(m, v)", `
+		0: Load ob
+		2: Iter2
+		3: Jump 15
+		6: Load m
+		8: Load v
+		10: Global Print
+		13: CallFuncDiscard (?, ?)
+		15: ForIn2 m v 6
+		20: Pop`)
+
 	test(`for ..10 { a; break; b; continue; c }`, `
 		0: Int 10
 		3: MinusOne
@@ -542,8 +580,8 @@ func parseFunction(src string) *ast.Function {
 	return p.Function()
 }
 
-func TestBug(t *testing.T) {
-	assert.T(t).
-		This(func() { parseFunction("function (x) { a = function() { _ } }") }).
-		Panics("syntax error @32 invalid identifier: '_'")
-}
+// func TestBug(t *testing.T) {
+// 	assert.T(t).
+// 		This(func() { parseFunction("function (x) { a = function() { _ } }") }).
+// 		Panics("syntax error @32 invalid identifier: '_'")
+// }

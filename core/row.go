@@ -37,23 +37,29 @@ func JoinRows(row1, row2 Row) Row {
 //   - returns stored value for Fields (rule ignored)
 //   - calls rule for Columns not in Fields
 func (row Row) GetVal(hdr *Header, fld string, th *Thread, tran *SuTran) Value {
-	if !slices.Contains(hdr.Columns, fld) {
-		return EmptyStr
+	for {
+		if !slices.Contains(hdr.Columns, fld) {
+			return EmptyStr
+		}
+		if raw, ok := row.getRaw2(hdr, fld); ok {
+			if len(raw) > 0 && raw[0] == PackForward {
+				fld = raw[1:]
+				continue
+			}
+			return Unpack(raw)
+		}
+		if strings.HasSuffix(fld, "_lower!") {
+			base := fld[:len(fld)-7]
+			x, _ := row.getRaw2(hdr, base)
+			val := Unpack(x)
+			return SuStr(str.ToLower(ToStr(val)))
+		}
+		if nil == getRule(th, fld) {
+			return EmptyStr
+		}
+		// else construct SuRecord to handle rules
+		return SuRecordFromRow(row, hdr, "", tran).Get(th, SuStr(fld))
 	}
-	if raw, ok := row.getRaw2(hdr, fld); ok {
-		return Unpack(raw)
-	}
-	if strings.HasSuffix(fld, "_lower!") {
-		base := fld[:len(fld)-7]
-		x, _ := row.getRaw2(hdr, base)
-		val := Unpack(x)
-		return SuStr(str.ToLower(ToStr(val)))
-	}
-	if nil == getRule(th, fld) {
-		return EmptyStr
-	}
-	// else construct SuRecord to handle rules
-	return SuRecordFromRow(row, hdr, "", tran).Get(th, SuStr(fld))
 }
 
 // GetRaw handles _lower! but does NOT handle rules.
@@ -70,20 +76,26 @@ func (row Row) GetRaw(hdr *Header, fld string) string {
 
 // GetRawVal is like GetVal (i.e. handles rules) but returns a raw/packed value.
 func (row Row) GetRawVal(hdr *Header, fld string, th *Thread, tran *SuTran) string {
-	if strings.HasSuffix(fld, "_lower!") {
-		base := fld[:len(fld)-7]
-		x, _ := row.getRaw2(hdr, base)
-		return lowerRaw(x)
+	for {
+		if raw, ok := row.getRaw2(hdr, fld); ok {
+			if len(raw) > 0 && raw[0] == PackForward {
+				fld = raw[1:]
+				continue
+			}
+			return raw
+		}
+		if strings.HasSuffix(fld, "_lower!") {
+			base := fld[:len(fld)-7]
+			x, _ := row.getRaw2(hdr, base)
+			return lowerRaw(x)
+		}
+		if nil == getRule(th, fld) {
+			return ""
+		}
+		// else construct SuRecord to handle rules
+		v := SuRecordFromRow(row, hdr, "", tran).Get(th, SuStr(fld))
+		return Pack(v.(Packable))
 	}
-	if raw, ok := row.getRaw2(hdr, fld); ok {
-		return raw
-	}
-	if nil == getRule(th, fld) {
-		return ""
-	}
-	// else construct SuRecord to handle rules
-	v := SuRecordFromRow(row, hdr, "", tran).Get(th, SuStr(fld))
-	return Pack(v.(Packable))
 }
 
 func lowerRaw(x string) string {
@@ -91,7 +103,7 @@ func lowerRaw(x string) string {
 		return x
 	}
 	hasUpper := false
-	for i := 0; i < len(x); i++ {
+	for i := range len(x) {
 		hasUpper = hasUpper || ascii.IsUpper(x[i])
 	}
 	if !hasUpper {
@@ -126,10 +138,11 @@ func (row Row) getRaw2(hdr *Header, fld string) (string, bool) {
 		return row[at.Reci].GetRaw(int(at.Fldi)), true
 	}
 	// handle nil records from Union
-	for reci := int(at.Reci + 1); reci < len(hdr.Fields); reci++ {
-		if fldi := slices.Index(hdr.Fields[reci], fld); fldi >= 0 {
-			if row[reci].Record != "" {
-				return row[reci].GetRaw(int(fldi)), true
+	n := min(len(row), len(hdr.Fields))
+	for reci := int(at.Reci + 1); reci < n; reci++ {
+		if row[reci].Record != "" {
+			if fldi := slices.Index(hdr.Fields[reci], fld); fldi >= 0 {
+				return row[reci].GetRaw(fldi), true
 			}
 		}
 	}

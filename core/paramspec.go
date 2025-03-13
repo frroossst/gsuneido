@@ -84,7 +84,7 @@ func (ps *ParamSpec) String() string {
 	buf.WriteString("function(")
 	sep := ""
 	v := 0 // index into Values
-	for i := 0; i < int(ps.Nparams); i++ {
+	for i := range int(ps.Nparams) {
 		buf.WriteString(sep)
 		buf.WriteString(flagsToName(ps.ParamName(i), ps.Flags[i]))
 		if i >= int(ps.Nparams-ps.Ndefaults) {
@@ -143,7 +143,7 @@ func (ParamSpec) SetConcurrent() {
 // ParamsMethods is initialized by the builtin package
 var ParamsMethods Methods
 
-func (*ParamSpec) Lookup(_ *Thread, method string) Callable {
+func (*ParamSpec) Lookup(_ *Thread, method string) Value {
 	return ParamsMethods[method]
 }
 

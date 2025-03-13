@@ -34,14 +34,14 @@ func init() {
 // 		return DoAction(nil, ut, act, nil)
 // 	}
 // 	// DoAdmin(db, "ensure tmp(a,b,c) key(a,b) key(c)")
-// 	// for i := 0; i < 10000; i++ {
+// 	// for range 10000 {
 // 	// 	act("delete tmp")
 // 	// 	act("insert { a: 1, b: 1, c: 1 } into tmp")
 // 	// 	act("insert { a: 2, b: 2, c: 2 } into tmp")
 // 	// 	n := act("delete tmp")
 // 	// 	assert.This(n).Is(2)
 // 	// }
-// 	for i := 0; i < 10000; i++ {
+// 	for range 10000 {
 // 		// fmt.Println(i)
 // 		act("delete Test_lib")
 // 		act("insert { name: 'One', group: -1, num: 99999 } into Test_lib")
@@ -54,9 +54,7 @@ func init() {
 // }
 
 func TestDeleteBug(*testing.T) {
-	store := stor.HeapStor(8192)
-	db, err := db19.CreateDb(store)
-	ck(err)
+	db := db19.CreateDb(stor.HeapStor(8192))
 	db19.StartConcur(db, 50*time.Second)
 	act := func(act string) {
 		ut := db.NewUpdateTran()
@@ -69,7 +67,7 @@ func TestDeleteBug(*testing.T) {
 	if testing.Short() {
 		N = 1000
 	}
-	for i := 0; i < N; i++ {
+	for range N {
 		act("insert { k: 1 } into tmp")
 		act("delete tmp")
 	}
@@ -77,9 +75,7 @@ func TestDeleteBug(*testing.T) {
 }
 
 func TestDeleteSynch(*testing.T) {
-	store := stor.HeapStor(8192)
-	db, err := db19.CreateDb(store)
-	ck(err)
+	db := db19.CreateDb(stor.HeapStor(8192))
 	db.CheckerSync()
 	act := func(act string) {
 		ut := db.NewUpdateTran()
@@ -91,7 +87,7 @@ func TestDeleteSynch(*testing.T) {
 	if testing.Short() {
 		N = 1000
 	}
-	for i := 0; i < N; i++ {
+	for range N {
 		act("insert { k: 1 } into tmp")
 		act("delete tmp")
 	}

@@ -40,6 +40,8 @@ const (
 	MaxInt
 	// EmptyStr pushes EmptyStr ("")
 	EmptyStr
+	// PushReturn <uint8> pushes multiple return values onto the stack
+	PushReturn
 
 	// load and store -----------------------------------------------
 
@@ -161,10 +163,16 @@ const (
 	JumpLt
 	// Iter replaces the top with top.Iter()
 	Iter
-	// ForIn <int16> <uint8> calls top.Next()
-	// if the result is equal to top, it jumps
+	// Iter2 replaces the top with top.Iter2()
+	Iter2
+	// ForIn <uint8> <int16> calls top.Next()
+	// if the result is not nil, it assigns and jumps
 	// else it continues
 	ForIn
+	// ForIn2 <uint8> <uint8> <int16> calls top.Next2()
+	// if the result is not nil, it assigns and jumps
+	// else it continues
+	ForIn2
 	// ForCount <int16> increments top and jumps if greater than second
 	ForRange
 	// ForRangeVar <uint8> <int16> increments top, stores it,
@@ -223,6 +231,8 @@ const (
 	ReturnNil
 	// ReturnThrow, forces caller to check value
 	ReturnThrow
+	// ReturnMulti <uint8> returns multiple values from the stack
+	ReturnMulti
 
 	// blocks -------------------------------------------------------
 

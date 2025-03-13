@@ -21,7 +21,6 @@ package ast
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/apmckinlay/gsuneido/compile/lexer"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
@@ -188,16 +187,20 @@ func (a *Unary) Echo() string {
 	if a.Tok == tok.LParen {
 		return "(" + a.E.Echo() + ")"
 	}
+	if a.Tok == tok.Not {
+		if in, ok := a.E.(*In); ok {
+			return in.E.Echo() + " not" + in.echo()
+		}
+		if b, ok := a.E.(*Binary); ok {
+			return "not (" + b.Echo() + ")"
+		}
+	}
 	var op = map[tok.Token]string{
 		tok.Add: "+",
 		tok.Sub: "-",
 		tok.Not: "not ",
 	}
-	e := a.E.Echo()
-	if strings.Contains(e, " ") {
-		e = "(" + e + ")"
-	}
-	return op[a.Tok] + e
+	return op[a.Tok] + a.E.Echo()
 }
 
 func (a *Unary) Children(fn func(Node) Node) {
@@ -407,7 +410,11 @@ func (a *In) String() string {
 }
 
 func (a *In) Echo() string {
-	s := a.E.Echo() + " in ("
+	return a.E.Echo() + a.echo()
+}
+
+func (a *In) echo() string {
+	s := " in ("
 	sep := ""
 	for _, e := range a.Exprs {
 		s += sep + e.Echo()
@@ -703,7 +710,7 @@ func (a *If) Children(fn func(Node) Node) {
 }
 
 type Return struct {
-	E Expr
+	Exprs []Expr
 	stmtNodeT
 	ReturnThrow bool
 }
@@ -713,14 +720,18 @@ func (a *Return) String() string {
 	if a.ReturnThrow {
 		s = "ReturnThrow("
 	}
-	if a.E != nil {
-		s += a.E.String()
+	sep := ""
+	for _, e := range a.Exprs {
+		s += sep + e.String()
+		sep = " "
 	}
 	return s + ")"
 }
 
 func (a *Return) Children(fn func(Node) Node) {
-	childExpr(fn, &a.E)
+	for i := range a.Exprs {
+		childExpr(fn, &a.Exprs[i])
+	}
 }
 
 type Throw struct {
@@ -786,6 +797,7 @@ type ForIn struct {
 	E2   Expr // used by for-range
 	Body Statement
 	Var  Ident // optional with for-range
+	Var2 Ident // used with: for m,v in ob
 	stmtNodeT
 }
 
@@ -793,6 +805,9 @@ func (a *ForIn) String() string {
 	s := "ForIn("
 	if a.Var.Name != "" {
 		s += a.Var.Name + " "
+	}
+	if a.Var2.Name != "" {
+		s += a.Var2.Name + " "
 	}
 	s += a.E.String()
 	if a.E2 != nil {
@@ -904,6 +919,27 @@ func (a *ExprStmt) String() string {
 
 func (a *ExprStmt) Children(fn func(Node) Node) {
 	childExpr(fn, &a.E)
+}
+
+type MultiAssign struct {
+	stmtNodeT
+	Lhs []Expr
+	Rhs Expr
+}
+
+func (a *MultiAssign) String() string {
+	s := "MultiAssign("
+    for _, e := range a.Lhs {
+        s += e.Echo() + " "
+    }
+	return s + a.Rhs.String() + ")"
+}
+
+func (a *MultiAssign) Children(fn func(Node) Node) {
+    for i := range a.Lhs {
+        childExpr(fn, &a.Lhs[i])
+    }
+    childExpr(fn, &a.Rhs)
 }
 
 type Switch struct {

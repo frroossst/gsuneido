@@ -8,7 +8,6 @@ import (
 
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/core/types"
-	"github.com/apmckinlay/gsuneido/util/assert"
 )
 
 type suLruCacheGlobal struct {
@@ -29,11 +28,11 @@ var lruCacheCallClass = func(th *Thread, args []Value) Value {
 	return newSuLruCache(size, fn, okForResetAll)
 }
 
-var lruCacheClassMethods = methods()
+var lruStaticMethods = methods("lruStatic")
 
-var _ = staticMethod(lru_ResetAll, "()")
+var _ = staticMethod(lruStatic_ResetAll, "()")
 
-func lru_ResetAll(th *Thread, _ []Value) Value {
+func lruStatic_ResetAll(th *Thread, _ []Value) Value {
 	iter := ToContainer(Global.Find(th, GnSuneido)).Iter2(true, true)
 	for _, v := iter(); v != nil; _, v = iter() {
 		if lc, ok := v.(*suLruCache); ok && lc.okForResetAll {
@@ -43,18 +42,26 @@ func lru_ResetAll(th *Thread, _ []Value) Value {
 	return nil
 }
 
-func (d *suLruCacheGlobal) Lookup(th *Thread, method string) Callable {
-	if f, ok := lruCacheClassMethods[method]; ok {
-		return f
-	}
-	return d.SuBuiltin.Lookup(th, method) // for Params
+var _ = staticMethod(lruStatic_Members, "()")
+
+func lruStatic_Members() Value {
+	return lruStatic_members
 }
 
-func (d *suLruCacheGlobal) String() string {
+var lruStatic_members = methodList(lruStaticMethods)
+
+func (lc *suLruCacheGlobal) Lookup(th *Thread, method string) Value {
+	if f, ok := lruStaticMethods[method]; ok {
+		return f
+	}
+	return lc.SuBuiltin.Lookup(th, method) // for Params
+}
+
+func (*suLruCacheGlobal) String() string {
 	return "LruCache /* builtin class */"
 }
 
-var suLruCacheMethods = methods()
+var suLruCacheMethods = methods("lru")
 
 // Get calls the getter with exactly the same arguments it receives.
 // If called with multiple arguments, the hash key is an @args object.
@@ -159,7 +166,7 @@ func (slc *suLruCache) SetConcurrent() {
 	}
 }
 
-func (*suLruCache) Lookup(_ *Thread, method string) Callable {
+func (*suLruCache) Lookup(_ *Thread, method string) Value {
 	return suLruCacheMethods[method]
 }
 
@@ -195,8 +202,8 @@ func newLruCache(req int) *lruCache {
 }
 
 func (lc *lruCache) Get(key Value) Value {
-	v := lc.hm.Get(key)
-	if v == nil {
+	v, ok := lc.hm.Get(key)
+	if !ok {
 		// not in cache
 		lc.misses++
 		return nil
@@ -244,23 +251,6 @@ func (lc *lruCache) Reset() {
 	lc.entries = lc.entries[:0]
 	lc.hits = 0
 	lc.misses = 0
-}
-
-// check is used by the test
-func (lc *lruCache) check() {
-	for _, ei := range lc.lru {
-		e := lc.entries[ei]
-		x := lc.hm.Get(e.key)
-		assert.That(x != nil)
-		xi, _ := x.ToInt()
-		assert.That(xi == int(ei))
-	}
-	for ei, e := range lc.entries {
-		x := lc.hm.Get(e.key)
-		assert.That(x != nil)
-		xi, _ := x.ToInt()
-		assert.That(xi == int(ei))
-	}
 }
 
 // func (lc *lruCache) print() {

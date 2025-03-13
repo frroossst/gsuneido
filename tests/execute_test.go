@@ -12,10 +12,37 @@ import (
 	"github.com/apmckinlay/gsuneido/builtin"
 	"github.com/apmckinlay/gsuneido/compile"
 	. "github.com/apmckinlay/gsuneido/core"
+	"github.com/apmckinlay/gsuneido/core/trace"
 	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/ptest"
 )
+
+func TestThrow(t *testing.T) {
+	f := compile.Constant(`function () {
+        for ..100000
+               try 
+                    throw 'test'
+                catch (e)
+                    {}
+	}`)
+	var th Thread
+	th.Call(f)
+	heap := builtin.HeapSys()
+	fmt.Println(trace.Number(heap))
+	assert.That(heap < 32_000_000)
+}
+
+func TestMulti(t *testing.T) {
+	f := compile.Constant(`function () {
+		z = Type(0)
+	    f = function() { return 12,34 }
+		a,b = f()
+		return a is 12 and b is 34
+	}`)
+	var th Thread
+	assert.This(th.Call(f)).Is(True)
+}
 
 func TestInRange(t *testing.T) {
 	options.StrictCompare = true
@@ -38,9 +65,9 @@ func BenchmarkForInSeq(b *testing.B) {
 		    {}
 	}`)
 	var th Thread
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		th.Call(f)
-    }
+	}
 }
 
 func BenchmarkForInCounted(b *testing.B) {
@@ -49,9 +76,9 @@ func BenchmarkForInCounted(b *testing.B) {
 		    {}
 	}`)
 	var th Thread
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		th.Call(f)
-    }
+	}
 }
 
 func BenchmarkForClassic(b *testing.B) {
@@ -60,9 +87,9 @@ func BenchmarkForClassic(b *testing.B) {
 		    {}
 	}`)
 	var th Thread
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		th.Call(f)
-    }
+	}
 }
 
 func TestNaming(t *testing.T) {
@@ -101,7 +128,7 @@ func BenchmarkCat(b *testing.B) {
 				s $= "abc"
 			}`).(*SuFunc)
 	var th Thread
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		th.Call(f)
 	}
 }
@@ -116,7 +143,7 @@ func BenchmarkJoin(b *testing.B) {
 			ob.Join()
 			}`).(*SuFunc)
 	var th Thread
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		th.Call(f)
 	}
 }
@@ -129,7 +156,7 @@ func BenchmarkBase(b *testing.B) {
 				;
 			}`).(*SuFunc)
 	var th Thread
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		th.Call(f)
 	}
 }
@@ -148,9 +175,9 @@ func TestBuiltinString(t *testing.T) {
 }
 
 // func TestTmp(t *testing.T) {
-// 	args := []string{`f = function (b){ c={}; b() }; f({ return 123 }); 456`, `123`}
+// 	args := []string{`Suneido.a = 0; --Suneido.a`, `-1`}
 // 	strq := []bool{}
-// 	if ! pt_execute(args, strq) {
+// 	if ! ptExecute(args, strq) {
 // 		t.Fail()
 // 	}
 // }
@@ -292,7 +319,7 @@ func strToList(s string) *SuObject {
 
 func ptCompare(args []string, _ []bool) bool {
 	n := len(args)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		x := constant(args[i])
 		if x.Compare(x) != 0 {
 			return false
@@ -310,7 +337,7 @@ func ptCompare(args []string, _ []bool) bool {
 
 func ptComparePacked(args []string, _ []bool) bool {
 	n := len(args)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		x := constant(args[i])
 		xp := Pack(x.(Packable))
 		x2 := Unpack(xp)
@@ -352,7 +379,7 @@ func BenchmarkInterp(b *testing.B) {
 	}`
 	fn := compile.Constant(src).(*SuFunc)
 	var th Thread
-	for n := 0; n < b.N; n++ {
+	for range b.N {
 		result := th.Call(fn)
 		if !result.Equal(SuInt(4950)) {
 			panic("wrong result " + result.String())
@@ -365,7 +392,7 @@ func BenchmarkCall(b *testing.B) {
 	as := &ArgSpec1
 	th := &Thread{}
 	th.Push(SuInt(123))
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		f.Call(th, nil, as)
 	}
 }

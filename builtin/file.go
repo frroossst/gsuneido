@@ -96,7 +96,11 @@ func (sf *suFile) reset() {
 }
 
 func (sf *suFile) size() int64 {
-	info, err := sf.f.(*os.File).Stat()
+	f := sf.f
+	if a, ok := sf.f.(appender); ok {
+		f = a.f
+	}
+	info, err := f.(*os.File).Stat()
 	if err != nil {
 		panic("File: " + err.Error())
 	}
@@ -132,13 +136,13 @@ func (sf *suFile) Equal(other any) bool {
 	return sf == other
 }
 
-func (*suFile) Lookup(_ *Thread, method string) Callable {
+func (*suFile) Lookup(_ *Thread, method string) Value {
 	return suFileMethods[method]
 }
 
 const MaxLine = 4000
 
-var suFileMethods = methods()
+var suFileMethods = methods("file")
 
 var _ = method(file_Close, "()")
 
@@ -170,6 +174,7 @@ func file_Read(this, arg Value) Value {
 	if n == 0 { // at end
 		return False
 	}
+	CheckStringSize("file.Read", n)
 	buf := make([]byte, n)
 	_, err := io.ReadFull(sf.r, buf)
 	sf.tell += int64(n)
@@ -182,11 +187,11 @@ func file_Read(this, arg Value) Value {
 var _ = method(file_CopyTo, "(dest, nbytes = false)")
 
 func file_CopyTo(th *Thread, this Value, args []Value) Value {
-	return CopyTo(th, sfOpenRead(this).f, args[0], args[1])
+	return CopyTo(th, sfOpenRead(this).r, args[0], args[1])
 }
 
 func (sf *suFile) writer() io.Writer {
-	return sfOpenWrite(sf).f
+	return sfOpenWrite(sf).w
 }
 
 var _ = method(file_Readline, "()")
@@ -223,6 +228,16 @@ func file_Seek(this, arg1, arg2 Value) Value {
 	}
 	sf.tell = offset
 	return nil
+}
+
+var _ = method(file_Size, "()")
+
+func file_Size(this Value) Value {
+	sf := sfOpen(this)
+	if sf.w != nil {
+		sf.w.Flush()
+	}
+	return Int64Val(sf.size())
 }
 
 var _ = method(file_Tell, "()")

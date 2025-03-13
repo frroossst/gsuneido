@@ -50,8 +50,8 @@ func merger(db *Database, prevState *DbState, mergeChan chan todo,
 loop:
 	for {
 		select {
-		case td := <-mergeChan: // receive todo's from checkco
-			if td.isZero() { // channel closed
+		case td, ok := <-mergeChan: // receive todo's from checkco
+			if !ok { // channel closed
 				break loop
 			}
 			for {
@@ -61,23 +61,23 @@ loop:
 					} else {
 						// persist
 						if db.GetState() != prevState {
-							prevState = db.persist(ep)
+							prevState = db.persist(ep, true)
 						}
 						td.ret <- prevState
 					}
 					break
 				}
 				merges.start(td)
-				td = merges.drain(mergeChan)
+				td, ok = merges.drain(mergeChan)
 				db.Merge(em.merge, merges)
 				// db.Merge(mergeSingle, merges)
-				if td.isZero() {
+				if !ok {
 					break
 				}
 			}
 		case <-ticker.C:
 			if db.GetState() != prevState {
-				prevState = db.persist(ep)
+				prevState = db.persist(ep, true)
 			}
 		}
 	}
@@ -85,8 +85,8 @@ loop:
 	if db.GetState() != prevState ||
 		prevState.Off != db.Store.Size()-uint64(stateLen) {
 		exit.Progress("persist starting")
-		defer exit.Progress("persist finished")
-		db.persist(ep)
+		db.persist(ep, true)
+		exit.Progress("persist finished")
 	}
 	close(allDone)
 }
@@ -96,10 +96,6 @@ type todo struct {
 	fn     func()
 	ret    chan any
 	tables []string
-}
-
-func (td *todo) isZero() bool {
-	return td.tables == nil && td.meta == nil && td.ret == nil
 }
 
 func (td *todo) run() (err any) {
@@ -134,7 +130,7 @@ func startMergeWorkers() *execMulti {
 		jobChan:    make(chan job, 1),
 		resultChan: make(chan meta.MergeUpdate, 1),
 	}
-	for i := 0; i < nMergeWorkers; i++ {
+	for range nMergeWorkers {
 		go em.worker()
 	}
 	return em
@@ -213,20 +209,20 @@ outer:
 
 // drain returns the next message that can't be added to the mergeList
 // and must be processed separately
-func (ml *mergeList) drain(mergeChan chan todo) todo {
+func (ml *mergeList) drain(mergeChan chan todo) (_ todo, _ bool) {
 	for {
 		select {
-		case td := <-mergeChan:
-			if td.isZero() { // channel closed
-				return todo{}
+		case td, ok := <-mergeChan:
+			if !ok { // channel closed
+				return
 			}
 			if td.ret == nil && ml.meta.SameSchemaAs(td.meta) {
 				ml.add(td.tables)
 			} else {
-				return td // not added to merge (sync or persist)
+				return td, true // not added to merge (sync or persist)
 			}
 		default: // channel empty
-			return todo{}
+			return
 		}
 	}
 }
@@ -268,7 +264,7 @@ const nPersistWorkers = 8 // ???
 func startExecPersistMulti() *execPersistMulti {
 	workChan := make(chan func() meta.PersistUpdate, 1)
 	resultChan := make(chan meta.PersistUpdate, 1)
-	for i := 0; i < nPersistWorkers; i++ {
+	for range nPersistWorkers {
 		go persistWorker(workChan, resultChan)
 	}
 	return &execPersistMulti{workChan: workChan, resultChan: resultChan}

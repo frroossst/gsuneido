@@ -62,10 +62,10 @@ func TestMergeAndSave(*testing.T) {
 	MaxNodeSize = 64
 	bt := CreateBtree(stor.HeapStor(8192), nil)
 
-	for i := 0; i < nMerges; i++ {
+	for range nMerges {
 		_ = t && trace("---")
 		x := &ixbuf.T{}
-		for j := 0; j < opsPerMerge; j++ {
+		for range opsPerMerge {
 			k := rand.Intn(4)
 			switch {
 			case k == 0 || k == 1 || d.Len() == 0:
@@ -90,14 +90,13 @@ func TestMergeAndSave(*testing.T) {
 
 //-------------------------------------------------------------------
 
-//lint:ignore U1000 for debugging
-func (st *state) print() {
-	fmt.Println("state:", st.bt.treeLevels)
-	for _, m := range st.path {
-		fmt.Println("   ", &m)
-		fmt.Println("       ", m.node.knowns())
-	}
-}
+// func (st *state) print() {
+// 	fmt.Println("state:", st.bt.treeLevels)
+// 	for _, m := range st.path {
+// 		fmt.Println("   ", &m)
+// 		fmt.Println("       ", m.node.knowns())
+// 	}
+// }
 
 func (m *merge) String() string {
 	limit := m.limit

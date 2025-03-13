@@ -565,7 +565,7 @@ func (w *Where) optInit() {
 		if !w.exprMore {
 			// check if any colSels were not used by idxSels
 			for _, idxSel := range w.idxSels {
-				for i := 0; i < idxSel.nfields; i++ {
+				for i := range idxSel.nfields {
 					delete(w.colSels, idxSel.index[i])
 				}
 			}
@@ -809,7 +809,9 @@ func (w *Where) Lookup(th *Thread, cols, vals []string) Row {
 func singletonFilter(
 	hdr *Header, row Row, cols []string, vals []string) bool {
 	for i, col := range cols {
-		if row.GetRaw(hdr, col) != vals[i] {
+		x := row.GetRaw(hdr, col)
+		assert.That(len(x) == 0 || x[0] != PackForward)
+		if x != vals[i] {
 			return false
 		}
 	}

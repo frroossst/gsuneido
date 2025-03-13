@@ -61,7 +61,7 @@ func GetTempFileName(path, prefix Value) Value {
 
 var _ = builtin(CreateDir, "(dirname)")
 
-func CreateDir(th *Thread, args []Value) Value { //TEMP for transition
+func CreateDir(th *Thread, args []Value) Value {
 	path := ToStr(args[0])
 	err := os.Mkdir(path, 0755)
 	if errors.Is(err, os.ErrExist) {
@@ -103,7 +103,8 @@ func DeleteFileApi(th *Thread, args []Value) Value {
 	err := deleteFile(path) // see sys_unix.go and sys_windows.go
 	if errors.Is(err, os.ErrNotExist) {
 		// not return-throw
-		return SuStr("DeleteFileApi " + path + ": does not exist")
+		return SuStr("DeleteFileApi: " + path + " does not exist")
+		// WARNING: application code may depend on "does not exist"
 	}
 	if err != nil {
 		th.ReturnThrow = true
@@ -160,7 +161,7 @@ func DeleteDir(th *Thread, args []Value) Value {
 		return SuStr("DeleteDir: " + err.Error())
 	}
 	if !info.Mode().IsDir() {
-		return SuStr("DeleteDir " + path + ": not a directory")
+		return SuStr("DeleteDir: " + path + " not a directory")
 	}
 	path = strings.TrimRight(path, `/\`)
 	err = os.RemoveAll(path)
@@ -209,11 +210,11 @@ func FileSize(th *Thread, args []Value) Value {
 	path := ToStr(args[0])
 	info, err := os.Stat(path)
 	if err != nil {
-		error := err.Error()
 		if errors.Is(err, fs.ErrNotExist) {
-			return False
-		}
-		panic("FileSize: " + error)
+			panic("FileSize: " + path + " does not exist")
+		// WARNING: application code may depend on "does not exist"
+	}
+		panic("FileSize: " + err.Error())
 	}
 	return Int64Val(info.Size())
 }

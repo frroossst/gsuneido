@@ -42,11 +42,11 @@ func (h suAdler32) Equal(other any) bool {
 	return h == other
 }
 
-func (suAdler32) Lookup(_ *Thread, method string) Callable {
+func (suAdler32) Lookup(_ *Thread, method string) Value {
 	return adler32Methods[method]
 }
 
-var adler32Methods = methods()
+var adler32Methods = methods("adler32")
 
 var _ = method(adler32_Update, "(string)")
 

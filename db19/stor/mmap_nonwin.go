@@ -31,8 +31,8 @@ func (ms *mmapStor) Get(chunk int) []byte {
 	return mmap
 }
 
-func (ms *mmapStor) flush(chunk []byte) {
-	if err := unix.Msync(chunk, unix.MS_ASYNC); err != nil {
+func (ms *mmapStor) Flush(chunk []byte) {
+	if err := unix.Msync(chunk, unix.MS_SYNC); err != nil {
 		log.Println("Msync:", err)
 	}
 }
