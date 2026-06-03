@@ -69,6 +69,7 @@ func (th *Thread) run() Value {
 	if th.profile.enabled {
 		th.profile.calls[fr.fn]++
 	}
+	th.recordParams(fr)
 	// fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 	// fmt.Println(strings.Repeat("    ", t.fp) + "run:", t.frames[t.fp].fn)
 	sp := th.sp
@@ -103,7 +104,9 @@ func (th *Thread) run() Value {
 			if th.sp <= sp {
 				return nil // implicit return from last statement had no value
 			}
-			return th.Top()
+			ret := th.Top()
+			th.recordType(fr.fn, typeRetSlot, ret)
+			return ret
 		}
 		// try block threw
 		th.sp = fr.catchSp
@@ -249,7 +252,10 @@ loop:
 			}
 			th.Push(val)
 		case op.Store:
-			fr.setSlot(fetchUint8(), th.Top())
+			i := fetchUint8()
+			v := th.Top()
+			fr.setSlot(i, v)
+			th.recordType(fr.fn, i, v)
 		case op.LoadStore:
 			i := fetchUint8()
 			n := fetchUint8()
@@ -257,6 +263,7 @@ loop:
 				OpAdd, OpSub, OpCat, OpMul, OpDiv, OpMod,
 				OpLeftShift, OpRightShift, OpBitOr, OpBitAnd, OpBitXor}[n>>1]
 			th.stack[th.sp-1] = fr.getSetSlot(i, th.stack[th.sp-1], op, n&1 != 0)
+			th.recordType(fr.fn, i, fr.getSlot(i))
 		case op.Dyload:
 			i := fetchUint8()
 			val := fr.getSlot(i)
@@ -286,7 +293,9 @@ loop:
 			th.Push(fr.fn.Values[valueIdx])
 		case op.StorePop:
 			i := fetchUint8()
-			fr.setSlot(i, th.Pop())
+			v := th.Pop()
+			fr.setSlot(i, v)
+			th.recordType(fr.fn, i, v)
 		case op.ThisLoad:
 			// This
 			if fr.this == nil {

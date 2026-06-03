@@ -117,6 +117,9 @@ type thread2 struct {
 
 	// Name is the name of the thread (default is Thread-#)
 	Name string
+
+	// typerec accumulates observed runtime types per function/variable.
+	typerec typerec
 }
 
 var threadNum atomic.Int32
