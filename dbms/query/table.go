@@ -158,71 +158,37 @@ const ( // ???
 )
 
 func (tbl *Table) optimize(mode Mode, req Require) (Cost, Cost, any) {
-	if tbl.singleton {
-		return tbl.costFor(tbl.indexes[0], req.frac, 0)
+	if tbl.singleton || req.use == ReqNone {
+		return tbl.costFor(tbl.indexes[0], req)
 	}
-	switch req.Use() {
-	case ReqUnordered:
-		return tbl.costFor(tbl.indexes[0], req.frac, 0)
-	case ReqOrdered:
-		idxi := tbl.indexFor(req.cols)
-		if idxi == -1 {
-			return impossible, impossible, nil
+	best := newBest[[]string]()
+	for _, idx := range tbl.indexes {
+		if req.SatisfiedBy(idx) {
+			f, v, _ := tbl.costFor(idx, req)
+			best.update(f, v, idx)
 		}
-		return tbl.costFor(tbl.indexes[idxi], req.frac, 0)
-	case ReqGrouped:
-		best := newBestIndex()
-		for _, idx := range tbl.indexes {
-			if set.StartsWithSet(idx, req.cols) {
-				f, v, _ := tbl.costFor(idx, req.frac, req.nlookups)
-				best.update(idx, f, v)
-			}
-		}
-		if best.index == nil {
-			return impossible, impossible, nil
-		}
-		return best.fixcost, best.varcost, tableApproach{index: best.index}
-	case ReqLookup:
-		best := newBestIndex()
-		for idxi, idx := range tbl.indexes {
-			if set.Subset(req.cols, idx) {
-				varcost := Cost(req.nlookups) * tbl.lookupCostFor(idxi)
-				best.update(idx, 0, varcost)
-			}
-		}
-		if best.index == nil {
-			return impossible, impossible, nil
-		}
-		return 0, best.varcost, tableApproach{index: best.index}
 	}
-	panic("unreachable")
+	if best.none() {
+		return impossible, impossible, nil
+	}
+	return best.fixcost, best.varcost, tableApproach{index: best.data}
 }
 
-func (tbl *Table) costFor(index []string, frac float32, nlookups int32) (Cost, Cost, any) {
+func (tbl *Table) costFor(index []string, req Require) (Cost, Cost, any) {
 	rowCost := tableFast
 	if tbl.info.Size > tableLarge && !slices.Equal(index, tbl.indexes[0]) {
 		rowCost = tableSlow
 	}
 	rowCost += len(index) * colsBias
 	varcost := tbl.info.Nrows * rowCost
-	result := Cost(float64(frac) * float64(varcost))
-	if nlookups > 0 {
+	result := Cost(float64(req.frac) * float64(varcost))
+	if req.nseeks > 0 {
 		idxi := slc.IndexFn(tbl.indexes, index, slices.Equal)
 		if idxi != -1 {
-			result += Cost(nlookups) * tbl.lookupCostFor(idxi)
+			result += Cost(req.nseeks) * tbl.lookupCostFor(idxi)
 		}
 	}
 	return 0, result, tableApproach{index: index}
-}
-
-// find an index that satisfies the required order
-func (tbl *Table) indexFor(order []string) int {
-	for i, index := range tbl.indexes {
-		if slc.HasPrefix(index, order) {
-			return i
-		}
-	}
-	return -1 // not found
 }
 
 func (tbl *Table) setApproach(_ Require, approach any, _ QueryTran) {

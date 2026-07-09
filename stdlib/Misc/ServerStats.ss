@@ -16,6 +16,7 @@ class
 		msg = .MsgPrefix $ "\n"
 		msg $= "OS: " $ stats.system $ "\n"
 		msg $= "Processor: " $ stats.processor $ "\n"
+		msg $= "Processor V2 Support: " $ stats.processorV2Support $ "\n"
 		msg $= "Number of Logical Processors: " $ stats.num_logical_processors $ '\n'
 		msg $= "Number of CPU Cores: " $ stats.num_cpu_cores $ '\n'
 		msg $= 'Running since ' $ stats.start_time.StdShortDateTime() $
@@ -55,6 +56,7 @@ class
 			system: SystemSummary(),
 			last_boot_time: .GetLastBootTime(),
 			processor: .GetCpuName(),
+			processorV2Support: .getCpuV2Support(),
 			num_logical_processors: .getNumLogicalProcs(),
 			num_cpu_cores: .getCpuCores(),
 			mac_address: GetMainMacAddressHex(),
@@ -91,29 +93,28 @@ class
 
 	GetLastBootTime()
 		{
-		try
-			return LocalCmds.GetLastBootTime()
-		catch (e)
-			return e
+		return .localCmd("GetLastBootTime")
 		}
 	GetCpuName()
 		{
-		try
-			return LocalCmds.GetCpuName()
-		catch (e)
-			return e
+		return .localCmd("GetCpuName")
+		}
+	getCpuV2Support()
+		{
+		return .localCmd("GetCpuCaption")
 		}
 	getNumLogicalProcs()
 		{
-		try
-			return LocalCmds.GetLogicalProcessors()
-		catch (e)
-			return e
+		return .localCmd("GetLogicalProcessors")
 		}
 	getCpuCores()
 		{
+		return .localCmd("GetCpuCores")
+		}
+	localCmd(name)
+		{
 		try
-			return LocalCmds.GetCpuCores()
+			return LocalCmds[name]()
 		catch (e)
 			return e
 		}

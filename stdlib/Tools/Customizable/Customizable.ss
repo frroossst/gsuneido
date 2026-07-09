@@ -127,7 +127,7 @@ class
 	LayoutExists?(tab = '')
 		{
 		x = .CustomTab(tab)
-		return x isnt false and x.layout isnt '' or .defaultLayout isnt ''
+		return x isnt false ? x.layout isnt '' : .defaultLayout isnt ''
 		}
 
 	CustomTab(tab)
@@ -342,7 +342,7 @@ class
 		if t.Member?('customOptions')
 			{
 			customOptFn = Global(t.customOptions)
-			options = customOptFn.UpdateProperties(f.colnme, f.colpro, .lib)
+			options.Merge(customOptFn.UpdateProperties(f.colnme, f.colpro, .lib))
 			}
 
 		recName = 'Field_' $ f.colnme
@@ -531,6 +531,16 @@ class
 		format = injectOpts.GetDefault('format', #())
 		for m, v in format
 			str $= '\tFormat_' $ m $ ': ' $ Display(v) $ '\n'
+
+		// extra options
+		c = GetContributions('CustomizableFieldDialogProperties')
+		for item in c
+			for field in item.GetSetFields
+				{
+				v = injectOpts.GetDefault(field.label, '')
+				if v isnt ""
+					str $= '\t' $ field.label $ ': ' $ Display(v) $ '\n'
+				}
 		return str
 		}
 

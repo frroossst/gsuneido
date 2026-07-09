@@ -74,8 +74,8 @@ class
 				loadOnTop?: false)
 			}
 		else
-			BookLog('LoadFrom Failed',
-				params: [:row, top: .loadedTop, bottom: .loadedBottom])
+			SuRenderBackend().AddLog(Object('LoadFrom Failed',
+				:row, top: .loadedTop, bottom: .loadedBottom))
 		}
 
 	loadUp(i, dataBatch)
@@ -202,8 +202,6 @@ class
 				.loadedTop = .releaseTo + 1
 			else
 				.loadedBottom = .releaseTo - 1
-BookLog('Virtuallist recycle', params: [releaseTo: .releaseTo, loadedTop: .loadedTop,
-	loadedBottom: .loadedBottom, modelOffset: .model.Offset, :offset])
 			.releaseTo = false
 			}
 		return result
@@ -219,5 +217,10 @@ BookLog('Virtuallist recycle', params: [releaseTo: .releaseTo, loadedTop: .loade
 
 		.releaseTo = row_num + .model.Offset
 		return true
+		}
+
+	GetInfo()
+		{
+		return Object(loadedTop: .loadedTop, loadedBottom: .loadedBottom)
 		}
 	}

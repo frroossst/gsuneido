@@ -544,26 +544,13 @@ func (w *Where) optimize(mode Mode, req Require) (Cost, Cost, any) {
 		fixcost, varcost := Optimize(w.source, mode, req)
 		return fixcost, varcost, nil
 	}
-	switch req.Use() {
-	case ReqUnordered:
-		return w.optWhereIdx(req, func(idx []string) bool { return true }, false)
-	case ReqOrdered:
-		return w.optWhereIdx(req, func(idx []string) bool {
-			return ordered(idx, req.cols, w.fixed)
-		}, false)
-	case ReqGrouped:
-		nColsUnfixed := countUnfixed(req.cols, w.fixed)
-		return w.optWhereIdx(req, func(idx []string) bool {
-			return grouped(idx, req.cols, nColsUnfixed, w.fixed)
-		}, true)
-	case ReqLookup:
+	if req.use == ReqUnique {
 		return w.optWhereLookup(req)
 	}
-	panic("unreachable")
+	return w.optWhereIdx(req)
 }
 
-func (w *Where) optWhereIdx(req Require, indexOk func([]string) bool,
-	addSeek bool) (Cost, Cost, any) {
+func (w *Where) optWhereIdx(req Require) (Cost, Cost, any) {
 	if w.singleton {
 		// here singleton == fastSingle
 		// because source is a Table and Table keys are a subset of indexes
@@ -571,13 +558,16 @@ func (w *Where) optWhereIdx(req Require, indexOk func([]string) bool,
 		isel := w.idxSels[0]
 		return 0, cost, &whereApproach{index: isel.index, cost: cost, idxSel: isel}
 	}
-	best := newBestIndex()
-	var bestIdxSel *idxSel
+	type bestIdx struct {
+		index  []string
+		idxSel *idxSel
+	}
+	best := newBest[bestIdx]()
 	for _, idx := range w.source.Indexes() {
-		if !indexOk(idx) {
+		if !req.SatisfiedByWithFixed(idx, w.fixed) {
 			continue
 		}
-		_, varCost, _ := w.tbl.optimize(0, OrderedReq(idx, 1.0))
+		_, varCost, _ := w.tbl.optimize(0, OrderReq(idx, 1.0))
 		irFrac := 1.0
 		ifFrac := 1.0
 		dfFrac := w.wfrac
@@ -587,20 +577,15 @@ func (w *Where) optWhereIdx(req Require, indexOk func([]string) bool,
 			ifFrac = isel.indexFilterFrac
 			dfFrac = isel.dataFilterFrac
 		}
-		wc := WhereCost(float64(varCost), float64(req.frac), irFrac, ifFrac, dfFrac)
-		cost := wc
-		if addSeek {
-			cost += Cost(req.nlookups) * w.source.lookupCost()
-		}
-		if best.update(idx, 0, cost) {
-			bestIdxSel = isel
-		}
+		cost := WhereCost(float64(varCost), float64(req.frac), irFrac, ifFrac, dfFrac)
+		cost += Cost(req.nseeks) * w.source.lookupCost()
+		best.update(0, cost, bestIdx{index: idx, idxSel: isel})
 	}
-	if best.index == nil {
+	if best.none() {
 		return impossible, impossible, nil
 	}
-	return 0, best.varcost, &whereApproach{index: best.index,
-		cost: best.varcost, idxSel: bestIdxSel}
+	return 0, best.varcost, &whereApproach{index: best.data.index,
+		cost: best.varcost, idxSel: best.data.idxSel}
 }
 
 func (w *Where) optWhereLookup(req Require) (Cost, Cost, any) {
@@ -609,17 +594,17 @@ func (w *Where) optWhereLookup(req Require) (Cost, Cost, any) {
 		cost := w.tbl.lookupCostFor(w.tbl.indexi(isel.index))
 		return 0, cost, &whereApproach{index: isel.index, cost: cost, idxSel: isel}
 	}
-	best := newBestIndex()
+	best := newBest[[]string]()
 	for idxi, idx := range w.tbl.indexes {
 		if indexCovered(idx, req.cols, w.fixed) {
-			varcost := Cost(req.nlookups) * w.tbl.lookupCostFor(idxi)
-			best.update(idx, 0, varcost)
+			varcost := Cost(req.nseeks) * w.tbl.lookupCostFor(idxi)
+			best.update(0, varcost, idx)
 		}
 	}
-	if best.index == nil {
+	if best.none() {
 		return impossible, impossible, nil
 	}
-	return 0, best.varcost, &whereApproach{index: best.index, cost: best.varcost}
+	return 0, best.varcost, &whereApproach{index: best.data, cost: best.varcost}
 }
 
 // exprFalse checks if any expressions folded to false
@@ -934,11 +919,7 @@ func (w *Where) Lookup(th *Thread, sels Sels) Row {
 		// srcIndex == nil: fixed covers a key (singleton detected in optInit),
 		// so Optimize passed index=nil and setApproach left srcIndex nil.
 		w.Rewind()
-		row := GetNext1(w, th)
-		if row == nil || !singletonFilter(w.header, row, sels) {
-			return nil
-		}
-		return row
+		return GetNext1(w, th, sels)
 	}
 	cloned := false
 	sels = slices.Clip(sels)

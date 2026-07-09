@@ -78,12 +78,10 @@ Controller
 
 		.peditor = .getPeditor()
 
-		if typeOb.GetDefault('oneWay', false)
-			return .noPropertiesCtrl()
-
 		return false is .peditor and editType is false
 			? .noPropertiesCtrl()
-			: .controls(editName:, :editType, type: typeOb.base)
+			: .controls(editName:, :editType, type: typeOb.base,
+				oneWay: typeOb.GetDefault('oneWay', false))
 		}
 
 	matchingControl(c)
@@ -108,7 +106,7 @@ Controller
 			))
 		}
 
-	controls(editName = false, editType = false, type = false)
+	controls(editName = false, editType = false, type = false, oneWay = false)
 		{
 		ob = Object()
 		ob.Add('Record')
@@ -125,7 +123,7 @@ Controller
 		else
 			vert.Add(Object('Pair' #(Static 'Name') #(Static name: 'colpro')))
 
-		if editType isnt false
+		if editType isnt false and oneWay is false
 			vert.Add(Object('Pair' #(Static 'Type') Object('ChooseFieldType'
 				filterBy: type, mandatory:, name: 'ctllbl')))
 		else
@@ -179,13 +177,18 @@ Controller
 
 	OK()
 		{
-		if .notChanged?()
+		peditor = .FindControl('peditor')
+		if peditor isnt false and peditor.Valid?() isnt true
+			return false
+
+		if .notChanged?(peditor)
 			{
+			// the only way we get here is if valid IS true
 			.On_Cancel()
 			return false
 			}
 		data = .Data.Get()
-		if .valid?(data)
+		if .valid?(data, peditor)
 			{
 			if .hasConversionFunction?()
 				.handleConversion(data)
@@ -200,16 +203,13 @@ Controller
 			return data
 			}
 		else
-			Beep()
+			.beep()
 		return false
 		}
 
-	notChanged?()
+	notChanged?(peditor)
 		{
 		if .Data.Valid(forceCheck:) isnt true
-			return false
-		peditor = .FindControl('peditor')
-		if peditor isnt false and peditor.Valid?() isnt true
 			return false
 		return not .Data.Dirty?() and (peditor is false or .originalData is peditor.Get())
 		}
@@ -237,18 +237,27 @@ Controller
 
 		for mem in requiredData.format.Members()
 			data.options.format.Add(requiredData.format[mem], at: mem)
+		return Nothing
 		}
 
-	valid?(data)
+	valid?(data, pe)
 		{
 		data.options = false
-		pe = .FindControl('peditor')
-		if  false isnt pe
-			if false is pe.Valid?()
-				return false
-			else
-				data.options = pe.Get()
+		if false isnt pe
+			data.options = pe.Get()
 
+		if .promptInUse?(data)
+			return false
+
+		if not .promptValid?(data)
+			return false
+
+		return .Data.Valid() is true
+		}
+
+	// factored out for the test
+	promptInUse?(data)
+		{
 		// calls function Custom_PromptInUse that checks if the prompt has been
 		// used already. This function wipes out the prompt field in the data
 		// which we didn't want so used fake field "custom_xxx", only way to
@@ -257,15 +266,22 @@ Controller
 		ob = Object(custom_xxx: field)
 		data[field] = "VALID"
 		Custom_PromptInUse(field, ob, data.colpro, .Window.Hwnd, data, exclude_custom?:)
-		if data[field] is ''
-			return false
+		// if data[field] is EMPTY, the prompt WAS in use
+		return data[field] is ''
+		}
 
+	promptValid?(data)
+		{
 		if "" isnt prompt_valid = CustomPromptValid(data.colpro, description: "Name")
 			{
 			.AlertError(.title, prompt_valid)
 			return false
 			}
+		return true
+		}
 
-		return .Data.Valid() is true
+	beep()
+		{
+		Beep()
 		}
 	}

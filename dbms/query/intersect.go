@@ -57,27 +57,34 @@ func (it *Intersect) getHeader() *Header {
 
 func (it *Intersect) getKeys() [][]string {
 	k := slc.With(it.source1.Keys(), it.source2.Keys()...)
-	return minimizeKeys(k)
+	return projectKeys(minimizeKeys(k), it.header.Columns)
 }
 
 func (it *Intersect) getIndexes() [][]string {
 	idx1 := it.source1.Indexes()
 	idx2 := it.source2.Indexes()
-	if isEmptyKey(idx1) {
-		return idx2
-	} else if isEmptyKey(idx2) {
-		return idx1
+	if isEmptyKey(idx1) && isEmptyKey(idx2) {
+		return emptyKey
 	}
-	return set.UnionFn(idx1, idx2, slices.Equal)
+	return projectIndexes(set.UnionFn(idx1, idx2, slices.Equal), it.header.Columns)
 }
 
 func (it *Intersect) getFixed() Fixed {
-	// same as Join
 	fixed, none := it.source1.Fixed().Combine(it.source2.Fixed())
 	if none {
 		it.conflict = true
 	}
-	return fixed
+	return intersectFixed(fixed, it.header.Columns)
+}
+
+func intersectFixed(fixed Fixed, cols []string) Fixed {
+	result := make(Fixed, 0, len(fixed))
+	for _, f := range fixed {
+		if slices.Contains(cols, f.col) {
+			result = append(result, f)
+		}
+	}
+	return result
 }
 
 func (it *Intersect) getNrows() (int, int) {
@@ -154,10 +161,21 @@ func (it *Intersect) cost2(mode Mode, req Require, reverse bool) (Cost, Cost, *i
 	if reverse {
 		src1, src2 = src2, src1
 	}
+	// Intersect.Lookup only calls src1.Lookup, so if req needs Lookup
+	// support (ReqUnique or ReqGroup), req.cols must contain an actual
+	// key of src1. it.keys is the union of both sources' keys (valid for
+	// Intersect as a whole, since a key on either side is sufficient to
+	// make rows unique) but a key coming solely from src2 can't be used
+	// to satisfy Lookup through src1 - that must fall back to a temp index.
+	if use := req.use; use == ReqUnique || use == ReqGroup {
+		if !hasKey(req.cols, src1.Keys(), src1.Fixed()) {
+			return impossible, impossible, nil
+		}
+	}
 	fixcost1, varcost1 := Optimize(src1, mode, req)
 	nrows1, _ := src1.Nrows()
-	nlookups := req.LookupCount(nrows1)
-	req2 := LookupReq(src2.Columns(), nlookups)
+	nseeks := req.SeekCount(nrows1)
+	req2 := UniqueReq(src2.Columns(), nseeks)
 	fc2, vc2 := Optimize(src2, mode, req2)
 	if fc2+vc2 >= impossible {
 		return impossible, impossible, nil

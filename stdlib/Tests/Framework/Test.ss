@@ -229,6 +229,8 @@ class
 		{
 		if not TableExists?(lib)
 			.makeLibrary(lib)
+		if lib is .testlib
+			Database('ensure ' $ .testlib $ ' (lib_committed)')
 		if ServerEval('Use', lib)
 			Unload()
 		else if lib is .testlib and Libraries().Last() isnt lib
@@ -276,7 +278,7 @@ class
 			}
 		return library
 		}
-	checkLibraryName(name)
+	checkLibraryName(name /*unused*/)
 		{
 //		if name.GlobalName?() and
 //			not name.Has?(Date().Format("yyyyMMdd")) and
@@ -303,9 +305,15 @@ class
 
 	MakeBook()
 		{
-		.AddTeardown(.teardown_tables)
+		.AddTeardown(.teardownBookTables)
 		BookModel.Create(book = .TempTableName())
 		return book
+		}
+
+	teardownBookTables()
+		{
+		.teardown_tables()
+		SvcDisabledBooks.ResetCache()
 		}
 
 	MakeBookRecord(book, text, path = '', extrafields = #())
@@ -601,6 +609,12 @@ class
 	GetWatchTable(watchMember)
 		{
 		return ServerSuneido.Get(watchMember, Object())
+		}
+
+	MemoizeSingleOverride(cache, value)
+		{
+		MemoizeSingle.Cache()[override = cache $ 'Override'] = value
+		.AddTeardown({ MemoizeSingle.Cache().Delete(override) })
 		}
 
 	SpyOn(target)
