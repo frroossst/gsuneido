@@ -505,7 +505,7 @@ func (ck *Check) blockAsClosure(b *ast.Block, init set) set {
 
 	shared := sharedVarNames(b)
 
-	before := init
+	before := init.cow()
 	// pass full init so nested closures can see all outer vars
 	after := ck.check(&b.Function, init, true)
 	// only merge shared vars back; non-shared block-locals stay invisible
