@@ -50,14 +50,7 @@ func opgp_SymmetricEncrypt(passphrase, source, toFile Value) Value {
 	return opgpFile(passphrase, source, toFile, symEncrypt)
 }
 
-var _ = staticMethod(opgp_SymmetricDecrypt,
-<<<<<<< HEAD
-	"(passphrase, source :string, toFile = false) :string|void")
-||||||| 6c9d8415
-	"(passphrase, source, toFile = false) :string|void")
-=======
-	"(passphrase :string, source :string, toFile = false) :string|void")
->>>>>>> df9bf87f7f349579137d63bae881886e15c0986c
+var _ = staticMethod(opgp_SymmetricDecrypt,"(passphrase :string, source :string, toFile = false) :string|void")
 
 func opgp_SymmetricDecrypt(passphrase, source, toFile Value) Value {
 	if toFile == False {
