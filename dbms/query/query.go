@@ -38,9 +38,7 @@
 package query
 
 import (
-	"fmt"
 	"math"
-	"strings"
 	"sync/atomic"
 
 	. "github.com/apmckinlay/gsuneido/core"
@@ -53,7 +51,6 @@ import (
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/opt"
 	"github.com/apmckinlay/gsuneido/util/set"
-	"github.com/apmckinlay/gsuneido/util/str"
 )
 
 // Query is the interface for nodes in a query tree.
@@ -65,20 +62,21 @@ import (
 // the database directly.
 //
 // Optimization phase:
-//  - Transform() refactors the query for efficiency (bottom-up).
-//  - optimize()/caching selects the best execution strategy based on costs.
-//  - setApproach() locks in the chosen strategy and sets up for execution.
-//  - Requires/Nrows/Keys/Indexes provide metadata for cost estimation.
+//   - Transform() refactors the query for efficiency (bottom-up).
+//   - optimize()/caching selects the best execution strategy based on costs.
+//   - setApproach() locks in the chosen strategy and sets up for execution.
+//   - Requires/Nrows/Keys/Indexes provide metadata for cost estimation.
 //
 // Execution phase:
-//  - Get(Next/Prev) returns rows one at a time, sticking at EOF until Rewind.
-//  - Lookup(sels) returns a single matching row (optimized path).
-//  - Select(sels) restricts results to a key range (used by joins/filters).
-//  - Rewind() resets the position for re-iteration.
+//   - Get(Next/Prev) returns rows one at a time, sticking at EOF until Rewind.
+//   - Lookup(sels) returns a single matching row (optimized path).
+//   - Select(sels) restricts results to a key range (used by joins/filters).
+//   - Rewind() resets the position for re-iteration.
 //
 // Terminology:
-//  - "incoming" means calls *to* a query operation
-//  - "outgoing" means calls *from" a query operation
+//   - "incoming" means calls *to* a query operation
+//   - "outgoing" means calls *from" a query operation
+//
 // The "incoming" [Require] is the one passed to a node's
 // own optimize/setApproach (called by its parent).
 // The "outgoing" Require is the one this node passes to its children's
@@ -225,6 +223,8 @@ type Query interface {
 
 var emptyKey = [][]string{{}}
 
+//-------------------------------------------------------------------
+
 // queryBase is embedded by almost all Query types
 type queryBase struct {
 	// header must be set by constructors and setApproach.
@@ -250,29 +250,6 @@ const (
 	within
 	eof
 )
-
-type metrics struct {
-	fixcost  Cost
-	varcost  Cost
-	costself Cost
-	frac     float64
-	ngets    int32
-	nsels    int32
-	nlooks   int32
-	tget     uint64
-	tgetself uint64
-}
-
-func (m *metrics) String() string {
-	return fmt.Sprintf("metrics{fixcost: %v varcost: %v costself: %v frac: %.2f ngets: %d nsels: %d nlooks: %d tget: %d tgetself: %d}",
-		m.fixcost, m.varcost, m.costself, m.frac, m.ngets, m.nsels, m.nlooks, m.tget, m.tgetself)
-}
-
-func (m *metrics) setCost(frac float64, fixcost, varcost Cost) {
-	m.frac = frac
-	m.fixcost = fixcost
-	m.varcost = varcost
-}
 
 func (q *queryBase) Columns() []string {
 	return q.header.Columns
@@ -332,13 +309,20 @@ func (*queryBase) knowExactNrows() bool {
 	return false
 }
 
-// Mode is the transaction context - cursor, read, or update.
-// It affects the use of temporary indexes.
+//-------------------------------------------------------------------
+
+// Mode is the query execution context.
+// It affects the use of temporary indexes —
+// they are only valid within a single transaction,
+// so they are disabled for CursorMode.
 type Mode int
 
 const (
-	CursorMode Mode = iota
+	// CursorMode is used for cursor queries that span multiple transactions
+	CursorMode Mode = iota + 1
+	// ReadMode is used for read-only queries within a single transaction
 	ReadMode
+	// UpdateMode is used for updates within a single transaction
 	UpdateMode
 )
 
@@ -401,9 +385,6 @@ func setup(q Query, mode Mode, frac float64, t QueryTran) (Query, Cost, Cost) {
 		panic("invalid query: " + String(q))
 	}
 	q = SetApproach(q, req, t)
-	if mode == CursorMode {
-		setCursorMode(q)
-	}
 	return q, fixcost, varcost
 }
 
@@ -434,9 +415,6 @@ func SetupIdx(q Query, mode Mode, t QueryTran, index []string) Query {
 		panic("invalid query: " + String(q))
 	}
 	q = SetApproach(q, req, t)
-	if mode == CursorMode {
-		setCursorMode(q)
-	}
 	return q
 }
 
@@ -448,8 +426,6 @@ const outOfOrder = 10
 const impossible = Cost(math.MaxInt / 64) // allow for adding impossible's
 
 //-------------------------------------------------------------------
-// new version of Optimize using Require (not used yet)
-// initially duplicates the existing one, will eventually replace it
 
 func Optimize(q Query, mode Mode, req Require) (fixcost, varcost Cost) {
 	fixcost, varcost, _ = optimize(q, mode, req)
@@ -748,6 +724,10 @@ func lookupViaSelectGet(q Query, th *Thread, sels Sels) Row {
 	return GetNext1(q, th, sels)
 }
 
+func lookup(q Query, th *Thread, sels Sels) Row {
+	return q.Lookup(th, sels)
+}
+
 // Query1 -----------------------------------------------------------
 
 type Query1 struct {
@@ -826,146 +806,6 @@ func (q2 *Query2) Source2() Query {
 }
 
 // ------------------------------------------------------------------
-
-// String prints the full query, including child sources
-// whereas query.String only shows that operation
-func String(q Query) string {
-	switch qi := q.(type) {
-	case q2i:
-		return paren2(qi.Source()) + " " + q.String() + " " + paren1(qi.Source2())
-	case *Sort:
-		return String(qi.Source()) + str.Opt(" ", q.String()) // no parens
-	case *View:
-		return q.String()
-	case q1i:
-		return paren2(qi.Source()) + str.Opt(" ", q.String())
-	default:
-		return q.String()
-	}
-}
-
-func paren1(q Query) string {
-	switch q.(type) {
-	case *Table, *Tables, *TablesLookup, *Columns, *Indexes, *Views,
-		*Nothing, *ProjectNone:
-		return String(q)
-	}
-	return "(" + String(q) + ")"
-}
-
-func paren2(q Query) string {
-	if _, ok := q.(q2i); ok {
-		return "(" + String(q) + ")"
-	}
-	return String(q)
-}
-
-// ------------------------------------------------------------------
-
-func Strategy(q Query) string {
-	return strategy(q, 0)
-}
-
-const indent1 = "    "
-
-func strategy(q Query, indent int) string { // recursive
-	in := strings.Repeat(indent1, indent)
-	nrows, pop := q.Nrows()
-	m := q.Metrics()
-	cost := "{"
-	if m.frac != 1 {
-		cost += fmt.Sprintf("%.3fx ", m.frac)
-	}
-	cost += trace.Number(nrows)
-	if nrows != pop {
-		cost += "/" + trace.Number(pop)
-	}
-	cost += " " + trace.Number(m.fixcost) + "+" + trace.Number(m.varcost)
-	cost += "} "
-	switch q := q.(type) {
-	case *Sort:
-		if q.String() == "" {
-			return strategy(q.Source(), indent)
-		} else {
-			return strategy(q.Source(), indent) + "\n" +
-				in + cost + q.String()
-		}
-	case q2i:
-		return strategy(q.Source(), indent+1) + "\n" +
-			in + cost + q.String() + "\n" +
-			strategy(q.Source2(), indent+1)
-	case q1i:
-		return strategy(q.Source(), indent) + "\n" +
-			in + cost + q.String()
-	default:
-		return in + cost + q.String()
-	}
-}
-
-// Strategy2 is like Strategy but without the cost/size estimates
-// so it is more stable for tests
-func Strategy2(q Query) string {
-	return strategy2(q, 0)
-}
-
-func strategy2(q Query, indent int) string { // recursive
-	in := strings.Repeat(indent1, indent)
-	switch q := q.(type) {
-	case *Sort:
-		if q.String() == "" {
-			return strategy2(q.Source(), indent)
-		} else {
-			return strategy2(q.Source(), indent) + "\n" +
-				in + q.String()
-		}
-	case q2i:
-		return strategy2(q.Source(), indent+1) + "\n" +
-			in + q.String() + "\n" +
-			strategy2(q.Source2(), indent+1)
-	case q1i:
-		return strategy2(q.Source(), indent) + "\n" +
-			in + q.String()
-	default:
-		return in + q.String()
-	}
-}
-
-func CalcSelf(q0 Query) { // recursive
-	m := q0.Metrics()
-	if m.tgetself != 0 {
-		return // already calculated
-	}
-	switch q := q0.(type) {
-	case q2i:
-		m1 := q.Source().Metrics()
-		m2 := q.Source2().Metrics()
-		m.tgetself = m.tget - (m1.tget + m2.tget)
-		m.costself = (m.fixcost + m.varcost) -
-			(m1.fixcost + m1.varcost + m2.fixcost + m2.varcost)
-		CalcSelf(q.Source())
-		CalcSelf(q.Source2())
-	case q1i:
-		sm := q.Source().Metrics()
-		m.tgetself = m.tget - sm.tget
-		m.costself = (m.fixcost + m.varcost) - (sm.fixcost + sm.varcost)
-		CalcSelf(q.Source())
-	default:
-		m.tgetself = q0.Metrics().tget
-		m.costself = q0.Metrics().fixcost + q0.Metrics().varcost
-	}
-}
-
-func setCursorMode(q Query) {
-	switch q := q.(type) {
-	case q2i:
-		setCursorMode(q.Source())
-		setCursorMode(q.Source2())
-	case q1i:
-		setCursorMode(q.Source())
-	case *Table:
-		q.cursorMode = true
-	}
-}
 
 // func unpack(packed []string) []Value {
 // 	vals := make([]Value, len(packed))
