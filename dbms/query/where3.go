@@ -81,11 +81,6 @@ func betterMinPre(a, b *idxSel) bool {
 	return a.prefixFrac < b.prefixFrac
 }
 
-func sameFrac(x, y float64) bool {
-	const epsilon = 1e-9
-	return math.Abs(x-y) < epsilon
-}
-
 func (w *Where) buildIdxSel(index []string, mode byte, perCol map[string][]span) *idxSel {
 	encode := mode != 'k' || len(index) > 1
 	isel := idxSel{index: index, encoded: encode, mode: mode}
@@ -383,7 +378,7 @@ func (w *Where) moreFilters(index []string, isel *idxSel) (bool, bool) {
 	dataFilter := false
 	for _, e := range w.expr.Exprs {
 		exprCols := e.Columns()
-		if len(exprCols) == 0 || !set.Subset(index, exprCols) {
+		if len(exprCols) == 0 || !set.HasSubset(index, exprCols) {
 			dataFilter = true
 		} else if !set.Disjoint(exprCols, unconstrained) {
 			// e.g. index(a,b) where a>1 and F(a,b)

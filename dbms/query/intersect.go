@@ -13,6 +13,16 @@ import (
 	"github.com/apmckinlay/gsuneido/util/tsc"
 )
 
+// Intersect is a Query that intersects two sources.
+// It allows the sources to have different columns.
+// The result columns are the intersection of the source columns
+// (i.e. the common columns).
+// All columns are compared when matching rows;
+// so columns unique to either source must be "".
+// (Rules could complicate this.)
+// This means we don't need an extra deduplication step
+// like we would if we only compared common columns.
+// To get that behavior, use project on the sources before intersect.
 type Intersect struct {
 	Compatible1
 	conflict   bool
@@ -22,7 +32,7 @@ type Intersect struct {
 }
 
 type intersectApproach struct {
-	keyIndex   []string
+	cols       []string
 	reverse    bool
 	req1, req2 Require
 }
@@ -40,6 +50,8 @@ func newIntersect(src1, src2 Query, t QueryTran, prevFixed1, prevFixed2 Fixed) *
 	it.fixed = it.getFixed()
 	it.setNrows(it.getNrows())
 	it.rowSiz.Set(src1.rowSize())
+	// to be fast, source1 must be fastSingle
+	// but we might reverse so we don't know which will be source1
 	it.fast1.Set(src1.fastSingle() && src2.fastSingle())
 	return &it
 }
@@ -49,9 +61,8 @@ func (it *Intersect) String() string {
 }
 
 func (it *Intersect) getHeader() *Header {
-	hdr := it.source1.Header()
 	cols := set.Intersect(it.source1.Columns(), it.source2.Columns())
-	return NewHeader(hdr.Fields, cols)
+	return projectHeader(it.source1.Header(), cols)
 }
 
 func (it *Intersect) getKeys() [][]string {
@@ -145,8 +156,8 @@ func compatCopyFixed(fromFixed, toFixed Fixed, to Query, t QueryTran) Query {
 
 func (it *Intersect) optimize(mode Mode, req Require) (Cost, Cost, any) {
 	assert.That(it.disjoint == "") // eliminated by Transform
-	fixcost1, varcost1, ap1 := it.cost2(mode, req, false)
-	fixcost2, varcost2, ap2 := it.cost2(mode, req, true)
+	fixcost1, varcost1, ap1 := it.optDir(mode, req, false)
+	fixcost2, varcost2, ap2 := it.optDir(mode, req, true)
 	fixcost2 += outOfOrder
 	if fixcost1+varcost1 < fixcost2+varcost2 {
 		return fixcost1, varcost1, ap1
@@ -154,7 +165,7 @@ func (it *Intersect) optimize(mode Mode, req Require) (Cost, Cost, any) {
 	return fixcost2, varcost2, ap2
 }
 
-func (it *Intersect) cost2(mode Mode, req Require, reverse bool) (Cost, Cost, *intersectApproach) {
+func (it *Intersect) optDir(mode Mode, req Require, reverse bool) (Cost, Cost, *intersectApproach) {
 	// iterate source and lookup on source2
 	src1, src2 := it.source1, it.source2
 	if reverse {
@@ -180,12 +191,12 @@ func (it *Intersect) cost2(mode Mode, req Require, reverse bool) (Cost, Cost, *i
 		return impossible, impossible, nil
 	}
 	return fixcost1 + fc2, varcost1 + vc2,
-		&intersectApproach{keyIndex: req2.cols, req1: req, req2: req2, reverse: reverse}
+		&intersectApproach{cols: req2.cols, req1: req, req2: req2, reverse: reverse}
 }
 
 func (it *Intersect) setApproach(req Require, approach any, tran QueryTran) {
 	ap := approach.(*intersectApproach)
-	it.keyIndex = ap.keyIndex
+	it.lookupCols = ap.cols
 	if ap.reverse {
 		it.source1, it.source2 = it.source2, it.source1
 	}

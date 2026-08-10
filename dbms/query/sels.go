@@ -3,7 +3,12 @@
 
 package query
 
-import "iter"
+import (
+	"iter"
+	"strings"
+
+	. "github.com/apmckinlay/gsuneido/core"
+)
 
 type Sels []Sel
 
@@ -78,4 +83,18 @@ func (sels Sels) All() iter.Seq2[string, string] {
 			}
 		}
 	}
+}
+
+func (sels Sels) String() string {
+	var sb strings.Builder
+	sb.WriteString("Sels{")
+	sep := ""
+	for _, sel := range sels {
+		sb.WriteString(sep)
+		sb.WriteString(sel.col)
+		sb.WriteString(": ")
+		sb.WriteString(Unpack(sel.val).String())
+		sep = ", "
+	}
+	return sb.String() + "}"
 }

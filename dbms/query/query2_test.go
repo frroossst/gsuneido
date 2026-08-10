@@ -19,7 +19,6 @@ import (
 	"github.com/apmckinlay/gsuneido/util/hacks"
 	"github.com/apmckinlay/gsuneido/util/hash"
 	"github.com/apmckinlay/gsuneido/util/shmap"
-	"github.com/apmckinlay/gsuneido/util/slc"
 )
 
 func TestQuery(t *testing.T) {
@@ -51,7 +50,7 @@ func TestQuery(t *testing.T) {
 	th := &Thread{}
 	n := 0
 	hdr := q.Header()
-	fields := slc.Without(hdr.GetFields(), "-")
+	fields := hdr.Physical()
 	hashes := make(map[uint64]struct{})
 	for {
 		row := q.Get(th, Next)
@@ -126,14 +125,8 @@ func TestQuery2(t *testing.T) {
 	s := `aln where ik is "67" sort ik`
 	q := ParseQuery(s, tran, nil)
 	// trace.QueryOpt.Set()
-	q = q.Transform()
 	const frac = 100
-	req := NoneReq(frac)
-	fixcost, varcost := Optimize(q, ReadMode, req)
-	if fixcost+varcost >= 9999999999 {
-		panic("invalid query: " + q.String())
-	}
-	q = SetApproach(q, req, tran)
+	q, _, _ = SetupReq(q, ReadMode, tran, NoneReq(frac))
 
 	fmt.Println("----------------")
 	fmt.Println(Strategy(q))

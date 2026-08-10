@@ -36,6 +36,7 @@ const (
 	ReqGroup      = UsePrefix | UseSet   // used with Select
 	ReqUnique     = UseFull | UseSet     // used with Lookup
 	ReqOrder      = UsePrefix | UseOrder // used to Get in a particular order
+	ReqAny        = 0xff                 // used with Table SetIndex
 )
 
 func (use Use) String() string {
@@ -48,10 +49,16 @@ func (use Use) String() string {
 		return "ReqUnique"
 	case ReqOrder:
 		return "ReqOrder"
+	case ReqAny:
+		return "ReqAny"
 	}
 	panic("invalid Use")
 }
 
+// Require specifies what a query node needs from its children
+// during optimization.
+// It bottoms out at Table.optimize
+// which picks the lowest-cost index satisfying the Require.
 type Require struct {
 	cols   []string
 	frac   float32
@@ -127,7 +134,7 @@ func (r Require) SatisfiedBy(index []string) bool {
 	case ReqOrder:
 		return slc.HasPrefix(index, r.cols)
 	case ReqUnique:
-		return set.Subset(r.cols, index)
+		return set.HasSubset(r.cols, index)
 	}
 	panic("invalid Require use")
 }

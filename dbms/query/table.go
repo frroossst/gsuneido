@@ -12,6 +12,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/meta"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/set"
 	"github.com/apmckinlay/gsuneido/util/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -52,6 +53,7 @@ type Table struct {
 	singleton   bool
 	indexEncode bool
 	cursorMode  bool
+	req         Require
 }
 
 func (tbl *Table) isSingleton() bool {
@@ -64,6 +66,7 @@ func (tbl *Table) schemaIndexes() []Index {
 
 type tableApproach struct {
 	index []string
+	mode  Mode
 }
 
 func (tbl *Table) String() string {
@@ -159,22 +162,22 @@ const ( // ???
 
 func (tbl *Table) optimize(mode Mode, req Require) (Cost, Cost, any) {
 	if tbl.singleton || req.use == ReqNone {
-		return tbl.costFor(tbl.indexes[0], req)
+		return tbl.costFor(tbl.indexes[0], mode, req)
 	}
 	best := newBest[[]string]()
 	for _, idx := range tbl.indexes {
 		if req.SatisfiedBy(idx) {
-			f, v, _ := tbl.costFor(idx, req)
+			f, v, _ := tbl.costFor(idx, mode, req)
 			best.update(f, v, idx)
 		}
 	}
 	if best.none() {
 		return impossible, impossible, nil
 	}
-	return best.fixcost, best.varcost, tableApproach{index: best.data}
+	return best.fixcost, best.varcost, tableApproach{index: best.data, mode: mode}
 }
 
-func (tbl *Table) costFor(index []string, req Require) (Cost, Cost, any) {
+func (tbl *Table) costFor(index []string, mode Mode, req Require) (Cost, Cost, any) {
 	rowCost := tableFast
 	if tbl.info.Size > tableLarge && !slices.Equal(index, tbl.indexes[0]) {
 		rowCost = tableSlow
@@ -188,14 +191,17 @@ func (tbl *Table) costFor(index []string, req Require) (Cost, Cost, any) {
 			result += Cost(req.nseeks) * tbl.lookupCostI(idxi)
 		}
 	}
-	return 0, result, tableApproach{index: index}
+	return 0, result, tableApproach{index: index, mode: mode}
 }
 
-func (tbl *Table) setApproach(_ Require, approach any, _ QueryTran) {
-	tbl.SetIndex(approach.(tableApproach).index)
+func (tbl *Table) setApproach(req Require, approach any, _ QueryTran) {
+	tbl.req = req
+	ap := approach.(tableApproach)
+	tbl.setIndex(ap.index, ap.mode)
 }
 
-func (tbl *Table) SetIndex(index []string) {
+func (tbl *Table) setIndex(index []string, mode Mode) {
+	tbl.cursorMode = (mode == CursorMode)
 	if tbl.singleton {
 		index = tbl.allKeys[0]
 	}
@@ -203,6 +209,13 @@ func (tbl *Table) SetIndex(index []string) {
 	tbl.iIndex = tbl.indexi(index)
 	tbl.indexEncode = tbl.IndexEncodes(index)
 	IdxUse(tbl.name, tbl.index)
+}
+
+// SetIndex sets the index used to access the table.
+// It also sets req to ReqAny so that Select and Lookup can be used.
+func (tbl *Table) SetIndex(index []string, mode Mode) {
+	tbl.setIndex(index, mode)
+	tbl.req = Require{use: ReqAny}
 }
 
 // IndexEncodes returns whether the index key is encoded
@@ -239,10 +252,11 @@ func (tbl *Table) lookupCostI(i int) Cost {
 // execution --------------------------------------------------------
 
 func (tbl *Table) Lookup(_ *Thread, sels Sels) Row {
-	assert.That(!selConflict(tbl.header.Columns, sels))
+	dbg.Assert(func() bool { return checkSels(sels, tbl.header.Columns) })
 	tbl.nlooks++
 	key := ""
 	if !tbl.singleton {
+		assert.That(tbl.req.use == ReqUnique || tbl.req.use == ReqAny)
 		ix := &tbl.schema.Indexes[tbl.iIndex]
 		key = selOrg(tbl.indexEncode, ix.Fields, sels, true)
 		if len(ix.Ixspec.Fields2) > 0 && key == "" {
@@ -250,11 +264,16 @@ func (tbl *Table) Lookup(_ *Thread, sels Sels) Row {
 			key = selOrg(true, fullFields, sels, true)
 		}
 	}
-	row := tbl.LookupRaw(key)
-	if row == nil || !singletonFilter(tbl.header, row, sels) {
-		return nil
+	return tbl.LookupRaw(key)
+}
+
+func checkSels(sels Sels, srcCols []string) bool {
+	for _, sel := range sels {
+		if !slices.Contains(srcCols, sel.col) {
+			return false
+		}
 	}
-	return row
+	return true
 }
 
 func (tbl *Table) LookupRaw(key string) Row {
@@ -313,6 +332,9 @@ func (tbl *Table) GetFilter(dir Dir, filter func(key string) bool) Row {
 }
 
 func (tbl *Table) Select(sels Sels) {
+	// singleton doesn't use an index range - it filters (via singletonFilter
+	// in GetFilter) after a full scan, so it supports Select regardless of
+	// tbl.req.use.
 	tbl.nsels++
 	if tbl.singleton {
 		tbl.sels = sels
@@ -323,7 +345,9 @@ func (tbl *Table) Select(sels Sels) {
 		tbl.ensureIter().Range(iface.All)
 		return
 	}
-	assert.That(!selConflict(tbl.header.Columns, sels))
+	assert.That(tbl.req.use == ReqAny ||
+		tbl.req.use == ReqGroup || tbl.req.use == ReqOrder)
+	dbg.Assert(func() bool { return checkSels(sels, tbl.header.Columns) })
 	org, end := selKeys(tbl.indexEncode, tbl.index, sels)
 	tbl.SelectRaw(org, end)
 }

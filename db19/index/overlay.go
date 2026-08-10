@@ -5,6 +5,7 @@ package index
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	btree "github.com/apmckinlay/gsuneido/db19/index/btree"
@@ -129,9 +130,9 @@ func (ov *Overlay) RangeFrac(org, end string, nrecs, btreeNrows int) float64 {
 	}
 	btFrac := 0.0
 	if btreeNrows > 0 {
-		btFrac = ov.bt.RangeFrac(org, end, btreeNrows)
+		btFrac = ov.bt.RangeFrac(org, end)
 	}
-	if float64(btreeNrows)/float64(nrecs) > 0.98 {
+	if math.Abs(float64(nrecs-btreeNrows))/float64(nrecs) < 0.02 {
 		// ixbufs are < 2%
 		return btFrac
 	}
@@ -143,7 +144,7 @@ func (ov *Overlay) RangeFrac(org, end string, nrecs, btreeNrows int) float64 {
 	}
 
 	delta := ov.ixbufApproxDelta(org, end)
-	btCount := btFrac * float64(nrecs)
+	btCount := btFrac * float64(btreeNrows)
 	count := btCount + float64(delta)
 	frac := float64(count) / float64(nrecs)
 	if frac < 0 {

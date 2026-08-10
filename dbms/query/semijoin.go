@@ -68,7 +68,7 @@ func NewSemiJoin(src1, src2 Query, by []string, t QueryTran) *SemiJoin {
 	}
 	if by == nil {
 		by = b
-	} else if !set.Subset(b, by) {
+	} else if !set.HasSubset(b, by) {
 		panic("semijoinjoin: by must be a subset of the common columns")
 	}
 	sj := &SemiJoin{qt: t, st: MakeSuTran(t), by: by}
@@ -150,15 +150,15 @@ func (sj *SemiJoin) Transform() Query {
 }
 
 func (sj *SemiJoin) optimize(mode Mode, req Require) (Cost, Cost, any) {
-	fwdFix, fwdVar, fwdApp := sj.optimizeForward(mode, req)
-	revFix, revVar, revApp := sj.optimizeReverse(mode, req)
+	fwdFix, fwdVar, fwdApp := sj.optForward(mode, req)
+	revFix, revVar, revApp := sj.optReverse(mode, req)
 	if revFix+revVar < fwdFix+fwdVar {
 		return revFix, revVar, revApp
 	}
 	return fwdFix, fwdVar, fwdApp
 }
 
-func (sj *SemiJoin) optimizeForward(mode Mode, req Require) (Cost, Cost, any) {
+func (sj *SemiJoin) optForward(mode Mode, req Require) (Cost, Cost, any) {
 	fixcost1, varcost1 := Optimize(sj.source1, mode, req)
 	nrows1, _ := sj.source1.Nrows()
 	nrows2, _ := sj.source2.Nrows()
@@ -181,7 +181,7 @@ func (sj *SemiJoin) optimizeForward(mode Mode, req Require) (Cost, Cost, any) {
 		&semiJoinApproach{req2: req2}
 }
 
-// optimizeReverse evaluates the cost of running the semijoin in "reverse" mode,
+// optReverse evaluates the cost of running the semijoin in "reverse" mode,
 // where source2 drives the iteration instead of source1. In this strategy:
 //   - Source2 is iterated (or seeked) according to the incoming request
 //   - For each source2 row, the "by" columns are projected and used to lookup
@@ -199,12 +199,20 @@ func (sj *SemiJoin) optimizeForward(mode Mode, req Require) (Cost, Cost, any) {
 // only once. This adds overhead proportional to the number of source2 rows
 // scanned, so reverse mode is only chosen when its total cost (including
 // deduplication) is lower than forward mode.
-func (sj *SemiJoin) optimizeReverse(mode Mode, req Require) (Cost, Cost, any) {
-	nrows2, _ := sj.source2.Nrows()
+func (sj *SemiJoin) optReverse(mode Mode, req Require) (Cost, Cost, any) {
+	if req.use == ReqUnique {
+		// Lookup never benefits from reverse: it's always just
+		// "source1.Lookup then source2Has" (see Lookup), which is
+		// exactly forward's approach and is sound for every join type.
+		// Reverse only helps choose a cheaper iteration order for Get,
+		// so it's never worth considering for a point Lookup.
+		return impossible, impossible, nil
+	}
 	fixcost2, varcost2 := Optimize(sj.source2, mode, req)
 	if fixcost2+varcost2 >= impossible {
 		return impossible, impossible, nil
 	}
+	nrows2, _ := sj.source2.Nrows()
 	nseeks := req.SeekCount(nrows2)
 	if nseeks <= 0 {
 		nseeks = 1
@@ -346,7 +354,8 @@ func (sj *SemiJoin) getReverse(th *Thread, dir Dir) Row {
 			sj.row2 = row2
 			sels := slc.With(sj.sels1, sj.projectRow2(th, sj.row2)...)
 			if sj.joinType == one_to_one || sj.joinType == one_to_many {
-				sj.lookupRow = sj.source1.Lookup(th, sels)
+				// no benefit to lookup cache here due to dedup
+				sj.lookupRow = lookup(sj.source1, sels, th, sj.st)
 			} else { // many_to_one, many_to_many
 				sj.source1.Select(sels)
 			}
@@ -411,22 +420,15 @@ func (sj *SemiJoin) dedupRow(row2 Row) (Row, bool) {
 }
 
 func (sj *SemiJoin) projectRow2(th *Thread, row Row) Sels {
-	sels := make(Sels, len(sj.by))
-	for i, col := range sj.by {
-		sels[i] = Sel{col, row.GetRawVal(sj.source2.Header(), col, th, sj.st)}
-	}
-	return sels
+	return makeSels(sj.source2.Header(), row, sj.by, th, sj.st)
 }
 
 func (sj *SemiJoin) source2Has(th *Thread, row Row, dir Dir) bool {
-	sels := make(Sels, len(sj.by))
-	for i, col := range sj.by {
-		sels[i] = Sel{col, row.GetRawVal(sj.source1.Header(), col, th, sj.st)}
-	}
+	sels := makeSels(sj.source1.Header(), row, sj.by, th, sj.st)
 	if sj.joinType == one_to_one {
-		return sj.source2.Lookup(th, sels) != nil
+		return lookup(sj.source2, sels, th, sj.st) != nil
 	} else if sj.joinType == many_to_one {
-		return sj.lookupCache.Lookup(th, sj.source2, sels, sj.st) != nil
+		return sj.lookupCache.Lookup(sj.source2, sels, th, sj.st) != nil
 	}
 	sj.source2.Select(sels)
 	return sj.source2.Get(th, dir) != nil
@@ -462,32 +464,23 @@ func (sj *SemiJoin) Select(sels Sels) {
 	sj.Rewind()
 }
 
+// Lookup uses source1.Lookup directly (source1 is always optimized with
+// the same req as the semijoin itself, see optForward, so it supports
+// Lookup whenever the semijoin does), then checks source2Has to confirm
+// the join condition. This works for all join types and, importantly,
+// never needs Select on source1, which would not be supported if source1
+// was set up for ReqUnique.
+//
+// This is always the forward approach, regardless of sj.reverse: reverse
+// only chooses a cheaper iteration order for Get, it's never chosen for
+// ReqUnique (see optReverse), so Lookup is never called while reverse.
 func (sj *SemiJoin) Lookup(th *Thread, sels Sels) Row {
 	sj.nlooks++
-	if sj.reverse {
-		return lookupViaSelectGet(sj, th, sels)
+	row1 := sj.source1.Lookup(th, sels)
+	if row1 == nil || !sj.source2Has(th, row1, Next) {
+		return nil
 	}
-	if sj.joinType == one_to_one || sj.joinType == many_to_one {
-		row := sj.source1.Lookup(th, sels)
-		if row == nil {
-			return nil
-		}
-		sel2 := make(Sels, len(sj.by))
-		for i, col := range sj.by {
-			sel2[i] = Sel{col, row.GetRawVal(sj.source1.Header(), col, th, sj.st)}
-		}
-		var row2 Row
-		if sj.joinType == one_to_one {
-			row2 = sj.source2.Lookup(th, sel2)
-		} else {
-			row2 = sj.lookupCache.Lookup(th, sj.source2, sel2, sj.st)
-		}
-		if row2 == nil {
-			return nil
-		}
-		return row
-	}
-	return lookupViaSelectGet(sj, th, sels)
+	return row1
 }
 
 func (sj *SemiJoin) Simple(th *Thread) []Row {

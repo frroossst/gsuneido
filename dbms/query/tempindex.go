@@ -9,6 +9,7 @@ import (
 
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
+	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/sortlist"
 	"github.com/apmckinlay/gsuneido/util/str"
 	"github.com/apmckinlay/gsuneido/util/tsc"
@@ -38,9 +39,6 @@ const derivedWarn = 8_000_000 // ??? // derivedWarn is also used by Project
 
 func NewTempIndex(src Query, order []string, tran QueryTran) *TempIndex {
 	order = src.Fixed().RemoveFrom(order)
-	if len(order) == 0 {
-		panic("ERROR: empty TempIndex")
-	}
 	ti := TempIndex{order: order, tran: tran, selOrg: selMin, selEnd: selMax}
 	ti.source = src
 	ti.header = src.Header().Dup() // dup because sortlist is concurrent
@@ -59,20 +57,17 @@ func (ti *TempIndex) String() string {
 }
 
 func (ti *TempIndex) Transform() Query {
-	return ti
+	panic(assert.ShouldNotReachHere())
 }
 
 // optimize is only used by fuzz_test.go
 func (ti *TempIndex) optimize(mode Mode, req Require) (Cost, Cost, any) {
-	srcReq := NoneReq(req.frac)
-	fixcost, varcost := Optimize(ti.source, mode, srcReq)
-	return fixcost, varcost, nil
+	panic(assert.ShouldNotReachHere())
 }
 
 // setApproach is only used by fuzz_test.go
 func (ti *TempIndex) setApproach(req Require, _ any, tran QueryTran) {
-	srcReq := NoneReq(req.frac)
-	SetApproach(ti.source, srcReq, tran)
+	panic(assert.ShouldNotReachHere())
 }
 
 // execution --------------------------------------------------------
@@ -124,13 +119,6 @@ func (ti *TempIndex) Lookup(th *Thread, sels Sels) Row {
 	row := ti.iter.Seek(key)
 	if row == nil || !ti.matches(row, key) {
 		return nil
-	}
-	for _, sel := range sels {
-		if !slices.Contains(ti.order, sel.col) {
-			if row.GetRawVal(ti.header, sel.col, ti.th, ti.st) != sel.val {
-				return nil
-			}
-		}
 	}
 	return row
 }

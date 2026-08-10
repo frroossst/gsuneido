@@ -6,12 +6,14 @@ package query
 import (
 	"fmt"
 	"log"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
 
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/set"
 	"github.com/apmckinlay/gsuneido/util/shmap"
 	"github.com/apmckinlay/gsuneido/util/slc"
@@ -87,17 +89,11 @@ var _ = AddInfo("query.summarize.unique", &sumUniqueCount)
 var _ = AddInfo("query.summarize.wholerow", &sumWholeRowCount)
 
 func NewSummarize(src Query, hint sumHint, by, cols, ops, ons []string) *Summarize {
-	if !set.Subset(src.Columns(), by) {
+	if !set.HasSubset(src.Columns(), by) {
 		panic("summarize: nonexistent columns: " +
 			str.Join(", ", set.Difference(by, src.Columns())))
 	}
-	check(by)
-	check(ons)
-	for i := range len(cols) {
-		if cols[i] == "" {
-			cols[i] = defaultColName(ops[i], ons[i])
-		}
-	}
+	cols = checkSummarize(by, cols, ops, ons)
 	su := &Summarize{hint: hint, by: by, cols: cols, ops: ops, ons: ons}
 	su.source = src
 	sort.Stable(su)
@@ -115,11 +111,48 @@ func NewSummarize(src Query, hint sumHint, by, cols, ops, ons []string) *Summari
 	return su
 }
 
+func checkSummarize(by, cols, ops, ons []string) []string {
+	check(by)
+	check(ons)
+	if conflict := set.Intersect(by, ons); len(conflict) > 0 {
+		panic("summarize: by and on columns conflict: " + str.Join(", ", conflict))
+	}
+	seen := make(map[string]struct{}, len(cols))
+	for i := range len(cols) {
+		if cols[i] == "" {
+			cols[i] = defaultColName(ops[i], ons[i])
+		}
+		if _, dup := seen[cols[i]]; dup {
+			panic("summarize: duplicate output column: " + cols[i])
+		}
+		seen[cols[i]] = struct{}{}
+	}
+	if conflict := set.Intersect(by, cols); len(conflict) > 0 {
+		panic("summarize: output columns conflict with by: " +
+			str.Join(", ", conflict))
+	}
+	if conflict := set.Intersect(nonEmpty(ons), cols); len(conflict) > 0 {
+		panic("summarize: on columns conflict with output columns: " +
+			str.Join(", ", conflict))
+	}
+	return cols
+}
+
 func defaultColName(op, on string) string {
 	if op == "count" {
 		return "count"
 	}
 	return op + "_" + on
+}
+
+func nonEmpty(cols []string) []string {
+	result := make([]string, 0, len(cols))
+	for _, c := range cols {
+		if c != "" {
+			result = append(result, c)
+		}
+	}
+	return result
 }
 
 // Len / Less / Swap implement sort.Interface
@@ -176,27 +209,27 @@ func (su *Summarize) String() string {
 }
 
 func (su *Summarize) string2() string {
-	var s strings.Builder
+	var sb strings.Builder
 	if len(su.by) > 0 {
-		s.WriteString(" ")
-		s.WriteString(str.Join(", ", su.by))
-		s.WriteString(",")
+		sb.WriteString(" ")
+		sb.WriteString(str.Join(", ", su.by))
+		sb.WriteString(",")
 	}
 	sep := " "
 	for i := range su.cols {
-		s.WriteString(sep)
+		sb.WriteString(sep)
 		sep = ", "
 		if su.cols[i] != defaultColName(su.ops[i], su.ons[i]) {
-			s.WriteString(su.cols[i])
-			s.WriteString(" = ")
+			sb.WriteString(su.cols[i])
+			sb.WriteString(" = ")
 		}
-		s.WriteString(su.ops[i])
+		sb.WriteString(su.ops[i])
 		if su.ops[i] != "count" {
-			s.WriteString(" ")
-			s.WriteString(su.ons[i])
+			sb.WriteString(" ")
+			sb.WriteString(su.ons[i])
 		}
 	}
-	return s.String()
+	return sb.String()
 }
 
 const sumGrpDiv = 10 // ???
@@ -244,16 +277,16 @@ func (su *Summarize) optimize(mode Mode, req Require) (Cost, Cost, any) {
 		Optimize(su.source, mode, NoneReq(0))
 		return 0, 1, &summarizeApproach{strat: sumTbl, req: NoneReq(0)}
 	}
-	seqFix, seqVar, seqApp := su.seqCost(mode, req)
-	idxFix, idxVar, idxApp := su.idxCost(mode)
-	mapFix, mapVar, mapApp := su.mapCost(mode, req)
+	seqFix, seqVar, seqApp := su.optSeq(mode, req)
+	idxFix, idxVar, idxApp := su.optIdx(mode)
+	mapFix, mapVar, mapApp := su.optMap(mode, req)
 	return min3(
 		seqFix, seqVar, seqApp,
 		idxFix, idxVar, idxApp,
 		mapFix, mapVar, mapApp)
 }
 
-func (su *Summarize) seqCost(mode Mode, req Require) (Cost, Cost, any) {
+func (su *Summarize) optSeq(mode Mode, req Require) (Cost, Cost, any) {
 	if len(su.by) == 0 {
 		fixcost, varcost := Optimize(su.source, mode, NoneReq(1))
 		return fixcost, varcost, &summarizeApproach{strat: sumSeq, req: NoneReq(1)}
@@ -265,9 +298,14 @@ func (su *Summarize) seqCost(mode Mode, req Require) (Cost, Cost, any) {
 	// Drop them so the source sees only columns it actually has.
 	if req.use == ReqUnique {
 		req.cols = set.Difference(req.cols, su.cols)
-		debug.assert(len(req.cols) > 0)
+		dbg.Assert(func() bool { return len(req.cols) > 0 })
 	}
-	if hasKey(su.by, su.source.Keys(), su.source.Fixed()) {
+	if su.unique {
+		// by is a key of the source: pass req through unchanged (like
+		// Project's projCopy). When req.use == ReqUnique, req.cols (already
+		// stripped of su.cols above) is a valid Summarize key and therefore
+		// also indexCovered by a source key, so Lookup can delegate directly
+		// to source.Lookup using those same cols.
 		fixcost, varcost := Optimize(su.source, mode, req)
 		// Setting index=by lets Select() push sels on by-columns down to
 		// the source seek; sels on computed columns are filtered at runtime.
@@ -292,8 +330,8 @@ func (su *Summarize) seqCost(mode Mode, req Require) (Cost, Cost, any) {
 	case ReqUnique:
 		// by must be a key: its columns must be covered by req.cols or fixed
 		// (fixed columns of su.by need not appear in req.cols)
-		debug.assert(indexCovered(su.by, req.cols, su.Fixed()))
-		// we can use GroupReq because Lookup is implemented by Select + Get
+		dbg.Assert(func() bool { return indexCovered(su.by, req.cols, su.Fixed()) })
+		// use GroupReq because Lookup is implemented by Select + Get
 		srcReq := GroupReq(su.by, req.SelectFrac(nrows), req.nseeks)
 		fixcost, varcost := Optimize(su.source, mode, srcReq)
 		return fixcost, varcost, &summarizeApproach{strat: sumSeq, req: srcReq}
@@ -302,35 +340,11 @@ func (su *Summarize) seqCost(mode Mode, req Require) (Cost, Cost, any) {
 			fixcost, varcost := Optimize(su.source, mode, srcReq)
 			return fixcost, varcost, &summarizeApproach{strat: sumSeq, req: srcReq}
 		}
-		if !eitherSubset(req.cols, su.by) {
-			return impossible, impossible, nil
-		}
-		// requires are different ReqGroup
-		// this can't be handled with a single Require
-		// so we need to search here
-		nColsUnfixedReq := countUnfixed(req.cols, fixed)
-		best := newBest[Require]()
-		for _, idx := range su.source.Indexes() {
-			if grouped(idx, req.cols, nColsUnfixedReq, fixed) &&
-				grouped(idx, su.by, nColsUnfixed, fixed) {
-				// source req must be ordered so it doesn't ignore column order
-				// which is necessary to satisfy both groupings
-				srcReq := OrderReq(idx, req.SelectFrac(nrows))
-				srcReq.nseeks = req.nseeks
-				f, v := Optimize(su.source, mode, srcReq)
-				best.update(f, v, srcReq)
-			}
-		}
-		if best.found() {
-			return best.fixcost, best.varcost,
-				&summarizeApproach{strat: sumSeq, req: best.data}
-		}
-		return impossible, impossible, nil
 	}
 	return impossible, impossible, nil
 }
 
-func (su *Summarize) idxCost(mode Mode) (Cost, Cost, any) {
+func (su *Summarize) optIdx(mode Mode) (Cost, Cost, any) {
 	if !su.minmax1() {
 		return impossible, impossible, nil
 	}
@@ -345,7 +359,7 @@ func (su *Summarize) idxCost(mode Mode) (Cost, Cost, any) {
 		&summarizeApproach{strat: sumIdx, index: su.ons, req: srcReq}
 }
 
-func (su *Summarize) mapCost(mode Mode, req Require) (Cost, Cost, any) {
+func (su *Summarize) optMap(mode Mode, req Require) (Cost, Cost, any) {
 	nrows, _ := su.Nrows()
 	if req.use != ReqNone || su.hint == sumLarge ||
 		(nrows > mapThreshold && su.hint != sumSmall) {
@@ -476,6 +490,23 @@ func getIdx(th *Thread, su *Summarize, _ Dir) Row {
 
 func (su *Summarize) Lookup(th *Thread, sels Sels) Row {
 	su.nlooks++
+	if su.unique {
+		// by is a key, so the source row uniquely determines the group,
+		// like Project Lookup does when projCopy.
+		var bySels Sels
+		for _, sel := range sels {
+			if slices.Contains(su.by, sel.col) {
+				bySels = append(bySels, sel)
+			}
+		}
+		srcRow := su.source.Lookup(th, bySels)
+		if srcRow == nil {
+			return nil
+		}
+		sums := su.newSums()
+		su.addToSums(sums, srcRow, th, su.st)
+		return su.seqRow(th, srcRow, sums)
+	}
 	return lookupViaSelectGet(su, th, sels)
 }
 
@@ -718,10 +749,12 @@ func (su *Summarize) Simple(th *Thread) []Row {
 	}
 	groups := make(map[string]*group)
 	for _, row := range srcRows {
-		key := ""
+		var sb strings.Builder
 		for _, col := range su.by {
-			key += row.GetRaw(hdr, col) + "\x00"
+			sb.WriteString(row.GetRawVal(hdr, col, th, su.st))
+			sb.WriteString("\x00")
 		}
+		key := sb.String()
 		g, ok := groups[key]
 		if !ok {
 			g = &group{row: row, sums: su.newSums()}

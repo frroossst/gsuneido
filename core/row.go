@@ -4,6 +4,7 @@
 package core
 
 import (
+	"fmt"
 	"math"
 	"strings"
 
@@ -62,7 +63,7 @@ func (row Row) GetVal(hdr *Header, fld string, th *Thread, tran *SuTran) Value {
 	}
 }
 
-// GetRaw handles _lower! but does NOT handle rules.
+// GetRaw handles _lower! but does NOT handle rules or PackForward.
 // It is used by SuRecord Get.
 func (row Row) GetRaw(hdr *Header, fld string) string {
 	if strings.HasSuffix(fld, "_lower!") {
@@ -280,8 +281,9 @@ func (hdr *Header) HasDeleted() bool {
 	return ok
 }
 
-// GetFields returns a list of the fields, including deleted ("-"),
-// without duplicates (e.g. from Join or Union)
+// GetFields returns a list of the fields, without deleted "-",
+// and without duplicates (e.g. from Join or Union)
+// See also [Header.Physical]
 func (hdr *Header) GetFields() []string {
 	if len(hdr.Fields) == 1 {
 		return slices.Clip(hdr.Fields[0])
@@ -351,18 +353,38 @@ func (hdr *Header) AppendDerived(fields []string) []string {
 	return fields
 }
 
-// Physical is the fields without deleted ("-")
+// Physical is like [Header.GetFields] but without deleted ("-")
 func (hdr *Header) Physical() []string {
 	if len(hdr.Fields) == 1 && !slices.Contains(hdr.Fields[0], "-") {
-		return hdr.Fields[0]
+		return slices.Clip(hdr.Fields[0])
 	}
 	result := make([]string, 0, len(hdr.Columns))
 	for _, flds := range hdr.Fields {
 		for _, fld := range flds {
-			if fld != "-" {
+			if fld != "-" && !slices.Contains(result, fld) {
 				result = append(result, fld)
 			}
 		}
 	}
 	return result
+}
+
+// RowStr is used for debugging. It includes "" values.
+func RowStr(hdr *Header, row Row) string {
+	if row == nil {
+		return "Row(nil)"
+	}
+	cols := slices.Clone(hdr.Columns)
+	slices.Sort(cols)
+	th := &Thread{}
+	var sb strings.Builder
+	sb.WriteString("Row{")
+	sep := ""
+	for _, col := range cols {
+		val := row.GetVal(hdr, col, th, nil)
+		fmt.Fprint(&sb, sep, col, "=", val.String())
+		sep = " "
+	}
+	sb.WriteByte('}')
+	return sb.String()
 }

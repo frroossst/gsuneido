@@ -38,9 +38,7 @@
 package query
 
 import (
-	"fmt"
 	"math"
-	"strings"
 	"sync/atomic"
 
 	. "github.com/apmckinlay/gsuneido/core"
@@ -51,9 +49,9 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/opt"
 	"github.com/apmckinlay/gsuneido/util/set"
-	"github.com/apmckinlay/gsuneido/util/str"
 )
 
 // Query is the interface for nodes in a query tree.
@@ -65,20 +63,21 @@ import (
 // the database directly.
 //
 // Optimization phase:
-//  - Transform() refactors the query for efficiency (bottom-up).
-//  - optimize()/caching selects the best execution strategy based on costs.
-//  - setApproach() locks in the chosen strategy and sets up for execution.
-//  - Requires/Nrows/Keys/Indexes provide metadata for cost estimation.
+//   - Transform() refactors the query for efficiency (bottom-up).
+//   - optimize()/caching selects the best execution strategy based on costs.
+//   - setApproach() locks in the chosen strategy and sets up for execution.
+//   - Requires/Nrows/Keys/Indexes provide metadata for cost estimation.
 //
 // Execution phase:
-//  - Get(Next/Prev) returns rows one at a time, sticking at EOF until Rewind.
-//  - Lookup(sels) returns a single matching row (optimized path).
-//  - Select(sels) restricts results to a key range (used by joins/filters).
-//  - Rewind() resets the position for re-iteration.
+//   - Get(Next/Prev) returns rows one at a time, sticking at EOF until Rewind.
+//   - Lookup(sels) returns a single matching row (optimized path).
+//   - Select(sels) restricts results to a key range (used by joins/filters).
+//   - Rewind() resets the position for re-iteration.
 //
 // Terminology:
-//  - "incoming" means calls *to* a query operation
-//  - "outgoing" means calls *from" a query operation
+//   - "incoming" means calls *to* a query operation
+//   - "outgoing" means calls *from" a query operation
+//
 // The "incoming" [Require] is the one passed to a node's
 // own optimize/setApproach (called by its parent).
 // The "outgoing" Require is the one this node passes to its children's
@@ -158,7 +157,9 @@ type Query interface {
 	// Incoming Lookup should be consistent with the incoming Require.
 	// Outgoing Lookup should be consistent with the outgoing Require.
 	// It is valid for Require cols to specify a superset of key columns.
-	// Lookup implementations are required to apply (filter) all the sels.
+	// It is ok for sels to contain extra columns,
+	// BUT they will be ignored, not applied.
+	// The originator of the sels is responsible for comparing extra columns.
 	// Lookup generally corresponds to [UniqueReq]
 	Lookup(th *Thread, sels Sels) Row
 
@@ -169,7 +170,7 @@ type Query interface {
 	// Incoming Select should be consistent with the incoming Require.
 	// Outgoing Select should be consistent with the outgoing Require.
 	// It is ok for sels to contain extra columns,
-	// BUT they will be ignored, not applied (unlike Lookup)
+	// BUT they will be ignored, not applied.
 	// Select generally corresponds to [GroupReq]
 	Select(sels Sels)
 
@@ -225,6 +226,8 @@ type Query interface {
 
 var emptyKey = [][]string{{}}
 
+//-------------------------------------------------------------------
+
 // queryBase is embedded by almost all Query types
 type queryBase struct {
 	// header must be set by constructors and setApproach.
@@ -250,29 +253,6 @@ const (
 	within
 	eof
 )
-
-type metrics struct {
-	fixcost  Cost
-	varcost  Cost
-	costself Cost
-	frac     float64
-	ngets    int32
-	nsels    int32
-	nlooks   int32
-	tget     uint64
-	tgetself uint64
-}
-
-func (m *metrics) String() string {
-	return fmt.Sprintf("metrics{fixcost: %v varcost: %v costself: %v frac: %.2f ngets: %d nsels: %d nlooks: %d tget: %d tgetself: %d}",
-		m.fixcost, m.varcost, m.costself, m.frac, m.ngets, m.nsels, m.nlooks, m.tget, m.tgetself)
-}
-
-func (m *metrics) setCost(frac float64, fixcost, varcost Cost) {
-	m.frac = frac
-	m.fixcost = fixcost
-	m.varcost = varcost
-}
 
 func (q *queryBase) Columns() []string {
 	return q.header.Columns
@@ -332,13 +312,20 @@ func (*queryBase) knowExactNrows() bool {
 	return false
 }
 
-// Mode is the transaction context - cursor, read, or update.
-// It affects the use of temporary indexes.
+//-------------------------------------------------------------------
+
+// Mode is the query execution context.
+// It affects the use of temporary indexes —
+// they are only valid within a single transaction,
+// so they are disabled for CursorMode.
 type Mode int
 
 const (
-	CursorMode Mode = iota
+	// CursorMode is used for cursor queries that span multiple transactions
+	CursorMode Mode = iota + 1
+	// ReadMode is used for read-only queries within a single transaction
 	ReadMode
+	// UpdateMode is used for updates within a single transaction
 	UpdateMode
 )
 
@@ -380,8 +367,7 @@ type QueryTran interface {
 // It calls Transform, Optimize, and SetApproach.
 // The resulting Query is ready for execution.
 func Setup(q Query, mode Mode, t QueryTran) (Query, Cost, Cost) {
-	q = q.Transform()
-	return setup(q, mode, 1, t)
+	return SetupReq(q, mode, t, NoneReq(1))
 }
 
 // Setup1 is the same as Setup except it passes a frac of 1/nrows
@@ -391,19 +377,21 @@ func Setup1(q Query, mode Mode, t QueryTran) (Query, Cost, Cost) {
 	q = q.Transform()
 	nrows, _ := q.Nrows()
 	nrows = max(1, nrows) // avoid divide by zero
-	return setup(q, mode, 1/float64(nrows), t)
+	req := NoneReq(1 / float32(nrows))
+	return setupReq(q, mode, t, req)
 }
 
-func setup(q Query, mode Mode, frac float64, t QueryTran) (Query, Cost, Cost) {
-	req := NoneReq(float32(frac))
+func SetupReq(q Query, mode Mode, t QueryTran, req Require) (Query, Cost, Cost) {
+	q = q.Transform()
+	return setupReq(q, mode, t, req)
+}
+
+func setupReq(q Query, mode Mode, t QueryTran, req Require) (Query, Cost, Cost) {
 	fixcost, varcost := Optimize(q, mode, req)
 	if fixcost+varcost >= impossible {
 		panic("invalid query: " + String(q))
 	}
 	q = SetApproach(q, req, t)
-	if mode == CursorMode {
-		setCursorMode(q)
-	}
 	return q, fixcost, varcost
 }
 
@@ -425,18 +413,9 @@ func SetupKey(q Query, mode Mode, t QueryTran) Query {
 	return q
 }
 
-// SetupIdx is like Setup but specifies an index
-// e.g. to test Select or Lookup
-func SetupIdx(q Query, mode Mode, t QueryTran, index []string) Query {
-	req := OrderReq(index, 1)
-	fixcost, varcost := Optimize(q, mode, req)
-	if fixcost+varcost >= impossible {
-		panic("invalid query: " + String(q))
-	}
-	q = SetApproach(q, req, t)
-	if mode == CursorMode {
-		setCursorMode(q)
-	}
+// setupIndex is used for tests
+func setupIndex(q Query, mode Mode, t QueryTran, index []string) Query {
+	q, _, _ = SetupReq(q, mode, t, OrderReq(index, 1))
 	return q
 }
 
@@ -448,8 +427,6 @@ const outOfOrder = 10
 const impossible = Cost(math.MaxInt / 64) // allow for adding impossible's
 
 //-------------------------------------------------------------------
-// new version of Optimize using Require (not used yet)
-// initially duplicates the existing one, will eventually replace it
 
 func Optimize(q Query, mode Mode, req Require) (fixcost, varcost Cost) {
 	fixcost, varcost, _ = optimize(q, mode, req)
@@ -459,27 +436,27 @@ func Optimize(q Query, mode Mode, req Require) (fixcost, varcost Cost) {
 func optimize(q Query, mode Mode, req Require) (
 	fixcost, varcost Cost, approach any) {
 	assert.That(!math.IsNaN(float64(req.frac)) && !math.IsInf(float64(req.frac), 0))
-	if !set.Subset(q.Columns(), req.cols) {
+	if !set.HasSubset(q.Columns(), req.cols) {
 		return impossible, impossible, nil
 	}
 
 	// this condition must match SetApproach
-	// A fastSingle node (or one whose fixed covers req.cols) trivially
-	// satisfies any require, so the qualitative aspect (cols/use) is
-	// irrelevant. Clear cols AND nseeks
+	// A fastSingle node or ReqOrder covered by fixed
+	// trivially satisfies the requirement so we clear it.
 	// frac is kept as it scales the (single) row's varcost.
-	if q.fastSingle() || q.Fixed().All(req.cols) {
+	if q.fastSingle() ||
+		(req.use == ReqOrder && q.Fixed().All(req.cols)) {
 		req.cols = nil
 		req.nseeks = 0
 		req.use = ReqNone
 	}
-	if fixcost, varcost, app := q.cacheGet(req); varcost >= 0 {
-		return fixcost, varcost, app
+	if fixcost, varcost, ap := q.cacheGet(req); varcost >= 0 {
+		return fixcost, varcost, ap
 	}
-	fixcost, varcost, app := optTempIndex(q, mode, req)
+	fixcost, varcost, ap := optTempIndex(q, mode, req)
 	assert.That(fixcost >= 0 && varcost >= 0)
-	q.cacheAdd(req, fixcost, varcost, app)
-	return fixcost, varcost, app
+	q.cacheAdd(req, fixcost, varcost, ap)
+	return fixcost, varcost, ap
 }
 
 // optTempIndex determines if a TempIndex is a benefit
@@ -680,14 +657,14 @@ func tempIndexable(mode Mode) bool {
 
 func min3(fixcost1, varcost1 Cost, app1 any, fixcost2, varcost2 Cost, app2 any,
 	fixcost3, varcost3 Cost, app3 any) (Cost, Cost, any) {
-	fixcost, varcost, app := fixcost1, varcost1, app1
+	fixcost, varcost, ap := fixcost1, varcost1, app1
 	if fixcost2+varcost2 < fixcost+varcost {
-		fixcost, varcost, app = fixcost2, varcost2, app2
+		fixcost, varcost, ap = fixcost2, varcost2, app2
 	}
 	if fixcost3+varcost3 < fixcost+varcost {
-		fixcost, varcost, app = fixcost3, varcost3, app3
+		fixcost, varcost, ap = fixcost3, varcost3, app3
 	}
-	return fixcost, varcost, app
+	return fixcost, varcost, ap
 }
 
 var tempIndexCount atomic.Int64
@@ -697,7 +674,8 @@ var _ = AddInfo("query.tempindex", &tempIndexCount)
 // It also adds temp indexes where required.
 func SetApproach(q Query, req Require, tran QueryTran) Query {
 	// must match optimize's guard (see comment there)
-	if q.fastSingle() || q.Fixed().All(req.cols) {
+	if q.fastSingle() ||
+		(req.use == ReqOrder && q.Fixed().All(req.cols)) {
 		req.cols = nil
 		req.nseeks = 0
 		req.use = ReqNone
@@ -708,10 +686,10 @@ func SetApproach(q Query, req Require, tran QueryTran) Query {
 		panic("SetApproach: not found in cache")
 	}
 	assert.That(fixcost >= 0 && varcost >= 0)
-	if app, ok := approach.(*tempIndex); ok {
-		q.Metrics().setCost(1, app.srcfixcost, app.srcvarcost)
-		q.setApproach(OrderReq(app.srcindex, 1), app.srcapp, tran)
-		ti := NewTempIndex(q, app.index, tran)
+	if ap, ok := approach.(*tempIndex); ok {
+		q.Metrics().setCost(1, ap.srcfixcost, ap.srcvarcost)
+		q.setApproach(OrderReq(ap.srcindex, 1), ap.srcapp, tran)
+		ti := NewTempIndex(q, ap.index, tran)
 		ti.setCost(float64(req.frac), fixcost, varcost)
 		tempIndexCount.Add(1)
 		return ti
@@ -723,29 +701,40 @@ func SetApproach(q Query, req Require, tran QueryTran) Query {
 
 // execution --------------------------------------------------------
 
-// GetNext1 returns the next row from q if it matches sels, else nil.
-// Used when Lookup is implemented with Select+Get —
-// Select only restricts by the physical index prefix,
-// so GetNext1 verifies the row matches all of sels.
-func GetNext1(q Query, th *Thread, sels Sels) Row {
-	// this should *not* have to loop because the index should be unique
-	row := q.Get(th, Next)
-	if row != nil {
-		debug.assert(q.Get(th, Next) == nil)
-		if singletonFilter(q.Header(), row, sels) {
-			return row
-		}
-	}
-	return nil
-}
-
 // lookupViaSelectGet implements Lookup via Select+Get,
-// verifying the row matches all sels (since Select only restricts
-// by the physical index prefix) and clearing the select afterwards.
+// clearing the select afterwards.
+// Does not filter on "extra" columns
+// because sels origin is responsible for filtering.
 func lookupViaSelectGet(q Query, th *Thread, sels Sels) Row {
 	q.Select(sels)
 	defer q.Select(nil)
-	return GetNext1(q, th, sels)
+	return getNext1(q, th)
+}
+
+// getNext1 gets the next row from q, asserting there is only one
+func getNext1(q Query, th *Thread) Row {
+	// this does *not* need to loop because the index is unique
+	row := q.Get(th, Next)
+	dbg.Assert(func() bool { return row == nil || q.Get(th, Next) == nil })
+	return row
+}
+
+func lookup(q Query, sels Sels, th *Thread, st *SuTran) Row {
+	row := q.Lookup(th, sels)
+	return lookupFilter(q.Header(), row, sels, th, st)
+}
+
+func lookupFilter(hdr *Header, row Row, sels Sels, th *Thread, st *SuTran) Row {
+	if row != nil {
+		for _, sel := range sels {
+			x := row.GetRawVal(hdr, sel.col, th, st)
+			assert.That(len(x) == 0 || x[0] != PackForward)
+			if x != sel.val {
+				return nil
+			}
+		}
+	}
+	return row
 }
 
 // Query1 -----------------------------------------------------------
@@ -827,146 +816,6 @@ func (q2 *Query2) Source2() Query {
 
 // ------------------------------------------------------------------
 
-// String prints the full query, including child sources
-// whereas query.String only shows that operation
-func String(q Query) string {
-	switch qi := q.(type) {
-	case q2i:
-		return paren2(qi.Source()) + " " + q.String() + " " + paren1(qi.Source2())
-	case *Sort:
-		return String(qi.Source()) + str.Opt(" ", q.String()) // no parens
-	case *View:
-		return q.String()
-	case q1i:
-		return paren2(qi.Source()) + str.Opt(" ", q.String())
-	default:
-		return q.String()
-	}
-}
-
-func paren1(q Query) string {
-	switch q.(type) {
-	case *Table, *Tables, *TablesLookup, *Columns, *Indexes, *Views,
-		*Nothing, *ProjectNone:
-		return String(q)
-	}
-	return "(" + String(q) + ")"
-}
-
-func paren2(q Query) string {
-	if _, ok := q.(q2i); ok {
-		return "(" + String(q) + ")"
-	}
-	return String(q)
-}
-
-// ------------------------------------------------------------------
-
-func Strategy(q Query) string {
-	return strategy(q, 0)
-}
-
-const indent1 = "    "
-
-func strategy(q Query, indent int) string { // recursive
-	in := strings.Repeat(indent1, indent)
-	nrows, pop := q.Nrows()
-	m := q.Metrics()
-	cost := "{"
-	if m.frac != 1 {
-		cost += fmt.Sprintf("%.3fx ", m.frac)
-	}
-	cost += trace.Number(nrows)
-	if nrows != pop {
-		cost += "/" + trace.Number(pop)
-	}
-	cost += " " + trace.Number(m.fixcost) + "+" + trace.Number(m.varcost)
-	cost += "} "
-	switch q := q.(type) {
-	case *Sort:
-		if q.String() == "" {
-			return strategy(q.Source(), indent)
-		} else {
-			return strategy(q.Source(), indent) + "\n" +
-				in + cost + q.String()
-		}
-	case q2i:
-		return strategy(q.Source(), indent+1) + "\n" +
-			in + cost + q.String() + "\n" +
-			strategy(q.Source2(), indent+1)
-	case q1i:
-		return strategy(q.Source(), indent) + "\n" +
-			in + cost + q.String()
-	default:
-		return in + cost + q.String()
-	}
-}
-
-// Strategy2 is like Strategy but without the cost/size estimates
-// so it is more stable for tests
-func Strategy2(q Query) string {
-	return strategy2(q, 0)
-}
-
-func strategy2(q Query, indent int) string { // recursive
-	in := strings.Repeat(indent1, indent)
-	switch q := q.(type) {
-	case *Sort:
-		if q.String() == "" {
-			return strategy2(q.Source(), indent)
-		} else {
-			return strategy2(q.Source(), indent) + "\n" +
-				in + q.String()
-		}
-	case q2i:
-		return strategy2(q.Source(), indent+1) + "\n" +
-			in + q.String() + "\n" +
-			strategy2(q.Source2(), indent+1)
-	case q1i:
-		return strategy2(q.Source(), indent) + "\n" +
-			in + q.String()
-	default:
-		return in + q.String()
-	}
-}
-
-func CalcSelf(q0 Query) { // recursive
-	m := q0.Metrics()
-	if m.tgetself != 0 {
-		return // already calculated
-	}
-	switch q := q0.(type) {
-	case q2i:
-		m1 := q.Source().Metrics()
-		m2 := q.Source2().Metrics()
-		m.tgetself = m.tget - (m1.tget + m2.tget)
-		m.costself = (m.fixcost + m.varcost) -
-			(m1.fixcost + m1.varcost + m2.fixcost + m2.varcost)
-		CalcSelf(q.Source())
-		CalcSelf(q.Source2())
-	case q1i:
-		sm := q.Source().Metrics()
-		m.tgetself = m.tget - sm.tget
-		m.costself = (m.fixcost + m.varcost) - (sm.fixcost + sm.varcost)
-		CalcSelf(q.Source())
-	default:
-		m.tgetself = q0.Metrics().tget
-		m.costself = q0.Metrics().fixcost + q0.Metrics().varcost
-	}
-}
-
-func setCursorMode(q Query) {
-	switch q := q.(type) {
-	case q2i:
-		setCursorMode(q.Source())
-		setCursorMode(q.Source2())
-	case q1i:
-		setCursorMode(q.Source())
-	case *Table:
-		q.cursorMode = true
-	}
-}
-
 // func unpack(packed []string) []Value {
 // 	vals := make([]Value, len(packed))
 // 	for i, p := range packed {
@@ -977,17 +826,4 @@ func setCursorMode(q Query) {
 // 		}
 // 	}
 // 	return vals
-// }
-
-//-------------------------------------------------------------------
-
-var debug debugT
-
-type debugT struct{}
-
-func (debugT) assert(cond bool) {
-	assert.That(cond)
-}
-
-// func (debugT) assert(cond bool) {
 // }
