@@ -6,8 +6,8 @@ import (
 	"github.com/apmckinlay/gsuneido/core"
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/oracle"
-	. "github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/oracle"
+	. "github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 // thin local names over the shared oracle so the properties read naturally.

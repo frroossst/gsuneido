@@ -6,7 +6,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/oracle"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/oracle"
 )
 
 func semEq(a, b DynType) bool { return oracle.SemEq(a, b) }

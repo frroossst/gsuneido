@@ -5,7 +5,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/synth"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/synth"
 )
 
 // dirt model: an independent prediction of where the dirty flag may legally

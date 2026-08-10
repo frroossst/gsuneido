@@ -6,7 +6,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/synth"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/synth"
 )
 
 // safeParse recovers ParseClass's designed panic. ok=false means unparseable.

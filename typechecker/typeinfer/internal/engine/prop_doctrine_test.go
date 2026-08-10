@@ -7,7 +7,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/synth"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/synth"
 )
 
 // an error needs clean evidence: at least one non-? arm in Got.

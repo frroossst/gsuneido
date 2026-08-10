@@ -1,7 +1,7 @@
 package diagnostics
 
 import (
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 func ScoreConfidence(d *Diagnostic) float64 {

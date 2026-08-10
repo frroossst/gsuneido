@@ -6,7 +6,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 var atomTypes = []typealgebra.DynType{

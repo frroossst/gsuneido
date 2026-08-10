@@ -8,7 +8,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/synth"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/synth"
 )
 
 // requirement chains correct by construction: W1 -> W2 -> ... -> WD -> Scanner,

@@ -7,12 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/frroossst/SuneidoTypes/internal/tlog"
-	"github.com/frroossst/SuneidoTypes/typeinfer/annotations"
-	"github.com/frroossst/SuneidoTypes/typeinfer/diagnostics"
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/annotate"
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/engine"
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/internal/tlog"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/annotations"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/diagnostics"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/annotate"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/engine"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 // SourceEntry is one named Suneido source.

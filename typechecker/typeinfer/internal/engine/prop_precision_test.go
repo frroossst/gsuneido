@@ -6,7 +6,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/synth"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/synth"
 )
 
 func anySeverityError(env TypeEnv) (Diagnostic, bool) {

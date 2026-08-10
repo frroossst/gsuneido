@@ -1,7 +1,7 @@
 package annotations
 
 import (
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 type methodTable struct {

@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/frroossst/SuneidoTypes/typeinfer/diagnostics"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/diagnostics"
 )
 
 type (

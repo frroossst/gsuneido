@@ -1,7 +1,7 @@
 package diagnostics
 
 import (
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 // error = some clean (non-?) arm is provably bad; evidence that is nothing but a guess caps at warning. a dirty union can still error on its clean arms.

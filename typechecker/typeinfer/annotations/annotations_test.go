@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/annotations"
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/annotations"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 // sigFor returns the entry under name with an Object receiver, or nil.

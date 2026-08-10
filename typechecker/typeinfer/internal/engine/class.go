@@ -6,7 +6,7 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	"github.com/apmckinlay/gsuneido/core"
-	"github.com/frroossst/SuneidoTypes/internal/tlog"
+	"github.com/apmckinlay/gsuneido/typechecker/internal/tlog"
 )
 
 type ClassObject struct {

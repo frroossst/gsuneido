@@ -3,8 +3,8 @@ package engine
 import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/annotations"
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/annotations"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 type (

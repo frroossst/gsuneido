@@ -8,8 +8,8 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	"github.com/apmckinlay/gsuneido/compile/lexer"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
-	"github.com/frroossst/SuneidoTypes/typeinfer/internal/engine"
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/engine"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 func targetNodeSet(cls *engine.ClassObject) map[ast.Node]struct{} {

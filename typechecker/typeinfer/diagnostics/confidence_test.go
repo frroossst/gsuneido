@@ -3,8 +3,8 @@ package diagnostics_test
 import (
 	"testing"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/diagnostics"
-	. "github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/diagnostics"
+	. "github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 func TestScoreConfidence(t *testing.T) {

@@ -15,9 +15,9 @@ import (
 
 	"github.com/apmckinlay/gsuneido/builtin"
 
-	"github.com/frroossst/SuneidoTypes/internal/tlog"
-	"github.com/frroossst/SuneidoTypes/typeinfer"
-	"github.com/frroossst/SuneidoTypes/typeinfer/annotations"
+	"github.com/apmckinlay/gsuneido/typechecker/internal/tlog"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/annotations"
 )
 
 func loadAnnotationDatabase() {

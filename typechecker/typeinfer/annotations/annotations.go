@@ -3,7 +3,7 @@ package annotations
 import (
 	"strings"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/typealgebra"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/typealgebra"
 )
 
 type TypeSignature struct {

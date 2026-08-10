@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/diagnostics"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/diagnostics"
 )
 
 type rankedDiag struct {

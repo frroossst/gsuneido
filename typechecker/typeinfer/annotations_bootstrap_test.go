@@ -3,7 +3,7 @@ package typeinfer
 import (
 	"github.com/apmckinlay/gsuneido/builtin"
 
-	"github.com/frroossst/SuneidoTypes/typeinfer/annotations"
+	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/annotations"
 )
 
 func init() {
