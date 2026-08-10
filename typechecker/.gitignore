@@ -1,0 +1,51 @@
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Code coverage profiles and other test artifacts
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Build directories
+bin/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# env file
+.env
+
+# Editor/IDE
+# .idea/
+.vscode/
+.claude/
+
+[0-9]*
+# but keep numbered ADRs under version control
+!docs/adr/[0-9]*
+
+*.log
+
+# rapid property-based-test failure repro files - ephemeral; a real
+# counterexample gets promoted to an explicit unit test instead
+typeinfer/internal/engine/testdata/
+typeinfer/typealgebra/testdata/
+
+# patch files
+*.patch
+suneidotypes.log.gz
