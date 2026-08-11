@@ -1,0 +1,139 @@
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtnmem: 3
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtmemtype: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtnum: 1
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtmemtype: 4
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtbool: true
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtmemtype: 1
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtstr: "a"
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtnmeth: 2
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtnparams: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtret: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtnparams: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtret: 4
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtnstmts: 2
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtstmt: "assign"
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtvidx: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtvtype: 1
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtstr: "a"
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtstmt: "assign"
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtvidx: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtstr: "a"
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 1
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtnstmts: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 6
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 3
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wteqt: 4
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wteq: "is"
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtbool: true
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 1
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 0
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtbool: false
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtexpr: 1
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] [rapid] draw wtctor: false
+# 2026/07/27 08:14:40.171140 [TestPropWellTypedPublishedTypes] param-free program published dirty Returns["M1"]=False|?
+# src:
+# class
+# 	{
+# 	f0: 1
+# 	f1: true
+# 	f2: "a"
+# 	M0()
+# 	{
+# 		v0 = "a"
+# 		v0 = "a"
+# 		return .f0
+# 	}
+# 	M1()
+# 	{
+# 		return ((true is .f1) ? false : .f1)
+# 	}
+# 	}
+# 
+v0.4.8#15918407526378757077
+0x0
+0x38e38e38e38e4
+0x3
+0x0
+0x0
+0x0
+0x0
+0x0
+0x6b74f03291620
+0x4
+0x1
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x6b74f03291620
+0x4
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x6b74f03291620
+0x6
+0x0
+0x38e38e38e38e4
+0x3
+0x6b74f03291620
+0x4
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0

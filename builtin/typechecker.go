@@ -81,7 +81,6 @@ var _ = staticMethod(typechecker_Members, "() :object")
 // capture whichever methods happened to be registered by then.
 func typechecker_Members() Value {
 	typecheckerMembersOnce.Do(func() {
-		// Members itself is introspection, not part of the API
 		names := slices.Sorted(maps.Keys(typecheckerMethods))
 		names = slices.DeleteFunc(names, func(s string) bool { return s == "Members" })
 		typecheckerMembers = SuObjectOfStrs(names)

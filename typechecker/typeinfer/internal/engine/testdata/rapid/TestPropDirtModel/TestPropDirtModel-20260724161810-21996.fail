@@ -1,0 +1,164 @@
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnmem: 2
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtmemtype: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstr: "a"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtmemtype: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstr: "a"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnmeth: 2
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnparams: 0
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtret: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnparams: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtret: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnstmts: 0
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 0
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstr: "a"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnstmts: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstmt: "guard"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtguardp: "p0"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtguardt: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnstmts: 3
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstmt: "assign"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtvidx: 4
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtvtype: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstmt: "massign"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtmtgt: "f0"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 3
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstmt: "while"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtcmpt: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtcmp: "<"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtnstmts: 2
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstmt: "return"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtstmt: "assign"
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtvidx: 4
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 2
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtguardelse: false
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtexpr: 1
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] [rapid] draw wtctor: false
+# 2026/07/24 16:18:10.702222 [TestPropDirtModel] model-clean Returns["M1"] published dirty: String|?
+# src:
+# class
+# 	{
+# 	f0: "a"
+# 	f1: "a"
+# 	M0()
+# 	{
+# 		return "a"
+# 	}
+# 	M1(p0)
+# 	{
+# 		if (String?(p0))
+# 		{
+# 			v4 = p0
+# 			.f0 = .f0
+# 			while ((v4 < v4))
+# 			{
+# 				return v4
+# 				v4 = p0
+# 			}
+# 		}
+# 		return .f0
+# 	}
+# 	}
+# 
+v0.4.8#7870758715263286395
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0x1
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1
+0x6b74f03291620
+0x5
+0x0
+0x0
+0x0
+0x1
+0x0
+0x38e38e38e38e4
+0x3
+0x0
+0x0
+0x0
+0x6b74f03291620
+0x4
+0x0
+0x1
+0x0
+0x0
+0x1
+0x38e38e38e38e4
+0x2
+0x0
+0x0
+0x0
+0x38e38e38e38e4
+0x3
+0x1f2b5a0e61c3a6
+0x0
+0x0
+0x0
+0x1
+0x0
+0x1
+0x0
+0x0
+0x0
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0x1
+0x0
+0x0
+0x1
+0x0
+0x0
+0x0
+0x6b74f03291620
+0x4
+0x0
+0x38e38e38e38e4
+0x2
+0x0
+0x0
+0x0
+0x1
+0x0
