@@ -42,17 +42,18 @@ var methodPrefixReceiver = map[string]typealgebra.DynType{
 }
 
 var staticPrefixClass = map[string]string{
-	"dateStatic": "Date",
-	"db":         "Database",
-	"ftsearch":   "Ftsearch",
-	"lruStatic":  "LruCache",
-	"opgp":       "OpenPGP",
-	"pe":         "PdfEncrypt",
-	"rnd":        "Random",
-	"sqs":        "Query",
-	"suneido":    "Suneido",
-	"thread":     "Thread",
-	"zlib":       "Zlib",
+	"dateStatic":  "Date",
+	"db":          "Database",
+	"ftsearch":    "Ftsearch",
+	"lruStatic":   "LruCache",
+	"opgp":        "OpenPGP",
+	"pe":          "PdfEncrypt",
+	"rnd":         "Random",
+	"sqs":         "Query",
+	"suneido":     "Suneido",
+	"thread":      "Thread",
+	"typechecker": "TypeChecker",
+	"zlib":        "Zlib",
 }
 
 // gsuneido emits db-record methods under this prefix.
