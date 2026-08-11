@@ -50,6 +50,15 @@ func Close() {
 	}
 }
 
+// Enabled reports whether logging is set up. Logf is already a no-op when it
+// is not, so this is only for callers that would otherwise pay to build an
+// expensive argument - see Process, which would marshal the whole request.
+func Enabled() bool {
+	mu.Lock()
+	defer mu.Unlock()
+	return gz != nil
+}
+
 func Logf(format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()

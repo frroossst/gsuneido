@@ -124,9 +124,13 @@ func Process(req Request) (res Result, err error) {
 	start := time.Now()
 	curClass := ""
 
-	if reqJSON, mErr := json.Marshal(req); mErr == nil {
-		tlog.Logf("[req %d] request method=%q args=%d refs=%d: %s",
-			reqID, req.Method, len(req.Arguments), len(req.References), reqJSON)
+	// guarded: marshalling every source in the request is not free, and in
+	// process (the TypeChecker builtin) logging is never set up
+	if tlog.Enabled() {
+		if reqJSON, mErr := json.Marshal(req); mErr == nil {
+			tlog.Logf("[req %d] request method=%q args=%d refs=%d: %s",
+				reqID, req.Method, len(req.Arguments), len(req.References), reqJSON)
+		}
 	}
 
 	defer func() {
