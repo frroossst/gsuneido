@@ -163,7 +163,7 @@ func TestRequirement_CrossReference(t *testing.T) {
 		{Name: "Lib", Src: `class {
 	Wrap(s) { return Scanner(s) }
 	}`},
-	}, nil)
+	})
 	src := `class {
 	Use() { return Lib.Wrap(0) }
 	}`
@@ -188,7 +188,7 @@ func TestRequirement_ReferenceOrderIndependent(t *testing.T) {
 		{Name: "Inner", Src: `class {
 	CallClass(s) { return Scanner(s) }
 	}`},
-	}, nil)
+	})
 	src := `class {
 	Use() { return Outer(0) }
 	}`

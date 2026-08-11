@@ -23,10 +23,10 @@ func (r Registries) Seed(env *TypeEnv) {
 	env.ClassMethodSigs = r.Sigs
 }
 
-// refs must arrive base-first; earlier refs are visible to later ones; a ref that panics is skipped (reported via logf, may be nil), never fatal
+// refs must arrive base-first; earlier refs are visible to later ones; a ref that panics is skipped silently, never fatal
 //
 //nolint:gocognit // sequential registry build; stages share too much state to split cleanly
-func BuildReferenceRegistry(refs []RefSource, logf func(format string, args ...any)) Registries {
+func BuildReferenceRegistry(refs []RefSource) Registries {
 	r := Registries{
 		Returns:   make(map[string]map[string]DynType, len(refs)),
 		Seeds:     make(map[string]map[string]DynType, len(refs)),
@@ -41,14 +41,10 @@ func BuildReferenceRegistry(refs []RefSource, logf func(format string, args ...a
 		env TypeEnv
 	}
 	states := make([]refState, 0, len(refs))
-	for i, ref := range refs {
+	for _, ref := range refs {
 		func() {
-			defer func() {
-				if rec := recover(); rec != nil && logf != nil {
-					logf("reference[%d/%d]=%q panicked, skipping: %v",
-						i+1, len(refs), ref.Name, rec)
-				}
-			}()
+			// a bad reference must not sink the whole request; skip it
+			defer func() { _ = recover() }()
 			cls := NewClassObject(ref.Name, ParseClass(ref.Src))
 			env := NewTypeEnv()
 			r.Seed(&env) // earlier refs visible to later ones

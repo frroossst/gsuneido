@@ -34,7 +34,7 @@ func TestRequirement_ConflictCascadeConfluent(t *testing.T) {
 		for i, n := range order {
 			refs[i] = RefSource{Name: n, Src: srcs[n]}
 		}
-		regs := BuildReferenceRegistry(refs, nil)
+		regs := BuildReferenceRegistry(refs)
 		_, env := runPassesWith(driver, "T", func(e *TypeEnv) { regs.Seed(e) })
 		var out []string
 		for _, d := range diagList(env) {

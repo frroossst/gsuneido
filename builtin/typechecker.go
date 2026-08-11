@@ -93,7 +93,7 @@ func typechecker_Members() Value {
 var typecheckerMembersOnce sync.Once
 var typecheckerMembers *SuObject
 
-// runTypeChecker mirrors the JSON protocol the standalone binary speaks:
+// runTypeChecker mirrors the JSON protocol the standalone binary spoke:
 // same two argument forms, same response envelope.
 func runTypeChecker(method, meth string, arguments, references, config Value) Value {
 	res, err := typeinfer.Process(typeinfer.Request{

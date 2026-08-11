@@ -69,7 +69,7 @@ func runPassesWithRefSrcs(src string, refs map[string]string) (*ClassObject, Typ
 	for _, rname := range names {
 		list = append(list, RefSource{Name: rname, Src: refs[rname]})
 	}
-	regs := BuildReferenceRegistry(list, nil)
+	regs := BuildReferenceRegistry(list)
 	return runPassesWith(src, "T", func(e *TypeEnv) {
 		e.Classes = regs.Returns
 		e.PreCtorClasses = regs.Seeds

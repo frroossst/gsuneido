@@ -1,13 +1,9 @@
 package typeinfer
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
-	"sync/atomic"
-	"time"
 
-	"github.com/apmckinlay/gsuneido/typechecker/internal/tlog"
 	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/annotations"
 	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/diagnostics"
 	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/internal/annotate"
@@ -58,8 +54,6 @@ type Result struct {
 func LoadAnnotations(imported []annotations.TypeSignature) {
 	engine.LoadAnnotations(imported)
 }
-
-var reqSeq atomic.Uint64
 
 func buildConfig(raw map[string]string) (diagnostics.Config, error) {
 	cfg := diagnostics.DefaultConfig()
@@ -119,34 +113,7 @@ func offsetToLineCol(src string, off int) (line, col int) {
 	return
 }
 
-func Process(req Request) (res Result, err error) {
-	reqID := reqSeq.Add(1)
-	start := time.Now()
-	curClass := ""
-
-	// guarded: marshalling every source in the request is not free, and in
-	// process (the TypeChecker builtin) logging is never set up
-	if tlog.Enabled() {
-		if reqJSON, mErr := json.Marshal(req); mErr == nil {
-			tlog.Logf("[req %d] request method=%q args=%d refs=%d: %s",
-				reqID, req.Method, len(req.Arguments), len(req.References), reqJSON)
-		}
-	}
-
-	defer func() {
-		if err != nil {
-			where := ""
-			if curClass != "" {
-				where = fmt.Sprintf(" class=%q", curClass)
-			}
-			tlog.Logf("[ERROR] [req %d]%s failed after %s: %v", reqID, where, time.Since(start), err)
-			return
-		}
-		tlog.Logf("[req %d] response method=%q classes=%d errors=%d warnings=%d total=%s",
-			reqID, res.Method, len(res.Results),
-			len(res.Diagnostics.Errors), len(res.Diagnostics.Warnings), time.Since(start))
-	}()
-
+func Process(req Request) (Result, error) {
 	if req.Method != "TypeInfer" && req.Method != "TypeAnnotate" {
 		return Result{}, fmt.Errorf("unknown method: %q (expected TypeInfer or TypeAnnotate)", req.Method)
 	}
@@ -165,9 +132,7 @@ func Process(req Request) (res Result, err error) {
 	for i, r := range req.References {
 		refs[i] = engine.RefSource{Name: r.Name, Src: r.Src}
 	}
-	regs := engine.BuildReferenceRegistry(refs, func(format string, args ...any) {
-		tlog.Logf("[ERROR] [req %d] "+format, append([]any{reqID}, args...)...)
-	})
+	regs := engine.BuildReferenceRegistry(refs)
 
 	parsed := make([]*engine.ClassObject, len(req.Arguments))
 	for i, a := range req.Arguments {
@@ -180,11 +145,8 @@ func Process(req Request) (res Result, err error) {
 	results := make([]any, len(parsed))
 	var collected []rankedDiag
 	for i, c := range parsed {
-		curClass = req.Arguments[i].Name
-		t := time.Now()
+		class := req.Arguments[i].Name
 		pipeline.Run(c, env, parentReturns)
-		tlog.Logf("[req %d] class[%d/%d]=%q pipeline.Run bytes=%d took=%s",
-			reqID, i+1, len(parsed), curClass, len(req.Arguments[i].Src), time.Since(t))
 		switch req.Method {
 		case "TypeInfer":
 			results[i] = TypeInfo{
@@ -202,7 +164,7 @@ func Process(req Request) (res Result, err error) {
 					severity:   d.Severity,
 					confidence: diagnostics.ScoreConfidence(&d),
 					entry: ResultDiagnostic{
-						Class:  curClass,
+						Class:  class,
 						Method: d.Method,
 						Pos:    d.Pos,
 						Line:   line,
@@ -216,7 +178,6 @@ func Process(req Request) (res Result, err error) {
 		}
 		parentReturns = maps.Clone(env.Returns)
 	}
-	curClass = "" // past the per-class work; nothing below is class-specific
 
 	return Result{
 		Method:      req.Method,

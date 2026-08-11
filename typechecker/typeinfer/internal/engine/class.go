@@ -6,7 +6,6 @@ import (
 
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	"github.com/apmckinlay/gsuneido/core"
-	"github.com/apmckinlay/gsuneido/typechecker/internal/tlog"
 )
 
 type ClassObject struct {
@@ -90,8 +89,7 @@ func (c *ClassObject) Lineage(r ClassResolver) []*ClassObject {
 	for current := c.Base; current != ""; {
 		parent, err := r.Resolve(current)
 		if err != nil {
-			tlog.Logf("[ERROR] lineage: %v", err)
-			break
+			break // unresolvable base: the chain is truncated here
 		}
 		chain = append([]*ClassObject{parent}, chain...)
 		current = parent.Base
