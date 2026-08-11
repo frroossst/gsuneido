@@ -13,11 +13,13 @@ const (
 )
 
 type Diagnostic struct {
-	Severity   Severity              `json:"severity"`
-	Method     string                `json:"method"`
-	Pos        int                   `json:"pos"`
-	Msg        string                `json:"msg"`
-	Flag       Flag                  `json:"flag,omitempty"`
-	Got        []typealgebra.DynType `json:"-"` // operand types, so the scorer reads dirtiness without parsing Msg
-	Confidence float64               `json:"-"` // non-zero = per-rule precision, overrides the severity/dirtiness bucket
+	Severity Severity
+	Method   string
+	Pos      int
+	Msg      string
+	Flag     Flag
+	// operand types, so the scorer reads dirtiness without parsing Msg
+	Got []typealgebra.DynType
+	// non-zero = per-rule precision, overrides the severity/dirtiness bucket
+	Confidence float64
 }

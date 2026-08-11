@@ -25,24 +25,24 @@ type Request struct {
 }
 
 type TypeInfo struct {
-	Methods map[string]map[string]string `json:"methods"`
-	Members map[string]string            `json:"members"`
+	Methods map[string]map[string]string
+	Members map[string]string
 }
 
 // ResultDiagnostic is one reported finding, positioned in its class's source.
 type ResultDiagnostic struct {
-	Class  string           `json:"class"`
-	Method string           `json:"method"`
-	Pos    int              `json:"pos"`
-	Line   int              `json:"line"`
-	Col    int              `json:"col"`
-	Msg    string           `json:"msg"`
-	Flag   diagnostics.Flag `json:"flag,omitempty"`
+	Class  string
+	Method string
+	Pos    int
+	Line   int
+	Col    int
+	Msg    string
+	Flag   diagnostics.Flag
 }
 
 type DiagnosticSet struct {
-	Errors   []ResultDiagnostic `json:"errors"`
-	Warnings []ResultDiagnostic `json:"warnings"`
+	Errors   []ResultDiagnostic
+	Warnings []ResultDiagnostic
 }
 
 type Result struct {

@@ -1,9 +1,6 @@
 package diagnostics
 
-import (
-	"encoding/json"
-	"fmt"
-)
+import "fmt"
 
 type Level string
 
@@ -40,13 +37,9 @@ func (f Flag) String() string {
 	return ""
 }
 
-func (f Flag) MarshalJSON() ([]byte, error) {
-	return json.Marshal(f.String())
-}
-
 type Config struct {
-	StrictStringConcat      Level `json:"strictStringConcat"`
-	StrictCrossTypeCompares Level `json:"strictCrossTypeCompares"`
+	StrictStringConcat      Level
+	StrictCrossTypeCompares Level
 }
 
 func DefaultConfig() Config {
