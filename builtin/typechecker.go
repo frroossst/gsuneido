@@ -81,8 +81,10 @@ var _ = staticMethod(typechecker_Members, "() :object")
 // capture whichever methods happened to be registered by then.
 func typechecker_Members() Value {
 	typecheckerMembersOnce.Do(func() {
-		typecheckerMembers = methodList(typecheckerMethods).(*SuObject)
-		typecheckerMembers.Sort(nil, False)
+		// Members itself is introspection, not part of the API
+		names := slices.Sorted(maps.Keys(typecheckerMethods))
+		names = slices.DeleteFunc(names, func(s string) bool { return s == "Members" })
+		typecheckerMembers = SuObjectOfStrs(names)
 		typecheckerMembers.SetReadOnly()
 		typecheckerMembers.SetConcurrent() // shared, but read-only so no locking
 	})

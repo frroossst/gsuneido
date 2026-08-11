@@ -123,13 +123,13 @@ func TestTypeChecker_Annotations(t *testing.T) {
 }
 
 // regression: a var initializer would capture only the methods registered
-// before it, which is how Zlib.Members and Ftsearch.Members lose entries
+// before it, which is how Ftsearch, OpenPGP, and PdfEncrypt lose entries.
+// Members itself is introspection, so it is not listed.
 func TestTypeChecker_Members(t *testing.T) {
 	assert := assert.T(t)
 	members := callTypeChecker(&Thread{}, "Members")
-	assert.This(members.String()).
-		Is(`#("Annotations", "Infer", "InlayHints", "Members")`)
-	assert.This(ToContainer(members).ListSize()).Is(len(typecheckerMethods))
+	assert.This(members.String()).Is(`#("Annotations", "Infer", "InlayHints")`)
+	assert.This(ToContainer(members).ListSize()).Is(len(typecheckerMethods) - 1)
 }
 
 func TestTypeChecker_ConfigAndReferences(t *testing.T) {
