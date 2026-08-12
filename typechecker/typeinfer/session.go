@@ -113,6 +113,17 @@ func offsetToLineCol(src string, off int) (line, col int) {
 	return
 }
 
+// parseArgument turns the compiler's panic into an error naming the class, so an
+// unparsable argument reports itself instead of unwinding the whole request.
+func parseArgument(a SourceEntry) (co *engine.ClassObject, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%s: %v", a.Name, e)
+		}
+	}()
+	return engine.NewClassObject(a.Name, engine.ParseClass(a.Src)), nil
+}
+
 func Process(req Request) (Result, error) {
 	if req.Method != "TypeInfer" && req.Method != "TypeAnnotate" {
 		return Result{}, fmt.Errorf("unknown method: %q (expected TypeInfer or TypeAnnotate)", req.Method)
@@ -136,7 +147,9 @@ func Process(req Request) (Result, error) {
 
 	parsed := make([]*engine.ClassObject, len(req.Arguments))
 	for i, a := range req.Arguments {
-		parsed[i] = engine.NewClassObject(a.Name, engine.ParseClass(a.Src))
+		if parsed[i], err = parseArgument(a); err != nil {
+			return Result{}, err
+		}
 	}
 	env := engine.NewTypeEnv()
 	regs.Seed(&env)
