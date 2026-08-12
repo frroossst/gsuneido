@@ -275,7 +275,7 @@ func (c *callCheckCtx) checkOneArg(argType DynType, param *Param, pos int, guess
 	}
 	confidence := 0.0
 	if param.Inferred {
-		confidence = 0.75 
+		confidence = 0.75
 	}
 	switch {
 	case len(bad) > 0 && guessed:

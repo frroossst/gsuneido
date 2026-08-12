@@ -16,7 +16,7 @@ type (
 var builtinAnnotations = AnnotationSet{}
 
 func LoadAnnotations(imported []annotations.TypeSignature) {
-	builtinAnnotations, _ = annotations.Load(imported) 
+	builtinAnnotations, _ = annotations.Load(imported)
 }
 
 func Annotations() AnnotationSet {

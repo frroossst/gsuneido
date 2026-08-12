@@ -67,7 +67,7 @@ func proveDateCall(call *ast.Call) dateProof {
 		a := &call.Args[i]
 		c, ok := unwrapConstant(a.E)
 		if !ok {
-			return dateUnprovable 
+			return dateUnprovable
 		}
 		var idx int
 		if a.Name != nil {

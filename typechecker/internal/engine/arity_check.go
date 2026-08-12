@@ -149,10 +149,9 @@ func argShape(call *ast.Call) (callArgShape, bool) {
 }
 
 // per-callee-shape dispatch, one arm per call form
-//nolint:gocognit 
 func arityCalleeSig(call *ast.Call, d *callDispatch, env TypeEnv) *Signature {
 	if d.Sig != nil {
-		return d.Sig 
+		return d.Sig
 	}
 	switch fn := call.Fn.(type) {
 	case *ast.Ident:

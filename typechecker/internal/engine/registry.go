@@ -24,7 +24,6 @@ func (r Registries) Seed(env *TypeEnv) {
 }
 
 // refs must arrive base-first; a ref that panics is skipped silently
-//nolint:gocognit 
 func BuildReferenceRegistry(refs []RefSource) Registries {
 	r := Registries{
 		Returns:   make(map[string]map[string]DynType, len(refs)),

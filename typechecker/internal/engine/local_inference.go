@@ -10,7 +10,6 @@ import (
 )
 
 // collects and types simple class literals for a given class
-//nolint:gocognit
 func LocalInference(cls *ClassObject, env TypeEnv) {
 	// these are simple members for which we can 100% know the types like
 	// ```suneido

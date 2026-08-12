@@ -22,7 +22,6 @@ func (t *methodTable) method(name, sig string) {
 	t.l.register(name, s)
 }
 
-//nolint:funlen
 func (l *loader) applyOverlay() {
 
 	// ---- Object  ----

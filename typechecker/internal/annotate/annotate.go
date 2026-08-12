@@ -139,11 +139,11 @@ func (e *editor) apply() string {
 func paramNameEnd(p *ast.Param) (int, bool) {
 	raw := p.Name.Name
 	if raw == "" || raw[0] == '@' {
-		return 0, false 
+		return 0, false
 	}
 	identLen := len(raw)
 	if raw[0] == '.' {
-		identLen-- 
+		identLen--
 	}
 	return int(p.Name.Pos) + identLen, true
 }
@@ -213,7 +213,6 @@ func annotatedSource(src string, env engine.TypeEnv, cls *engine.ClassObject) st
 	return e.apply()
 }
 
-//nolint:gocognit,gocyclo,funlen 
 func memberValueEnds(src string, env engine.TypeEnv) map[string]int {
 	ends := make(map[string]int)
 	if len(env.Members) == 0 {

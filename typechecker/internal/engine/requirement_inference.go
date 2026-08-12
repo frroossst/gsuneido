@@ -199,7 +199,7 @@ func (d *demandCtx) callDemands(call *ast.Call) bool {
 	for i := range call.Args {
 		arg := &call.Args[i]
 		if isAtArg(arg) {
-			break 
+			break
 		}
 		id := bareIdent(arg.E)
 		if id == nil {
@@ -210,7 +210,7 @@ func (d *demandCtx) callDemands(call *ast.Call) bool {
 			continue
 		}
 		if d.env.GetType(arg.E) != TUnknown || d.env.GetType(id) != TUnknown {
-			continue 
+			continue
 		}
 		callee := matchParam(sig, arg, i)
 		if callee == nil || !cleanRequirement(callee.Typ) {

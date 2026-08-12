@@ -93,7 +93,7 @@ func checkBooleanContext(cond ast.Expr, what, method string, env TypeEnv) {
 				Pos:      condPos(cond),
 				Msg:      fmt.Sprintf("%s expects boolean, got %v", what, ty),
 			})
-			return 
+			return
 		}
 	}
 }

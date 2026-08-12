@@ -76,91 +76,29 @@ func narrowSeedAfterDivergingIf(iff *ast.If, sc scope) {
 	}
 }
 
-// exhaustive AST dispatch, one case per node kind
-//
-//nolint:gocognit,gocyclo,funlen,maintidx
+// walkNode dispatches on node kind. The control-flow forms below drive their
+// own recursion (they fork and merge scopes, or iterate to a fixpoint); every
+// other node walks its children generically and then stamps its own type.
 func walkNode(n ast.Node, env TypeEnv, sc scope) {
 	if n == nil {
 		return
 	}
-
-	if ep, ok := n.(*ast.ExprPos); ok {
-		if ep.Expr != nil {
-			walkNode(ep.Expr, env, sc)
-			if t := env.GetType(ep.Expr); t != TUnknown {
-				env.SetType(ep, t)
-			}
-		}
-		return
-	}
-
-	if c, ok := n.(*ast.Compound); ok {
-		walkStmtList(c.Body, env, sc)
-		return
-	}
-
-	if iff, ok := n.(*ast.If); ok {
-		walkNode(iff.Cond, env, sc)
-		thenSc := cloneScope(sc)
-		walkNode(iff.Then, env, thenSc)
-		var elseSc scope
-		if iff.Else != nil {
-			elseSc = cloneScope(sc)
-			walkNode(iff.Else, env, elseSc)
-		} else {
-			elseSc = sc
-		}
-		mergeScopesN(sc, []scope{thenSc, elseSc})
-		return
-	}
-
-	if sw, ok := n.(*ast.Switch); ok {
-		if sw.E != nil {
-			walkNode(sw.E, env, sc)
-		}
-		for i := range sw.Cases {
-			c := &sw.Cases[i]
-			for _, e := range c.Exprs {
-				walkNode(e, env, sc)
-			}
-		}
-		armScopes := make([]scope, 0, len(sw.Cases)+1)
-		for i := range sw.Cases {
-			c := &sw.Cases[i]
-			armSc := cloneScope(sc)
-			for _, stmt := range c.Body {
-				walkNode(stmt, env, armSc)
-			}
-			armScopes = append(armScopes, armSc)
-		}
-		if sw.Default != nil {
-			defSc := cloneScope(sc)
-			for _, stmt := range sw.Default {
-				walkNode(stmt, env, defSc)
-			}
-			armScopes = append(armScopes, defSc)
-		} else {
-			// no-default fall-through preserves entry-state types
-			armScopes = append(armScopes, sc)
-		}
-		mergeScopesN(sc, armScopes)
-		return
-	}
-
-	if b, ok := n.(*ast.Binary); ok && b.Tok == tok.Eq {
-		walkNode(b.Rhs, env, sc)
-		rhsType := env.GetType(b.Rhs)
-		if id, ok := b.Lhs.(*ast.Ident); ok && !isGlobalIdent(id.Name) {
-			sc[id.Name] = rhsType
-			env.SetType(id, rhsType)
-		} else {
-			walkNode(b.Lhs, env, sc)
-		}
-		env.SetType(b, rhsType)
-		return
-	}
-
 	switch x := n.(type) {
+	case *ast.ExprPos:
+		walkExprPos(x, env, sc)
+		return
+	case *ast.Compound:
+		walkStmtList(x.Body, env, sc)
+		return
+	case *ast.If:
+		walkIf(x, env, sc)
+		return
+	case *ast.Switch:
+		walkSwitch(x, env, sc)
+		return
+	case *ast.TryCatch:
+		walkTryCatch(x, env, sc)
+		return
 	case *ast.While:
 		walkLoopFixpoint(sc, func(s scope) {
 			walkNode(x.Cond, env, s)
@@ -179,96 +117,22 @@ func walkNode(n ast.Node, env TypeEnv, sc scope) {
 		})
 		return
 	case *ast.For:
-		for _, e := range x.Init {
-			walkNode(e, env, sc)
-		}
-		walkLoopFixpoint(sc, func(s scope) {
-			if x.Cond != nil {
-				walkNode(x.Cond, env, s)
-			}
-			walkNode(x.Body, env, s)
-			for _, e := range x.Inc {
-				walkNode(e, env, s)
-			}
-		})
+		walkFor(x, env, sc)
 		return
 	case *ast.ForIn:
-		// seed loop vars before walking the body so refs resolve.
-		//
-		// ```suneido
-		// for c in "abc" { ... }   // c -> TString (1-char string per element)
-		//     ^                ^
-		// for x in ob    { ... }   // x -> TUnknown (no per-element tracking)
-		//     ^
-		// for k, v in ob { ... }   // both stay TUnknown - semantics vary by iterable
-		//     ^  ^
-		// ```
-		if x.E != nil {
-			walkNode(x.E, env, sc)
-		}
-		if x.E2 != nil {
-			walkNode(x.E2, env, sc)
-		}
-		varType := DynType(TUnknown)
-		if x.Var2.Name == "" && env.GetType(x.E) == TString {
-			varType = TString
-		}
-		walkLoopFixpoint(sc, func(s scope) {
-			if x.Var.Name != "" {
-				s[x.Var.Name] = varType
-				env.SetType(&x.Var, varType)
-			}
-			if x.Var2.Name != "" {
-				s[x.Var2.Name] = TUnknown
-				env.SetType(&x.Var2, TUnknown)
-			}
-			if x.Body != nil {
-				walkNode(x.Body, env, s)
-			}
-		})
+		walkForIn(x, env, sc)
 		return
-	}
-
-	if tc, ok := n.(*ast.TryCatch); ok {
-		trySc := cloneScope(sc)
-		walkNode(tc.Try, env, trySc)
-		catchSc := cloneScope(sc)
-		joinScopeInto(catchSc, trySc)
-		if tc.CatchVar.Name != "" {
-			catchSc[tc.CatchVar.Name] = TString
-			env.SetType(&tc.CatchVar, TString)
+	case *ast.Binary:
+		if x.Tok == tok.Eq {
+			walkAssign(x, env, sc)
+			return
 		}
-		if tc.Catch != nil {
-			walkNode(tc.Catch, env, catchSc)
+		if x.Tok.IsAssign() {
+			walkCompoundAssign(x, env, sc)
+			return
 		}
-		mergeScopesN(sc, []scope{trySc, catchSc})
-		return
-	}
-
-	if b, ok := n.(*ast.Binary); ok && b.Tok.IsAssign() && b.Tok != tok.Eq {
-		walkNode(b.Rhs, env, sc)
-		resultType := inferResultTypeOfOperator(b.Tok)
-		if id, ok := b.Lhs.(*ast.Ident); ok && !isGlobalIdent(id.Name) {
-			if pre, ok := sc[id.Name]; ok {
-				env.SetType(id, pre)
-			}
-			sc[id.Name] = resultType
-		} else {
-			walkNode(b.Lhs, env, sc)
-		}
-		env.SetType(b, resultType)
-		return
-	}
-
-	if u, ok := n.(*ast.Unary); ok &&
-		(u.Tok == tok.Inc || u.Tok == tok.Dec ||
-			u.Tok == tok.PostInc || u.Tok == tok.PostDec) {
-		if id, ok := u.E.(*ast.Ident); ok && !isGlobalIdent(id.Name) {
-			if pre, ok := sc[id.Name]; ok {
-				env.SetType(id, pre)
-			}
-			sc[id.Name] = TNumber
-			env.SetType(u, TNumber)
+	case *ast.Unary:
+		if isIncDec(x.Tok) && walkIncDec(x, env, sc) {
 			return
 		}
 	}
@@ -277,7 +141,180 @@ func walkNode(n ast.Node, env TypeEnv, sc scope) {
 		walkNode(c, env, sc)
 		return c
 	})
+	stampNodeType(n, env, sc)
+}
 
+func walkExprPos(ep *ast.ExprPos, env TypeEnv, sc scope) {
+	if ep.Expr == nil {
+		return
+	}
+	walkNode(ep.Expr, env, sc)
+	if t := env.GetType(ep.Expr); t != TUnknown {
+		env.SetType(ep, t)
+	}
+}
+
+func walkIf(x *ast.If, env TypeEnv, sc scope) {
+	walkNode(x.Cond, env, sc)
+	thenSc := cloneScope(sc)
+	walkNode(x.Then, env, thenSc)
+	elseSc := sc
+	if x.Else != nil {
+		elseSc = cloneScope(sc)
+		walkNode(x.Else, env, elseSc)
+	}
+	mergeScopesN(sc, []scope{thenSc, elseSc})
+}
+
+func walkSwitch(sw *ast.Switch, env TypeEnv, sc scope) {
+	if sw.E != nil {
+		walkNode(sw.E, env, sc)
+	}
+	for i := range sw.Cases {
+		for _, e := range sw.Cases[i].Exprs {
+			walkNode(e, env, sc)
+		}
+	}
+	armScopes := make([]scope, 0, len(sw.Cases)+1)
+	for i := range sw.Cases {
+		armSc := cloneScope(sc)
+		for _, stmt := range sw.Cases[i].Body {
+			walkNode(stmt, env, armSc)
+		}
+		armScopes = append(armScopes, armSc)
+	}
+	if sw.Default != nil {
+		defSc := cloneScope(sc)
+		for _, stmt := range sw.Default {
+			walkNode(stmt, env, defSc)
+		}
+		armScopes = append(armScopes, defSc)
+	} else {
+		// no-default fall-through preserves entry-state types
+		armScopes = append(armScopes, sc)
+	}
+	mergeScopesN(sc, armScopes)
+}
+
+func walkTryCatch(tc *ast.TryCatch, env TypeEnv, sc scope) {
+	trySc := cloneScope(sc)
+	walkNode(tc.Try, env, trySc)
+	catchSc := cloneScope(sc)
+	joinScopeInto(catchSc, trySc)
+	if tc.CatchVar.Name != "" {
+		catchSc[tc.CatchVar.Name] = TString
+		env.SetType(&tc.CatchVar, TString)
+	}
+	if tc.Catch != nil {
+		walkNode(tc.Catch, env, catchSc)
+	}
+	mergeScopesN(sc, []scope{trySc, catchSc})
+}
+
+func walkFor(x *ast.For, env TypeEnv, sc scope) {
+	for _, e := range x.Init {
+		walkNode(e, env, sc)
+	}
+	walkLoopFixpoint(sc, func(s scope) {
+		if x.Cond != nil {
+			walkNode(x.Cond, env, s)
+		}
+		walkNode(x.Body, env, s)
+		for _, e := range x.Inc {
+			walkNode(e, env, s)
+		}
+	})
+}
+
+// seed loop vars before walking the body so refs resolve.
+//
+// ```suneido
+// for c in "abc" { ... }   // c -> TString (1-char string per element)
+//
+//	^                ^
+//
+// for x in ob    { ... }   // x -> TUnknown (no per-element tracking)
+//
+//	^
+//
+// for k, v in ob { ... }   // both stay TUnknown - semantics vary by iterable
+//
+//	^  ^
+//
+// ```
+func walkForIn(x *ast.ForIn, env TypeEnv, sc scope) {
+	if x.E != nil {
+		walkNode(x.E, env, sc)
+	}
+	if x.E2 != nil {
+		walkNode(x.E2, env, sc)
+	}
+	varType := DynType(TUnknown)
+	if x.Var2.Name == "" && env.GetType(x.E) == TString {
+		varType = TString
+	}
+	walkLoopFixpoint(sc, func(s scope) {
+		if x.Var.Name != "" {
+			s[x.Var.Name] = varType
+			env.SetType(&x.Var, varType)
+		}
+		if x.Var2.Name != "" {
+			s[x.Var2.Name] = TUnknown
+			env.SetType(&x.Var2, TUnknown)
+		}
+		if x.Body != nil {
+			walkNode(x.Body, env, s)
+		}
+	})
+}
+
+func walkAssign(b *ast.Binary, env TypeEnv, sc scope) {
+	walkNode(b.Rhs, env, sc)
+	rhsType := env.GetType(b.Rhs)
+	if id, ok := b.Lhs.(*ast.Ident); ok && !isGlobalIdent(id.Name) {
+		sc[id.Name] = rhsType
+		env.SetType(id, rhsType)
+	} else {
+		walkNode(b.Lhs, env, sc)
+	}
+	env.SetType(b, rhsType)
+}
+
+func walkCompoundAssign(b *ast.Binary, env TypeEnv, sc scope) {
+	walkNode(b.Rhs, env, sc)
+	resultType := inferResultTypeOfOperator(b.Tok)
+	if id, ok := b.Lhs.(*ast.Ident); ok && !isGlobalIdent(id.Name) {
+		if pre, ok := sc[id.Name]; ok {
+			env.SetType(id, pre)
+		}
+		sc[id.Name] = resultType
+	} else {
+		walkNode(b.Lhs, env, sc)
+	}
+	env.SetType(b, resultType)
+}
+
+func isIncDec(t tok.Token) bool {
+	return t == tok.Inc || t == tok.Dec || t == tok.PostInc || t == tok.PostDec
+}
+
+// reports whether it handled the node - a non-local operand falls through to
+// the generic child walk
+func walkIncDec(u *ast.Unary, env TypeEnv, sc scope) bool {
+	id, ok := u.E.(*ast.Ident)
+	if !ok || isGlobalIdent(id.Name) {
+		return false
+	}
+	if pre, ok := sc[id.Name]; ok {
+		env.SetType(id, pre)
+	}
+	sc[id.Name] = TNumber
+	env.SetType(u, TNumber)
+	return true
+}
+
+// stampNodeType records a node's own type once its children are walked
+func stampNodeType(n ast.Node, env TypeEnv, sc scope) {
 	switch x := n.(type) {
 	case *ast.Symbol:
 		env.SetType(x, TString)

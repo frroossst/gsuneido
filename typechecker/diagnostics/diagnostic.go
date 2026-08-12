@@ -12,11 +12,11 @@ const (
 )
 
 type Diagnostic struct {
-	Severity Severity
-	Method   string
-	Pos      int
-	Msg      string
-	Flag     Flag
-	Got []typealgebra.DynType
+	Severity   Severity
+	Method     string
+	Pos        int
+	Msg        string
+	Flag       Flag
+	Got        []typealgebra.DynType
 	Confidence float64
 }

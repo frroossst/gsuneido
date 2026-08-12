@@ -59,7 +59,7 @@ var staticPrefixClass = map[string]string{
 // gsuneido emits db-record methods under this prefix
 const recordPrefix = "record"
 
-// precedence = registration > interpreter signatures > overlay gap fills > record methods 
+// precedence = registration > interpreter signatures > overlay gap fills > record methods
 func Load(imported []TypeSignature) (Set, []string) {
 	l := &loader{set: Set{}, seen: map[sigKey]bool{}}
 	l.loadImported(imported)

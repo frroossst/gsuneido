@@ -16,21 +16,21 @@ type stores struct {
 	Returns          map[string]DynType // written only by ReturnUnionPass
 	PreCtorReturns   map[string]DynType // written only by CaptureSeedReturns
 	AnnotatedReturns map[string]DynType
-	Diagnostics     *[]Diagnostic
-	Classes         map[string]map[string]DynType 
-	PreCtorClasses  map[string]map[string]DynType 
-	ValidDateCalls  map[ast.Node]bool
-	FalseDateCalls  map[ast.Node]bool
-	GuessedCalls    map[ast.Node]bool // provenance: this call's type is a guess; check passes cap it at warning
-	GuessedVars     map[string]bool   
-	AssertedMembers map[string]AssertFact
-	Summaries       map[string]ReturnSummary
-	ClassSummaries  map[string]map[string]ReturnSummary
-	ClassMembers    map[string]map[string]DynType
-	ClassBases      map[string]string
-	CallSigs        map[ast.Node]*Signature
-	ClassMethodSigs map[string]map[string]*Signature
-	ReqConflicts    map[string]bool 
+	Diagnostics      *[]Diagnostic
+	Classes          map[string]map[string]DynType
+	PreCtorClasses   map[string]map[string]DynType
+	ValidDateCalls   map[ast.Node]bool
+	FalseDateCalls   map[ast.Node]bool
+	GuessedCalls     map[ast.Node]bool // provenance: this call's type is a guess; check passes cap it at warning
+	GuessedVars      map[string]bool
+	AssertedMembers  map[string]AssertFact
+	Summaries        map[string]ReturnSummary
+	ClassSummaries   map[string]map[string]ReturnSummary
+	ClassMembers     map[string]map[string]DynType
+	ClassBases       map[string]string
+	CallSigs         map[ast.Node]*Signature
+	ClassMethodSigs  map[string]map[string]*Signature
+	ReqConflicts     map[string]bool
 }
 
 // the value part holds only the per-class scope; copying a TypeEnv scopes it
@@ -134,7 +134,7 @@ func (env TypeEnv) ClassStaticAccessible(class, member string) (accessible, reso
 			}
 		}
 		if _, ok := env.ClassReturnSeed(c, member); ok {
-			return true, true 
+			return true, true
 		}
 		if _, ok := env.ClassReturnSeed(c, "Getter_"); ok {
 			return true, true // generic getter accepts any name
@@ -143,7 +143,7 @@ func (env TypeEnv) ClassStaticAccessible(class, member string) (accessible, reso
 			return true, true
 		}
 		if c = env.ClassBases[c]; c == "" {
-			return false, true 
+			return false, true
 		}
 	}
 }
@@ -304,12 +304,12 @@ func (env TypeEnv) PublishReturn(method string, ty DynType) {
 	env.Returns[method] = ty
 }
 
-// independent copy 
+// independent copy
 func (env TypeEnv) SnapshotReturns() map[string]DynType {
 	return maps.Clone(env.Returns)
 }
 
-// independent copy 
+// independent copy
 func (env TypeEnv) SnapshotSummaries() map[string]ReturnSummary {
 	return maps.Clone(env.Summaries)
 }

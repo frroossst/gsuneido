@@ -25,7 +25,7 @@ func ConstructorExecPass(cls *ClassObject, env TypeEnv) bool {
 
 	exec := &ctorExec{env: env, cls: cls, stack: map[string]bool{"New": true}}
 	st := &ctorState{members: cloneTypeMap(seedLits), locals: map[string]DynType{}}
-	exec.bindParams(newFn, nil, st, st) 
+	exec.bindParams(newFn, nil, st, st)
 	fell, exits := exec.runBody(newFn.Body, st)
 	if exec.bail {
 		return false
@@ -35,7 +35,7 @@ func ConstructorExecPass(cls *ClassObject, env TypeEnv) bool {
 		states = append(states, st.members)
 	}
 	if len(states) == 0 {
-		return false 
+		return false
 	}
 	postNew := joinMembers(states)
 
