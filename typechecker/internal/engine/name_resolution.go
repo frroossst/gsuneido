@@ -76,9 +76,6 @@ func narrowSeedAfterDivergingIf(iff *ast.If, sc scope) {
 	}
 }
 
-// walkNode dispatches on node kind. The control-flow forms below drive their
-// own recursion (they fork and merge scopes, or iterate to a fixpoint); every
-// other node walks its children generically and then stamps its own type.
 func walkNode(n ast.Node, env TypeEnv, sc scope) {
 	if n == nil {
 		return
@@ -298,8 +295,6 @@ func isIncDec(t tok.Token) bool {
 	return t == tok.Inc || t == tok.Dec || t == tok.PostInc || t == tok.PostDec
 }
 
-// reports whether it handled the node - a non-local operand falls through to
-// the generic child walk
 func walkIncDec(u *ast.Unary, env TypeEnv, sc scope) bool {
 	id, ok := u.E.(*ast.Ident)
 	if !ok || isGlobalIdent(id.Name) {
@@ -313,7 +308,6 @@ func walkIncDec(u *ast.Unary, env TypeEnv, sc scope) bool {
 	return true
 }
 
-// stampNodeType records a node's own type once its children are walked
 func stampNodeType(n ast.Node, env TypeEnv, sc scope) {
 	switch x := n.(type) {
 	case *ast.Symbol:

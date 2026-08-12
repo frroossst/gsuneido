@@ -1,8 +1,5 @@
 package engine
 
-// the refinement core: deciding what a condition proves about a target's type,
-// and narrowing a type toward or away from a set of candidates.
-
 import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"

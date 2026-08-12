@@ -1,8 +1,5 @@
 package engine
 
-// narrowing across if/else branches: forking a scope per arm and merging
-// the arms back together on the way out.
-
 import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"

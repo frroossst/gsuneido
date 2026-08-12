@@ -1,8 +1,5 @@
 package engine
 
-// narrowing across switch statements, in both cond mode (case exprs are
-// predicates) and scrutinee mode (case exprs are literals to match).
-
 import "github.com/apmckinlay/gsuneido/compile/ast"
 
 func narrowSwitch(sw *ast.Switch, env TypeEnv, sc narrowScope) {

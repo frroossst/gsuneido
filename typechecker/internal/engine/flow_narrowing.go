@@ -176,9 +176,6 @@ func initialNarrowScope(fn *ast.Function, env TypeEnv) narrowScope {
 	return sc
 }
 
-// narrowWalk pushes guard-derived refinements down the tree. Cases that fork a
-// scope, iterate a loop, or invalidate a refinement drive their own recursion;
-// everything else falls through to narrowChildren at the bottom.
 func narrowWalk(n ast.Node, env TypeEnv, sc narrowScope) {
 	if n == nil {
 		return
