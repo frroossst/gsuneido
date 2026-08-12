@@ -21,7 +21,6 @@ type suTypeChecker struct {
 
 func init() {
 	Global.Builtin("TypeChecker", &suTypeChecker{})
-	// var initializers have all run, so the signature table is complete
 	loadTypeCheckerAnnotations()
 }
 
@@ -39,7 +38,6 @@ func (*suTypeChecker) Lookup(_ *Thread, method string) Value {
 
 var typecheckerMethods = methods("typechecker")
 
-// without these, every builtin call would be untyped
 func loadTypeCheckerAnnotations() {
 	imported := make([]annotations.TypeSignature, len(builtinTypeSignatures))
 	for i, ts := range builtinTypeSignatures {
@@ -70,7 +68,6 @@ func typechecker_Annotations() Value {
 
 var _ = staticMethod(typechecker_Members, "() :object")
 
-// on first call, not a var initializer - registration order is not guaranteed
 func typechecker_Members() Value {
 	typecheckerMembersOnce.Do(func() {
 		names := slices.Sorted(maps.Keys(typecheckerMethods))
@@ -145,7 +142,6 @@ func configMap(v Value) map[string]string {
 	return cfg
 }
 
-// TypeInfer yields types, TypeAnnotate yields annotated source
 func resultsOb(results []any, meth string) Value {
 	ob := &SuObject{}
 	for _, r := range results {
@@ -172,7 +168,7 @@ func typeInfoOb(ti typechecker.TypeInfo) Value {
 	return ob
 }
 
-// sorted so repeated calls produce identical objects
+// sorted for idempotency
 func typeMapOb(m map[string]string) Value {
 	ob := &SuObject{}
 	for _, k := range slices.Sorted(maps.Keys(m)) {
@@ -206,7 +202,6 @@ func diagListOb(ds []typechecker.ResultDiagnostic) Value {
 	return ob
 }
 
-// never changes after startup
 var builtinSignaturesOnce sync.Once
 var builtinSignatures *SuObject
 

@@ -19,8 +19,8 @@ type Param struct {
 	Name       string
 	Typ        typealgebra.DynType
 	HasDefault bool
-	Inferred   bool   // Typ came from RequirementPass usage inference, not an annotation
-	Why        string // Inferred only: root callee whose contract the demand chains back to
+	Inferred   bool
+	Why        string
 }
 
 type Signature struct {
@@ -56,10 +56,10 @@ var staticPrefixClass = map[string]string{
 	"zlib":        "Zlib",
 }
 
-// gsuneido emits db-record methods under this prefix.
+// gsuneido emits db-record methods under this prefix
 const recordPrefix = "record"
 
-// precedence, first registration wins: imported interpreter sigs, then overlay gap-fill, then record methods (which must never shadow Object); second return lists every dropped input with its reason
+// precedence = registration > interpreter signatures > overlay gap fills > record methods 
 func Load(imported []TypeSignature) (Set, []string) {
 	l := &loader{set: Set{}, seen: map[sigKey]bool{}}
 	l.loadImported(imported)
@@ -155,7 +155,6 @@ func (l *loader) parseImportedSig(ts TypeSignature, recv typealgebra.DynType) (S
 	}
 	s.Receiver = recv
 	if s.Returns == nil {
-		// nil is not a valid type, so turn to TUnknown
 		s.Returns = typealgebra.TUnknown
 	}
 	return s, true

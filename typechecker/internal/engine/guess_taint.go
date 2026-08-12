@@ -51,7 +51,6 @@ func taintWalk(n ast.Node, method string, env TypeEnv) bool {
 	return changed
 }
 
-// the sig bound to a call on an guessed receiver rests on the same guess
 func callReceiverGuessed(call *ast.Call, method string, env TypeEnv) bool {
 	if mem, ok := call.Fn.(*ast.Mem); ok {
 		return exprGuessed(mem.E, method, env)

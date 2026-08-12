@@ -148,10 +148,11 @@ func argShape(call *ast.Call) (callArgShape, bool) {
 	return s, true
 }
 
-//nolint:gocognit // per-callee-shape dispatch, one arm per call form
+// per-callee-shape dispatch, one arm per call form
+//nolint:gocognit 
 func arityCalleeSig(call *ast.Call, d *callDispatch, env TypeEnv) *Signature {
 	if d.Sig != nil {
-		return d.Sig // builtin: matched sig or sole by-name candidate
+		return d.Sig 
 	}
 	switch fn := call.Fn.(type) {
 	case *ast.Ident:
@@ -161,7 +162,7 @@ func arityCalleeSig(call *ast.Call, d *callDispatch, env TypeEnv) *Signature {
 
 		// bare X(...) invokes CallClass.
 		if fn.Name == env.ClassName {
-			return classCallSig(env) // the class under analysis
+			return classCallSig(env)
 		}
 
 		if isGlobalIdent(fn.Name) {

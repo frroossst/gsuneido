@@ -35,6 +35,7 @@ func checkOperatorsIn(n ast.Node, method string, env TypeEnv) {
 	case *ast.Unary:
 		checkUnary(e, method, env)
 	}
+
 	n.Children(func(c ast.Node) ast.Node {
 		checkOperatorsIn(c, method, env)
 		return c

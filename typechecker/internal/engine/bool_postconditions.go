@@ -103,7 +103,6 @@ func (c *postCollector) collect(r *ast.Return, sc narrowScope) {
 		}
 		return
 	}
-	// non-literal (or bare) return: polarity unknowable, contributes to both
 	c.join(&c.trueExits, sc)
 	c.join(&c.falseExits, sc)
 }

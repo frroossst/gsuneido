@@ -67,8 +67,8 @@ func collectThisAssignments(n ast.Node, env TypeEnv) {
 }
 
 // runs once after the main loop. by now all resolvable callsites have
-// concrete types, so a still-TUnknown RHS is genuinely unknown - mark
-// the member dirty.
+// concrete types, so a still-TUnknown RHS is unknown
+// mark the member dirty.
 //
 // ```suneido
 //

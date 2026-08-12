@@ -29,7 +29,6 @@ type TypeInfo struct {
 	Members map[string]string
 }
 
-// ResultDiagnostic is one reported finding, positioned in its class's source.
 type ResultDiagnostic struct {
 	Class  string
 	Method string
@@ -74,8 +73,6 @@ func buildConfig(raw map[string]string) (diagnostics.Config, error) {
 	return cfg, nil
 }
 
-// stringifyTypes reports types in annotation spelling, the same language
-// TypeAnnotate splices into the source.
 func stringifyTypes(in map[string]typealgebra.DynType) map[string]string {
 	out := make(map[string]string, len(in))
 	for name, ty := range in {
@@ -84,7 +81,6 @@ func stringifyTypes(in map[string]typealgebra.DynType) map[string]string {
 	return out
 }
 
-// stringifyVarTypes is stringifyTypes for MethodVarTypes' nested per-method map.
 func stringifyVarTypes(in map[string]map[string]typealgebra.DynType) map[string]map[string]string {
 	out := make(map[string]map[string]string, len(in))
 	for method, vars := range in {
@@ -113,7 +109,6 @@ func offsetToLineCol(src string, off int) (line, col int) {
 	return
 }
 
-// the compiler panics on a syntax error - name the class and return it instead
 func parseArgument(a SourceEntry) (co *engine.ClassObject, err error) {
 	defer func() {
 		if e := recover(); e != nil {
@@ -150,6 +145,7 @@ func Process(req Request) (Result, error) {
 			return Result{}, err
 		}
 	}
+
 	env := engine.NewTypeEnv()
 	regs.Seed(&env)
 	pipeline := engine.DefaultPipeline()

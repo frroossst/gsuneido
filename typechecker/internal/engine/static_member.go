@@ -70,7 +70,6 @@ func checkStaticReads(n ast.Node, method string, env TypeEnv, targets map[ast.No
 	})
 }
 
-// a Class.member read: global ident base with a non-privatized member name
 func staticReadTarget(mem *ast.Mem) (string, string, bool) {
 	id, ok := mem.E.(*ast.Ident)
 	if !ok || !isGlobalIdent(id.Name) {

@@ -10,8 +10,7 @@ import (
 )
 
 // collects and types simple class literals for a given class
-//
-//nolint:gocognit // one sequential seeding pass; the member/annotation/param/body order is the logic
+//nolint:gocognit
 func LocalInference(cls *ClassObject, env TypeEnv) {
 	// these are simple members for which we can 100% know the types like
 	// ```suneido
@@ -51,11 +50,6 @@ func LocalInference(cls *ClassObject, env TypeEnv) {
 		// Foo(x = 0, a = "name", o = #(), b = false) {}
 		//     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ we are inferring these
 		// ```
-		//
-		// A source-code annotation `(x: T1 | T2)` is the hard contract for
-		// the param's type and overrides any inference from the default
-		// value. When both are present and the default's type isn't a
-		// subtype of the annotation, that's a diagnostic worth surfacing.
 		for i := range fn.Params {
 			p := &fn.Params[i]
 			annotated, annotatedOk := paramAnnotationType(p, name, env)

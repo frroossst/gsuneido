@@ -97,8 +97,6 @@ func (c *callCheckCtx) checkCall(call *ast.Call, pos int) {
 				d.Method, d.Returns),
 		})
 	}
-	// arg checking only makes sense when a specific signature was bound.
-	// CallSig covers builtin sigs and user methods with annotated params alike.
 	if sig := c.env.CallSig(call); sig != nil {
 		c.checkArgs(call, sig, pos)
 	}
@@ -153,7 +151,6 @@ func (c *callCheckCtx) checkArgs(call *ast.Call, sig *Signature, callPos int) {
 	if sig.AtParam {
 		return
 	}
-	// a sig bound through a guess cannot prove an argument mismatch
 	sigGuessed := c.env.GuessedCall(call) || callReceiverGuessed(call, c.method, c.env)
 	named := make(map[string]bool, len(call.Args))
 	for i := range call.Args {
@@ -165,7 +162,6 @@ func (c *callCheckCtx) checkArgs(call *ast.Call, sig *Signature, callPos int) {
 	for i := range call.Args {
 		arg := &call.Args[i]
 		if isAtArg(arg) {
-			// caller is spreading @args - positional reasoning is dead
 			return
 		}
 		c.checkCallArg(call, sig, arg, i, named, sigGuessed, callPos)
@@ -180,7 +176,7 @@ func (c *callCheckCtx) checkCallArg(call *ast.Call, sig *Signature, arg *ast.Arg
 		return
 	}
 	if arg.Name == nil && named[param.Name] {
-		return // massage: the named value overwrites this positional one
+		return
 	}
 	if param.Typ == nil || param.Typ == TUnknown {
 		return
@@ -197,9 +193,6 @@ func (c *callCheckCtx) checkCallArg(call *ast.Call, sig *Signature, arg *ast.Arg
 	c.checkOneArg(argType, param, argPos, guessed, call, arg)
 }
 
-// massage drops a named arg that matches no param without any runtime notice,
-// so a misspelled name silently loses its value.
-// "block" is exempt: trailing-block syntax always passes it, declared or not.
 func (c *callCheckCtx) checkDiscardedNamed(arg *ast.Arg, call *ast.Call, sigGuessed bool) {
 	if arg.Name == nil || sigGuessed {
 		return
@@ -274,9 +267,6 @@ func (c *callCheckCtx) checkOneArg(argType DynType, param *Param, pos int, guess
 	}
 	msg := func(suffix string) string {
 		if param.Inferred {
-			// the param name means nothing at the call site (it lives in the
-			// callee), so name the callee, echo the argument, and explain
-			// where the requirement comes from
 			return fmt.Sprintf("%s to %s has type %v, but %q is passed on to %s which requires %v%s",
 				argRef(arg, param), calleeDisplay(call), argType, param.Name, requirementRoot(param), param.Typ, suffix)
 		}
@@ -285,7 +275,7 @@ func (c *callCheckCtx) checkOneArg(argType DynType, param *Param, pos int, guess
 	}
 	confidence := 0.0
 	if param.Inferred {
-		confidence = 0.75 // a usage-inferred contract, one notch under an annotation
+		confidence = 0.75 
 	}
 	switch {
 	case len(bad) > 0 && guessed:
@@ -304,8 +294,6 @@ func (c *callCheckCtx) checkOneArg(argType DynType, param *Param, pos int, guess
 			Msg:        msg(""),
 		})
 	case dirty && !param.Inferred:
-		// inferred requirements stay silent here: requirement and arg are
-		// both speculative, that is guess-on-guess
 		c.env.Report(&Diagnostic{
 			Severity: SeverityWarning,
 			Method:   c.method,
@@ -323,8 +311,6 @@ func requirementRoot(param *Param) string {
 	return "a typed callee"
 }
 
-// `argument \`.Send('GetQuery')\“ - the source the caller actually sees;
-// falls back to the callee's param name when the expression won't echo.
 func argRef(arg *ast.Arg, param *Param) string {
 	if s := argText(arg); s != "" {
 		return "argument `" + s + "`"

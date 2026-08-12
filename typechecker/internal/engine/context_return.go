@@ -177,9 +177,6 @@ func reachStmtList(stmts []ast.Statement, overrides map[string]DynType, env Type
 func inferBodyReturnReachable(fn *ast.Function, overrides map[string]DynType, env TypeEnv) DynType {
 	var result DynType
 	if !reachStmtList(fn.Body, overrides, env, &result) {
-		// a reachable trailing expression statement is the implicit return:
-		// codegen compiles only the last top-level ExprStmt with its value
-		// kept (exprStmt lastStmt), so control-flow tails still fall to Void
 		if es, ok := lastExprStmt(fn.Body); ok {
 			result = mergeReturn(result, env.GetType(es.E))
 		}

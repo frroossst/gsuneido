@@ -48,7 +48,7 @@ func targetNodeSet(cls *engine.ClassObject) map[ast.Node]struct{} {
 }
 
 // alreadyAnnotated reports whether src already carries this exact annotation at
-// pos, so re-running the annotator over its own output does not stack copies.
+// pos, so re-running the annotator over its own output does not stack copies
 func alreadyAnnotated(src string, pos int, text string) bool {
 	if pos < 0 || pos > len(src) {
 		return false
@@ -70,14 +70,12 @@ func exprEnd(n ast.Node) (int, bool) {
 	return 0, false
 }
 
-// an edit replacing src[start:end]; start == end for a plain insertion
 type ann struct {
 	start int
 	end   int
 	text  string
 }
 
-// editor collects one source's annotation edits, one per position.
 type editor struct {
 	src     string
 	anns    []ann
@@ -88,7 +86,6 @@ func newEditor(src string) *editor {
 	return &editor{src: src, usedPos: make(map[int]bool)}
 }
 
-// claim reserves a position for the first pass that reaches it.
 func (e *editor) claim(pos int) bool {
 	if pos <= 0 || pos > len(e.src) || e.usedPos[pos] {
 		return false
@@ -99,26 +96,22 @@ func (e *editor) claim(pos int) bool {
 
 func (e *editor) add(start, end int, text string) {
 	if start == end && alreadyAnnotated(e.src, start, text) {
-		return // that annotation is already there
+		return
 	}
 	if e.src[start:end] == text {
-		return // already spelled the canonical way
+		return
 	}
 	e.anns = append(e.anns, ann{start: start, end: end, text: text})
 }
 
 func (e *editor) insert(pos int, text string) { e.add(pos, pos, text) }
 
-// respell rewrites an annotation the source already declares - the declaration
-// is the contract, so only its spelling changes.
 func (e *editor) respell(at int, decl string) {
 	if end, ok := typealgebra.AnnotationSpan(e.src, at); ok {
 		e.add(at, end, " :"+typealgebra.CanonicalAnnotation(decl))
 	}
 }
 
-// declare writes ty as a native `:type` where the syntax can express it, and
-// as an inline comment where it cannot.
 func (e *editor) declare(pos int, ty engine.DynType, commentFmt string) {
 	if native, ok := typealgebra.NativeAnnotation(ty); ok {
 		e.insert(pos, " :"+native)
@@ -135,7 +128,7 @@ func (e *editor) apply() string {
 	lastStart := len(e.src)
 	for _, a := range e.anns {
 		if a.end > lastStart {
-			continue // overlaps an edit already applied; leave the source as is
+			continue
 		}
 		result = result[:a.start] + a.text + result[a.end:]
 		lastStart = a.start
@@ -143,21 +136,18 @@ func (e *editor) apply() string {
 	return result
 }
 
-// paramNameEnd is where a parameter's annotation goes, just past its name.
 func paramNameEnd(p *ast.Param) (int, bool) {
 	raw := p.Name.Name
 	if raw == "" || raw[0] == '@' {
-		return 0, false // @args is implicitly object - not annotatable
+		return 0, false 
 	}
 	identLen := len(raw)
 	if raw[0] == '.' {
-		identLen-- // the dot is consumed before Name.Pos
+		identLen-- 
 	}
 	return int(p.Name.Pos) + identLen, true
 }
 
-// exprs annotates local variables and other typed expressions with an inline
-// /* type */ comment; native syntax has nowhere to go mid-expression.
 func (e *editor) exprs(env engine.TypeEnv) {
 	for node, ty := range env.Nodes {
 		if ty == engine.TUnknown {
@@ -204,8 +194,6 @@ func (e *editor) returns(env engine.TypeEnv, cls *engine.ClassObject) {
 	}
 }
 
-// members annotates with an inline :: comment, not native syntax, which would
-// collide with the member's own `name: value` colon.
 func (e *editor) members(env engine.TypeEnv) {
 	for mname, end := range memberValueEnds(e.src, env) {
 		ty, ok := env.Members[mname]
@@ -225,7 +213,7 @@ func annotatedSource(src string, env engine.TypeEnv, cls *engine.ClassObject) st
 	return e.apply()
 }
 
-//nolint:gocognit,gocyclo,funlen // single token-scanning state machine; the state is clearer inline than split across helpers
+//nolint:gocognit,gocyclo,funlen 
 func memberValueEnds(src string, env engine.TypeEnv) map[string]int {
 	ends := make(map[string]int)
 	if len(env.Members) == 0 {
@@ -327,8 +315,6 @@ func memberValueEnds(src string, env engine.TypeEnv) map[string]int {
 				}
 			}
 			if done {
-				// back up over trailing whitespace and comments, so the
-				// annotation lands right after the value
 				e := k
 				for e > ni+1 && isSkip(items[e-1].tk) {
 					e--

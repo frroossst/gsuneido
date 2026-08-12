@@ -6,29 +6,14 @@ import (
 	"strings"
 )
 
-// This file is the annotation language: how a type is written, read back, and
-// found in source. Everything about the surface syntax lives here, so changing
-// how annotations look is a change to this file alone. The lattice itself is in
-// typealgebra.go, and where an annotation gets spliced into a file is debug's.
-
-// armSep separates the alternatives of a union, with no spaces around it.
 const armSep = "|"
-
-// dirtyArm marks a union with an unknown alternative. It is printable but not
-// writable: no annotation can declare it.
 const dirtyArm = "?"
 
-// primitiveNames are the spellings of the primitives, and the one way a type is
-// written anywhere: annotations, inferred-type output, and diagnostics. They
-// are lowercase because capitalization means a class name. Note these are not
-// Suneido's own `Type(x)` strings, which stay capitalized.
 var primitiveNames = [...]string{
 	"unknown", "void", "boolean", "false", "true", "number", "string", "date",
 	"function", "block", "class", "object", "sequence",
 }
 
-// primitiveByName inverts primitiveNames, so writing and reading a type name
-// cannot drift apart.
 var primitiveByName = func() map[string]Primitive {
 	m := make(map[string]Primitive, len(primitiveNames))
 	for i, n := range primitiveNames {
@@ -37,15 +22,10 @@ var primitiveByName = func() map[string]Primitive {
 	return m
 }()
 
-// typeAliases are accepted spellings with no rendering of their own. Suneido's
-// Record is an Object as far as the type lattice is concerned, but a source
-// that says `record` keeps saying it.
 var typeAliases = map[string]Primitive{
 	"record": TObject,
 }
 
-// ParseName resolves a written builtin type name, matched case-insensitively.
-// It is the inverse of Primitive.String, plus the aliases.
 func ParseName(name string) (Primitive, bool) {
 	lower := strings.ToLower(name)
 	if p, ok := primitiveByName[lower]; ok {
@@ -55,10 +35,6 @@ func ParseName(name string) (Primitive, bool) {
 	return p, ok
 }
 
-// CanonicalName returns the spelling of a builtin type name, matched
-// case-insensitively, and reports whether name is a builtin at all. Aliases are
-// not canonicalized: `record` is left as written rather than turned into
-// `object`, since only the author knows which they meant.
 func CanonicalName(name string) (string, bool) {
 	if p, ok := primitiveByName[strings.ToLower(name)]; ok {
 		return p.String(), true
@@ -66,10 +42,6 @@ func CanonicalName(name string) (string, bool) {
 	return name, false
 }
 
-// ParseAnnotation reads an annotation into a type. A name is nominal because it
-// is not a builtin, not because it is capitalized: `String` and `string` are
-// one type, while `Foo` is a class. On error it still returns the best type it
-// could make, with the unreadable alternatives left unknown.
 func ParseAnnotation(s string) (DynType, error) {
 	if s == "" {
 		return TUnknown, nil
@@ -112,8 +84,6 @@ func parseArm(name string) (DynType, error) {
 	return TUnknown, fmt.Errorf("unknown type name %q", name)
 }
 
-// NativeAnnotation is String restricted to what native `:type` syntax can
-// express, reporting false for a type that has to be written as a comment.
 func NativeAnnotation(ty DynType) (string, bool) {
 	switch t := ty.(type) {
 	case Primitive:
@@ -148,9 +118,6 @@ func NativeAnnotation(ty DynType) (string, bool) {
 	}
 }
 
-// CanonicalAnnotation respells a declared annotation without changing what it
-// means, so a source that says `String | False` can be rewritten to the one
-// spelling everything else uses.
 func CanonicalAnnotation(decl string) string {
 	parts := strings.Split(decl, armSep)
 	for i, p := range parts {
@@ -160,17 +127,12 @@ func CanonicalAnnotation(decl string) string {
 	return strings.Join(parts, armSep)
 }
 
-// joinArms sorts so that semantically equal unions print identically whatever
-// order they were built in. "?" sorts last on its own, after every name.
 func joinArms(parts []string) string {
 	sorted := append([]string(nil), parts...)
 	sort.Strings(sorted)
 	return strings.Join(sorted, armSep)
 }
 
-// AnnotationSpan returns the end of the `: type | type` annotation written at
-// from, so it can be replaced with its canonical spelling. It reports false
-// when the annotation is not laid out on one line, leaving that source alone.
 func AnnotationSpan(src string, from int) (int, bool) {
 	i := skipBlank(src, from)
 	if i >= len(src) || src[i] != ':' {

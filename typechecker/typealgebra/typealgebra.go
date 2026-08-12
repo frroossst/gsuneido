@@ -24,7 +24,7 @@ const (
 	TClass
 
 	TObject
-	TSequence // virtual list - inherits Object methods (see suneidoc Sequence.md)
+	TSequence // for typechecking purposes we say sequences are subset of object (though suneido runtime semantics differ a bit)
 
 )
 
@@ -34,8 +34,6 @@ type Instance struct {
 
 func (i Instance) isDynType() {}
 
-// String canonicalizes a class named after a builtin, since that name reparses
-// as the builtin: what is printed is what an annotation would mean.
 func (i Instance) String() string {
 	name, _ := CanonicalName(i.Class)
 	return name
@@ -95,7 +93,7 @@ func (u Union) Fold() DynType {
 		}
 	}
 
-	// Collapse boolean primitives: any mix of TTrue/TFalse/TBoolean
+	// Collapse boolean primitives
 	var singleBool Primitive
 	boolCount := 0
 	for _, p := range []Primitive{TTrue, TFalse, TBoolean} {
@@ -112,7 +110,6 @@ func (u Union) Fold() DynType {
 		out = append(out, TBoolean)
 	}
 
-	// enum order, so union arm order is deterministic across runs
 	for p := Primitive(0); int(p) < len(primitiveNames); p++ {
 		if seen[p] {
 			out = append(out, p)

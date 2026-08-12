@@ -66,7 +66,7 @@ func (p Pipeline) Run(cls *ClassObject, env TypeEnv, parentReturns map[string]Dy
 	// sigs must be bound before the first CallsiteResolutionPass
 	env = env.WithClass(cls, buildMethodSigs(cls))
 
-	DateNarrowingPass(cls, env) // once, up front: its verdicts feed every later CallsiteResolutionPass
+	DateNarrowingPass(cls, env)
 
 	LocalInference(cls, env)
 	NameResolutionPass(cls, env)
@@ -93,12 +93,12 @@ func (p Pipeline) Run(cls *ClassObject, env TypeEnv, parentReturns map[string]Dy
 	}
 
 	if ConstructorExecPass(cls, env) {
-		env.CaptureSeedReturns() // one-instant window: demotion decided, demoted returns not yet recomputed
+		env.CaptureSeedReturns()
 		CallsiteResolutionPass(cls, env, p.Annotations)
 		ReturnUnionPass(cls, env)
 	}
 
-	// NameResolutionPass is intentionally omitted from this loop - it would undo the narrowing
+	// NameResolutionPass is intentionally omitted from this loop (it would undo the narrowing)
 	iterateToFixpoint(env, func() {
 		FlowNarrowingPass(cls, env)
 		RefreshTrinaryTypes(cls, env)
@@ -136,7 +136,7 @@ func (p Pipeline) Run(cls *ClassObject, env TypeEnv, parentReturns map[string]Dy
 	ComputeSummaries(cls, env)
 }
 
-// matches by message prefix - keep in sync with the "return type ..." diagnostics ReturnUnionPass emits
+// keep in sync with the "return type ..." diagnostics ReturnUnionPass emits
 func clearReturnDiagnostics(env TypeEnv) {
 	if env.Diagnostics == nil {
 		return

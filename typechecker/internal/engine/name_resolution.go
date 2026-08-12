@@ -26,7 +26,6 @@ func NameResolutionPass(cls *ClassObject, env TypeEnv) {
 			if t, ok := env.Params[p]; ok {
 				sc[paramName] = t
 			} else if len(p.Name.Name) > 0 && p.Name.Name[0] == '.' {
-				// inline init param (.x): the member type is the param type
 				if memberType, ok := env.LookupMember(paramName); ok {
 					sc[paramName] = memberType
 				} else {
@@ -77,7 +76,9 @@ func narrowSeedAfterDivergingIf(iff *ast.If, sc scope) {
 	}
 }
 
-//nolint:gocognit,gocyclo,funlen,maintidx // exhaustive AST dispatch, one case per node kind
+// exhaustive AST dispatch, one case per node kind
+//
+//nolint:gocognit,gocyclo,funlen,maintidx
 func walkNode(n ast.Node, env TypeEnv, sc scope) {
 	if n == nil {
 		return
@@ -438,5 +439,4 @@ func startsUpper(name string) bool {
 	return c >= 'A' && c <= 'Z'
 }
 
-// Suneido globals start with an uppercase letter
 func isGlobalIdent(name string) bool { return startsUpper(name) }

@@ -16,7 +16,7 @@ type (
 var builtinAnnotations = AnnotationSet{}
 
 func LoadAnnotations(imported []annotations.TypeSignature) {
-	builtinAnnotations, _ = annotations.Load(imported) // nothing here needs the skips
+	builtinAnnotations, _ = annotations.Load(imported) 
 }
 
 func Annotations() AnnotationSet {

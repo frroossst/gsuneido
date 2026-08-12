@@ -13,14 +13,6 @@ import (
 //	^^^^ throws on every path where Query1 returned false
 //
 // ```
-// a value reaches six positions, and each one only accepts some of the type
-// lattice. the table below was derived by executing every type against every
-// position in gsuneido, not by reading the runtime - several cells are
-// counter-intuitive (objects are callable, instances can never iterate even
-// with an Iter method, strings reject member writes).
-//
-// method calls are excluded - the callsite check already dispatches those
-// against the builtin signature table.
 func CapabilityCheckPass(cls *ClassObject, env TypeEnv) {
 	for name, fn := range cls.SortedMethods {
 		ctx := capCheckCtx{
@@ -49,8 +41,6 @@ const (
 	capIterate
 )
 
-// verified against gsuneido, type by type:
-//
 //	read     everything but a boolean - SuBool.Get panics before the method
 //	         lookup can bind a name, every other type falls through to it
 //	write    Instance, Object, Record, Sequence (no lookup fallback for Put)
@@ -174,7 +164,7 @@ func (c *capCheckCtx) checkMem(mem *ast.Mem, pos int) {
 
 func (c *capCheckCtx) checkCallee(call *ast.Call, pos int) {
 	if _, ok := call.Fn.(*ast.Mem); ok {
-		return // method call: the callsite check owns the receiver
+		return
 	}
 	if !ownedHere(call.Fn) {
 		return
@@ -209,7 +199,6 @@ func (c *capCheckCtx) check(e ast.Expr, pos int, subject string, cap capability)
 			subject, onExpr(target), cap.verb(), receiver)
 	}
 
-	// a receiver whose type rests on a guess cannot prove a mismatch
 	sev := SeverityError
 	if exprGuessed(target, c.method, c.env) {
 		sev = SeverityWarning
@@ -218,8 +207,6 @@ func (c *capCheckCtx) check(e ast.Expr, pos int, subject string, cap capability)
 	c.env.Report(&Diagnostic{Severity: sev, Method: c.method, Pos: pos, Msg: msg})
 }
 
-// this-members, super, and globals carry no local type to judge - they belong
-// to T-MemRead, the static-member check, and global resolution respectively.
 func ownedHere(e ast.Expr) bool {
 	id, ok := peelParens(e).(*ast.Ident)
 	if !ok {

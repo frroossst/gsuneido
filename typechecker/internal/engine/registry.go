@@ -24,8 +24,7 @@ func (r Registries) Seed(env *TypeEnv) {
 }
 
 // refs must arrive base-first; a ref that panics is skipped silently
-//
-//nolint:gocognit // sequential registry build; stages share too much state to split cleanly
+//nolint:gocognit 
 func BuildReferenceRegistry(refs []RefSource) Registries {
 	r := Registries{
 		Returns:   make(map[string]map[string]DynType, len(refs)),
@@ -43,11 +42,10 @@ func BuildReferenceRegistry(refs []RefSource) Registries {
 	states := make([]refState, 0, len(refs))
 	for _, ref := range refs {
 		func() {
-			// a bad reference must not sink the whole request; skip it
 			defer func() { _ = recover() }()
 			cls := NewClassObject(ref.Name, ParseClass(ref.Src))
 			env := NewTypeEnv()
-			r.Seed(&env) // earlier refs visible to later ones
+			r.Seed(&env)
 			var parentReturns map[string]DynType
 			if cls.Base != "" {
 				parentReturns = r.Returns[cls.Base]
@@ -55,9 +53,6 @@ func BuildReferenceRegistry(refs []RefSource) Registries {
 			pipeline.Run(cls, env, parentReturns)
 			r.Sigs[ref.Name] = ClassMethodSignatures(cls)
 
-			// rescope for the requirement fixpoint below: MethodSigs points at
-			// r.Sigs so inferred requirements land where later refs and the
-			// checked classes resolve callee signatures.
 			env = env.WithClass(cls, r.Sigs[ref.Name])
 			states = append(states, refState{cls, env})
 			if cls.IsFunction {
@@ -85,13 +80,6 @@ func BuildReferenceRegistry(refs []RefSource) Registries {
 		}()
 	}
 
-	// requirements flow callee -> caller, but refs arrive in inheritance
-	// order, not call order: a requirement discovered in a late ref must get
-	// another pass to reach the refs that call it. re-resolving first rebinds
-	// call sigs that missed classes not yet registered on the first walk.
-	// a round that grows any conflict set clears every inferred slot across
-	// the registry (see RequirementPass) so cross-ref derivations from a
-	// since-conflicted slot cannot survive on a lucky ref order.
 	conflicts := func() int {
 		n := 0
 		for i := range states {

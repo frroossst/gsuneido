@@ -7,24 +7,22 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 )
 
-// shared by every copy of a TypeEnv; one per NewTypeEnv
 type stores struct {
-	Nodes map[ast.Node]DynType // last-writer-wins across passes; pass order is the contract
+	Nodes map[ast.Node]DynType
 	// keyed by *ast.Param because Param does not implement Node
 	Params           map[*ast.Param]DynType
 	Members          map[string]DynType // seed-inclusive union view; PostCtorMembers is the post-New demoted view
 	PostCtorMembers  map[string]DynType // written only by ConstructorExecPass
-	Returns          map[string]DynType // published only by ReturnUnionPass
-	PreCtorReturns   map[string]DynType // captured only by CaptureSeedReturns
+	Returns          map[string]DynType // written only by ReturnUnionPass
+	PreCtorReturns   map[string]DynType // written only by CaptureSeedReturns
 	AnnotatedReturns map[string]DynType
-	// slice-backed via pointer so value-receiver methods can append
 	Diagnostics     *[]Diagnostic
-	Classes         map[string]map[string]DynType // caller-installed reference registries (Registries.Seed); readers tolerate nil
-	PreCtorClasses  map[string]map[string]DynType // seed views, populated only where they differ from Classes
+	Classes         map[string]map[string]DynType 
+	PreCtorClasses  map[string]map[string]DynType 
 	ValidDateCalls  map[ast.Node]bool
 	FalseDateCalls  map[ast.Node]bool
 	GuessedCalls    map[ast.Node]bool // provenance: this call's type is a guess; check passes cap it at warning
-	GuessedVars     map[string]bool   // keyed method+"\x00"+var: local's value rests on a guess
+	GuessedVars     map[string]bool   
 	AssertedMembers map[string]AssertFact
 	Summaries       map[string]ReturnSummary
 	ClassSummaries  map[string]map[string]ReturnSummary
@@ -32,7 +30,7 @@ type stores struct {
 	ClassBases      map[string]string
 	CallSigs        map[ast.Node]*Signature
 	ClassMethodSigs map[string]map[string]*Signature
-	ReqConflicts    map[string]bool // keyed method+"\x00"+param: usage demands disagreed, slot is permanently unconstrained
+	ReqConflicts    map[string]bool 
 }
 
 // the value part holds only the per-class scope; copying a TypeEnv scopes it
@@ -99,7 +97,7 @@ func (env TypeEnv) ClassStaticType(class, member string) DynType {
 	for c := class; ; {
 		mt, known := env.ClassMembers[c]
 		if !known {
-			return TUnknown // class (or an ancestor) not in the registry
+			return TUnknown
 		}
 		if t, ok := mt[member]; ok {
 			return t
@@ -136,7 +134,7 @@ func (env TypeEnv) ClassStaticAccessible(class, member string) (accessible, reso
 			}
 		}
 		if _, ok := env.ClassReturnSeed(c, member); ok {
-			return true, true // a method (or CallClass/New) of this name
+			return true, true 
 		}
 		if _, ok := env.ClassReturnSeed(c, "Getter_"); ok {
 			return true, true // generic getter accepts any name
@@ -145,7 +143,7 @@ func (env TypeEnv) ClassStaticAccessible(class, member string) (accessible, reso
 			return true, true
 		}
 		if c = env.ClassBases[c]; c == "" {
-			return false, true // whole chain resolved, member absent
+			return false, true 
 		}
 	}
 }
@@ -172,7 +170,6 @@ func NewTypeEnv() TypeEnv {
 	}}
 }
 
-// WithClass returns env scoped to cls; the shared stores are untouched
 func (env TypeEnv) WithClass(cls *ClassObject, sigs map[string]*Signature) TypeEnv {
 	env.ClassName = cls.Name
 	env.ClassBase = cls.Base
@@ -182,8 +179,6 @@ func (env TypeEnv) WithClass(cls *ClassObject, sigs map[string]*Signature) TypeE
 	return env
 }
 
-// AnnotationView is the env AnnotateClass renders from: Nodes filtered to the
-// given set, the class-level maps shared, everything else absent.
 func (env TypeEnv) AnnotationView(keep map[ast.Node]struct{}) TypeEnv {
 	nodes := make(map[ast.Node]DynType, len(keep))
 	for n, ty := range env.Nodes {
@@ -241,7 +236,6 @@ func (env TypeEnv) SetGuessedCall(n ast.Node, guessed bool) {
 	}
 }
 
-// GuessedCall reports whether n's type rests on a guess.
 func (env TypeEnv) GuessedCall(n ast.Node) bool {
 	return env.GuessedCalls[n]
 }
@@ -252,12 +246,10 @@ func (env TypeEnv) SetGuessedVar(method, name string) {
 	}
 }
 
-// GuessedVar reports whether the local's value rests on a guess.
 func (env TypeEnv) GuessedVar(method, name string) bool {
 	return env.GuessedVars[method+"\x00"+name]
 }
 
-// safe to call on a zero-value TypeEnv - the call is dropped
 func (env TypeEnv) Report(d *Diagnostic) {
 	if env.Diagnostics == nil {
 		return
@@ -290,7 +282,6 @@ func (env TypeEnv) SeedMember(name string, ty DynType) {
 	env.Members[name] = ty
 }
 
-// widens name with ty, folding nested unions. safe before seeding.
 func (env TypeEnv) UnionMember(name string, ty DynType) {
 	if existing, ok := env.Members[name]; ok {
 		ty = U(existing, ty)
@@ -309,17 +300,16 @@ func (env TypeEnv) LookupReturn(method string) DynType {
 	return TUnknown
 }
 
-// ReturnUnionPass is the sole publisher
 func (env TypeEnv) PublishReturn(method string, ty DynType) {
 	env.Returns[method] = ty
 }
 
-// independent copy - further writes to env.Returns don't affect it
+// independent copy 
 func (env TypeEnv) SnapshotReturns() map[string]DynType {
 	return maps.Clone(env.Returns)
 }
 
-// independent copy of the per-method conditional return summaries.
+// independent copy 
 func (env TypeEnv) SnapshotSummaries() map[string]ReturnSummary {
 	return maps.Clone(env.Summaries)
 }
@@ -329,9 +319,7 @@ func (env TypeEnv) SnapshotPreCtorReturns() map[string]DynType {
 }
 
 func (env TypeEnv) CaptureSeedReturns() {
-	for k, v := range env.Returns {
-		env.PreCtorReturns[k] = v
-	}
+	maps.Copy(env.PreCtorReturns, env.Returns)
 }
 
 func (env TypeEnv) ClassKnown(class string) bool {

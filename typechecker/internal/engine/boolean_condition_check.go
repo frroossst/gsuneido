@@ -28,7 +28,6 @@ func checkConditionsIn(n ast.Node, method string, env TypeEnv) {
 	if n == nil {
 		return
 	}
-	// ExprPos.Children() skips the wrapped node (see checkOperatorsIn)
 	if ep, ok := n.(*ast.ExprPos); ok {
 		if ep.Expr != nil {
 			checkConditionsIn(ep.Expr, method, env)
@@ -43,7 +42,6 @@ func checkConditionsIn(n ast.Node, method string, env TypeEnv) {
 	case *ast.DoWhile:
 		checkBooleanContext(e.Cond, "do-while condition", method, env)
 	case *ast.For:
-		// classic for; Cond is nil for `for (;;)`. ForIn carries no condition.
 		checkBooleanContext(e.Cond, "for condition", method, env)
 	case *ast.Trinary:
 		checkBooleanContext(e.Cond, "?: condition", method, env)
@@ -95,7 +93,7 @@ func checkBooleanContext(cond ast.Expr, what, method string, env TypeEnv) {
 				Pos:      condPos(cond),
 				Msg:      fmt.Sprintf("%s expects boolean, got %v", what, ty),
 			})
-			return // one diagnostic per condition position
+			return 
 		}
 	}
 }

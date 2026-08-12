@@ -5,25 +5,19 @@ import (
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 )
 
-// RequirementPass infers what type an unannotated no-default param must be
-// from the calls its body hands it to: passing p where the bound signature
-// declares String makes String a requirement on p. requirements are written
-// into the method's own Signature (marked Param.Inferred) so call sites check
-// against them exactly like annotations.
-//
 // soundness: a demand is only taken from a clean primitive on a non-guessed
 // signature, only for a param the method never reassigns, and only where the
 // arg's own type is still unknown (a narrowing-guarded use proves nothing
 // about the caller). two disagreeing demands conflict: the slot drops to
-// unconstrained, permanently (env.ReqConflicts).
+// unconstrained, permanently (env.ReqConflicts)
 //
-// returns whether any signature changed, so callers can drive a fixpoint.
+// returns whether any signature changed, so callers can drive a fixpoint
 //
 // confluence: a demand read from a slot that LATER conflicts is unjustified -
 // the source turned out polymorphic. so any sweep that grows the conflict set
 // clears every inferred slot and the iteration re-derives from scratch under
 // the larger (sticky, grow-only) conflict set. once conflicts stabilize the
-// system is monotone, so the result is order-independent.
+// system is monotone, so the result is order-independent
 func RequirementPass(cls *ClassObject, env TypeEnv) bool {
 	changed := false
 	for range maxFixpointPasses {
@@ -68,7 +62,7 @@ func requirementSweep(cls *ClassObject, env TypeEnv) bool {
 		}
 		params := paramNameSet(fn)
 		for p := range falseTestedParams(fn, params) {
-			delete(slots, p) // the body handles false itself - uses prove nothing
+			delete(slots, p)
 		}
 		if len(slots) == 0 {
 			continue
@@ -97,9 +91,6 @@ func paramNameSet(fn *ast.Function) map[string]bool {
 	return out
 }
 
-// params the body sentinel-tests (`p is false` / `false isnt p`, any nesting):
-// false is a caller value this body handles, so no use of the param may bind
-// callers to a type. equality tests against other literals do NOT count.
 func falseTestedParams(fn *ast.Function, params map[string]bool) map[string]bool {
 	out := map[string]bool{}
 	for _, stmt := range fn.Body {
@@ -115,7 +106,6 @@ func collectFalseTests(n ast.Node, params map[string]bool, out map[string]bool) 
 		return
 	}
 	if ep, ok := n.(*ast.ExprPos); ok {
-		// ExprPos.Children elides the wrapped node itself
 		collectFalseTests(ep.Expr, params, out)
 		return
 	}
@@ -132,7 +122,7 @@ func collectFalseTests(n ast.Node, params map[string]bool, out map[string]bool) 
 
 // index of the first top-level `if <false-test of any param> { ...always exits }`:
 // past that guard the body never sees the sentinel, so demands taken there
-// would wrongly bind callers that pass it.
+// would wrongly bind callers that pass it
 func sentinelCutoff(fn *ast.Function, params map[string]bool) int {
 	for i, stmt := range fn.Body {
 		iff, ok := stmt.(*ast.If)
@@ -209,7 +199,7 @@ func (d *demandCtx) callDemands(call *ast.Call) bool {
 	for i := range call.Args {
 		arg := &call.Args[i]
 		if isAtArg(arg) {
-			break // spread: positional reasoning is dead for the rest
+			break 
 		}
 		id := bareIdent(arg.E)
 		if id == nil {
@@ -220,7 +210,7 @@ func (d *demandCtx) callDemands(call *ast.Call) bool {
 			continue
 		}
 		if d.env.GetType(arg.E) != TUnknown || d.env.GetType(id) != TUnknown {
-			continue // narrowing already typed this use; it proves nothing about the caller
+			continue 
 		}
 		callee := matchParam(sig, arg, i)
 		if callee == nil || !cleanRequirement(callee.Typ) {
@@ -275,8 +265,6 @@ func calleeDisplay(call *ast.Call) string {
 	return calleeName(call)
 }
 
-// a requirement must be a clean concrete primitive - dirty or union demands
-// stay advisory and produce nothing.
 func cleanRequirement(t DynType) bool {
 	p, ok := t.(Primitive)
 	return ok && p != TUnknown && p != TVoid
@@ -293,8 +281,6 @@ func bareIdent(e ast.Expr) *ast.Ident {
 	return id
 }
 
-// every name the method writes to; a reassigned param's uses say nothing
-// about its entry value, so it never picks up a requirement.
 func assignedNames(fn *ast.Function) map[string]bool {
 	names := map[string]bool{}
 	var walk func(n ast.Node)

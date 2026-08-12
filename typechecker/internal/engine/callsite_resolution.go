@@ -226,7 +226,6 @@ func dispatchThisCall(name string, args []ast.Arg, env TypeEnv, annotations Anno
 	return d
 }
 
-// builtin static: Date.Begin(), keyed "ClassName.MethodName".
 func dispatchGlobalStatic(class, name string, args []ast.Arg, env TypeEnv, annotations AnnotationSet) callDispatch {
 	if sigs := annotations[class+"."+name]; len(sigs) > 0 {
 		return callDispatch{
@@ -355,7 +354,8 @@ func methodSigs(sigs []Signature) []Signature {
 	return sigs
 }
 
-// receiver unknown: guess by scanning builtin method names. results land in GuessedCalls, so checks warn, never error - GuessTaintPass carries the provenance through locals and chained receivers.
+// receiver unknown: guess by scanning builtin method names. results in GuessedCalls, so checks warn, never error
+// GuessTaintPass carries the provenance through locals and chained receivers
 func scanByName(sigs []Signature, name string) callDispatch {
 	switch len(sigs) {
 	case 0:

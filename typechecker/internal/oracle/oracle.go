@@ -1,4 +1,3 @@
-// Package oracle is the independent test model for the typealgebra spec: CanonArms reimplements Fold's collapse on purpose - never "simplify" it to call Fold or the properties comparing them go vacuous.
 package oracle
 
 import (

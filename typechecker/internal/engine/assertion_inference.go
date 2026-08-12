@@ -8,7 +8,7 @@ import (
 )
 
 // treats `Assert(cond)` whose condition constrains a class
-// member as a class-wide ground truth.
+// member as a class-wide ground truth
 //
 // ```suneido
 //
@@ -18,34 +18,7 @@ import (
 //	}
 //
 // ```
-//
-// the assert in New pins .x and .y to Number for the whole class (the inline
-// init params x / y ARE the members x / y). once pinned, the normal operator
-// and return checks flag any later use that contradicts the asserted type,
-// and a `.x = ...` assignment whose RHS **provably** isn't a Number errors here.
-//
-// class-wide pins come ONLY from New - the constructor runs first, so its
-// asserts are instance-lifetime invariants. asserts in other methods are
-// program-point runtime checks: FlowNarrowingPass applies them as guard
-// refinements for the rest of the method. a non-New assert that contradicts
-// a New-pinned truth (Number? in New, String? elsewhere) raises a conflict.
-//
-// `Assert(Number?(x) or String?(x))` pins x to number|string .
-// member targets come from two shapes: a direct `.x` Mem, or a bare local that
-// is an inline-init param of the enclosing method (which is the member by
-// another name). plain locals are ignored - asserting a local's type is a
-// method-scoped fact, not a member ground truth.
-//
-// public members (capitalized name - a `.X` member or a `.X` inline-init param)
-// are never pinned: external code can reassign a public member after
-// construction (`obj.X = anything`), so an Assert about it is not a reliable
-// class-wide invariant. only private (lowercase) members have the closed-world
-// guarantee that makes the ground truth sound. (a capitalized bare name is also
-// a global to the parser, so a public inline-init param isn't refinable by bare
-// name regardless - this guard covers the direct `.X` form.)
-//
-// returns true when it pinned at least one member, so the caller can skip the
-// follow-up NameResolution / ReturnUnion re-run for the common assert-free class.
+
 // ```suneido
 // New() { Assert(Number?(.count)) }
 //

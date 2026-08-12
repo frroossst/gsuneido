@@ -6,7 +6,6 @@ import (
 	"github.com/apmckinlay/gsuneido/core"
 )
 
-// Types/InGuard and Members/MemberInGuard are parallel maps: update them in lockstep or guard provenance goes wrong.
 type narrowScope struct {
 	Types               map[string]DynType
 	InGuard             map[string]bool
@@ -74,7 +73,7 @@ func unwrapTarget(e ast.Expr) (narrowTarget, bool) {
 }
 
 // peelParens strips position and parenthesis wrappers to reach the expression
-// that actually carries a type stamp.
+// that actually carries a type stam
 func peelParens(e ast.Expr) ast.Expr {
 	for {
 		switch x := e.(type) {
@@ -177,7 +176,7 @@ func initialNarrowScope(fn *ast.Function, env TypeEnv) narrowScope {
 	return sc
 }
 
-//nolint:gocognit,gocyclo,funlen // exhaustive AST dispatch
+//nolint:gocognit,gocyclo,funlen 
 func narrowWalk(n ast.Node, env TypeEnv, sc narrowScope) {
 	if n == nil {
 		return
@@ -402,7 +401,7 @@ type loopWrites struct {
 }
 
 // `v = v` cannot change v's value on any iteration, so it does not
-// invalidate a loop-entry fact. only plain `=` qualifies: `v += v` widens.
+// invalidate a loop-entry fact. only plain `=` qualifies: `v += v` widens
 func selfAssign(b *ast.Binary) bool {
 	if b.Tok != tok.Eq {
 		return false
@@ -490,7 +489,6 @@ func memberTypeAcrossCall(name string, sc narrowScope, env TypeEnv) (DynType, bo
 	return rf, true
 }
 
-// typeHasBoolish reports whether t has a True or Boolean arm.
 func typeHasBoolish(t DynType) bool {
 	switch x := t.(type) {
 	case Primitive:
@@ -518,7 +516,7 @@ func walkBlock(stmts []ast.Statement, env TypeEnv, sc narrowScope) {
 	}
 }
 
-// the Assert(...) call of an expression-statement, if stmt is one.
+// the Assert(...) call of an expression-statement, if stmt is one
 func assertStmtCall(stmt ast.Statement) (*ast.Call, bool) {
 	es, ok := stmt.(*ast.ExprStmt)
 	if !ok || es.E == nil {
@@ -589,7 +587,7 @@ func applyAssertStmt(call *ast.Call, sc narrowScope, env TypeEnv) {
 
 // the sole non-msg named arg of a matcher-style Assert; ok=false means old
 // style (condition form). unrecognized matchers still return ok=true so the
-// condition path is not misapplied to a matcher subject.
+// condition path is not misapplied to a matcher subject
 func assertMatcher(call *ast.Call) (name string, arg ast.Expr, ok bool) {
 	for i := range call.Args {
 		a := &call.Args[i]
@@ -786,7 +784,7 @@ func joinBranchKills(x *ast.If, sc narrowScope, preTypes, preMembers map[string]
 // joinReachingFacts intersects the pre-if refinements against every route that
 // reaches past the if, writing the survivors back into vals/guard. A name keeps
 // its refinement only if all routes still refine it, at the union of the types
-// they give it; whatever any route dropped is dropped here too.
+// they give it; whatever any route dropped is dropped here too!
 func joinReachingFacts(pre map[string]DynType, routes []map[string]DynType,
 	vals map[string]DynType, guard map[string]bool) {
 	for name := range pre {
@@ -836,7 +834,7 @@ func branchAlwaysExits(s ast.Statement) bool {
 	return false
 }
 
-//nolint:gocognit,gocyclo // exhaustive union/primitive case analysis
+//nolint:gocognit,gocyclo 
 func isNarrower(a, b DynType) bool {
 	if a == nil || b == nil {
 		return false
@@ -853,9 +851,9 @@ func isNarrower(a, b DynType) bool {
 		return false
 	}
 	// any clean type is strictly narrower than any dirty one: dirty admits
-	// unknown values, clean is a proof. without this an assignment whose RHS
+	// unknown values, without this an assignment whose RHS
 	// narrowing cleaned (e.g. a ternary arm reading a guarded param) cannot
-	// rescue the local from its stale pre-narrowing dirty flow stamp.
+	// rescue the local from its stale pre-narrowing dirty flow stamp
 	if _, bDirty := decomposeForCheck(b); bDirty {
 		if _, aDirty := decomposeForCheck(a); !aDirty {
 			return true
@@ -1065,7 +1063,8 @@ type savedNode struct {
 	ty      DynType
 }
 
-// the chain walk stamps speculative types into env.Nodes; restoreEnvStamps must undo them or narrowed types leak outside the guard.
+// the chain walk stamps speculative types into env.Nodes; restoreEnvStamps 
+// must undo them or narrowed types leak outside the guard.
 func overrideEnvWithScopeBaseline(e ast.Expr, sc narrowScope, env TypeEnv) []savedNode {
 	var saved []savedNode
 	var walk func(n ast.Node)
@@ -1429,7 +1428,7 @@ func boolIntersect(targets []DynType) DynType {
 	return TVoid
 }
 
-// dual of boolIntersect - removing [TFalse] leaves TTrue, etc.
+// dual of boolIntersect removing [TFalse] leaves TTrue, etc.
 func boolComplement(targets []DynType) DynType {
 	removeF, removeT := false, false
 	for _, tgt := range targets {

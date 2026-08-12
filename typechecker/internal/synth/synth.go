@@ -1,6 +1,4 @@
 // Package synth generates random Suneido class sources for property-based
-// testing: an IR, a renderer, a general (possibly ill-typed) generator, and a
-// well-typed generator whose programs carry their own ground-truth types.
 package synth
 
 import (

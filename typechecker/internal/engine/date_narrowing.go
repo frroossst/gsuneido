@@ -67,7 +67,7 @@ func proveDateCall(call *ast.Call) dateProof {
 		a := &call.Args[i]
 		c, ok := unwrapConstant(a.E)
 		if !ok {
-			return dateUnprovable // non-constant arg -> can't decide either way
+			return dateUnprovable 
 		}
 		var idx int
 		if a.Name != nil {
@@ -119,7 +119,7 @@ func evalConstDate(slot *[9]core.Value, has [9]bool) (proof dateProof) {
 func evalDateString(slot *[9]core.Value, has [9]bool) dateProof {
 	v := slot[0]
 	if isDateValue(v) {
-		return dateProvenValid // an already-constructed date/timestamp literal
+		return dateProvenValid
 	}
 	s := core.AsStr(v)
 	if strings.HasPrefix(s, "#") || isTimestampLiteral(s) {
