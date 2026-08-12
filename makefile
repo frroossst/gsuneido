@@ -85,7 +85,7 @@ deploy : git-status gs_windows_amd64.exe gs_windows_amd64_gui.exe \
 git-status :
 	@test -z "$(shell git status --porcelain)"
 
-PBT_PKGS     = ./typechecker/typeinfer/internal/engine/ ./typechecker/typeinfer/typealgebra/
+PBT_PKGS     = ./typechecker/internal/engine/ ./typechecker/typealgebra/
 PBT_ITERS   ?= 500
 PBT_TIMEOUT ?= 30m
 

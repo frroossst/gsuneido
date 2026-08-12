@@ -11,8 +11,8 @@ import (
 
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/options"
-	"github.com/apmckinlay/gsuneido/typechecker/typeinfer"
-	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/annotations"
+	"github.com/apmckinlay/gsuneido/typechecker"
+	"github.com/apmckinlay/gsuneido/typechecker/annotations"
 )
 
 type suTypeChecker struct {
@@ -45,7 +45,7 @@ func loadTypeCheckerAnnotations() {
 	for i, ts := range builtinTypeSignatures {
 		imported[i] = annotations.TypeSignature(ts)
 	}
-	typeinfer.LoadAnnotations(imported)
+	typechecker.LoadAnnotations(imported)
 }
 
 var _ = staticMethod(typechecker_Infer,
@@ -86,7 +86,7 @@ var typecheckerMembersOnce sync.Once
 var typecheckerMembers *SuObject
 
 func runTypeChecker(method, meth string, arguments, references, config Value) Value {
-	res, err := typeinfer.Process(typeinfer.Request{
+	res, err := typechecker.Process(typechecker.Request{
 		Method:     method,
 		Arguments:  sourceEntries(arguments, meth, "arguments"),
 		References: sourceEntries(references, meth, "references"),
@@ -104,14 +104,14 @@ func runTypeChecker(method, meth string, arguments, references, config Value) Va
 }
 
 // each element is a source string, or an object with src and optional name
-func sourceEntries(v Value, meth, kind string) []typeinfer.SourceEntry {
+func sourceEntries(v Value, meth, kind string) []typechecker.SourceEntry {
 	ob := ToContainer(v)
-	entries := make([]typeinfer.SourceEntry, ob.ListSize())
+	entries := make([]typechecker.SourceEntry, ob.ListSize())
 	for i := range entries {
 		el := ob.ListGet(i)
 		name := fmt.Sprintf("Class%d", i)
 		if src, ok := el.ToStr(); ok {
-			entries[i] = typeinfer.SourceEntry{Name: name, Src: src}
+			entries[i] = typechecker.SourceEntry{Name: name, Src: src}
 			continue
 		}
 		e, ok := el.ToContainer()
@@ -126,7 +126,7 @@ func sourceEntries(v Value, meth, kind string) []typeinfer.SourceEntry {
 		if nm := e.GetIfPresent(nil, SuStr("name")); nm != nil && ToStr(nm) != "" {
 			name = ToStr(nm)
 		}
-		entries[i] = typeinfer.SourceEntry{Name: name, Src: ToStr(src)}
+		entries[i] = typechecker.SourceEntry{Name: name, Src: ToStr(src)}
 	}
 	return entries
 }
@@ -150,7 +150,7 @@ func resultsOb(results []any, meth string) Value {
 	ob := &SuObject{}
 	for _, r := range results {
 		switch r := r.(type) {
-		case typeinfer.TypeInfo:
+		case typechecker.TypeInfo:
 			ob.Add(typeInfoOb(r))
 		case string:
 			ob.Add(SuStr(r))
@@ -161,7 +161,7 @@ func resultsOb(results []any, meth string) Value {
 	return ob
 }
 
-func typeInfoOb(ti typeinfer.TypeInfo) Value {
+func typeInfoOb(ti typechecker.TypeInfo) Value {
 	meths := &SuObject{}
 	for _, name := range slices.Sorted(maps.Keys(ti.Methods)) {
 		meths.Put(nil, SuStr(name), typeMapOb(ti.Methods[name]))
@@ -181,14 +181,14 @@ func typeMapOb(m map[string]string) Value {
 	return ob
 }
 
-func diagnosticsOb(ds typeinfer.DiagnosticSet) Value {
+func diagnosticsOb(ds typechecker.DiagnosticSet) Value {
 	ob := &SuObject{}
 	ob.Put(nil, SuStr("errors"), diagListOb(ds.Errors))
 	ob.Put(nil, SuStr("warnings"), diagListOb(ds.Warnings))
 	return ob
 }
 
-func diagListOb(ds []typeinfer.ResultDiagnostic) Value {
+func diagListOb(ds []typechecker.ResultDiagnostic) Value {
 	ob := &SuObject{}
 	for _, d := range ds {
 		e := &SuObject{}
