@@ -89,7 +89,7 @@ func (c *ClassObject) Lineage(r ClassResolver) []*ClassObject {
 	for current := c.Base; current != ""; {
 		parent, err := r.Resolve(current)
 		if err != nil {
-			break // unresolvable base: the chain is truncated here
+			break // unresolvable base
 		}
 		chain = append([]*ClassObject{parent}, chain...)
 		current = parent.Base

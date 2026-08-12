@@ -113,8 +113,7 @@ func offsetToLineCol(src string, off int) (line, col int) {
 	return
 }
 
-// parseArgument turns the compiler's panic into an error naming the class, so an
-// unparsable argument reports itself instead of unwinding the whole request.
+// the compiler panics on a syntax error - name the class and return it instead
 func parseArgument(a SourceEntry) (co *engine.ClassObject, err error) {
 	defer func() {
 		if e := recover(); e != nil {

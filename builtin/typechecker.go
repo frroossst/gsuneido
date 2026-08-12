@@ -21,10 +21,7 @@ type suTypeChecker struct {
 
 func init() {
 	Global.Builtin("TypeChecker", &suTypeChecker{})
-	// package level variable initializers - the builtin, method, and
-	// staticMethod calls that build builtinTypeSignatures - all run before
-	// any init function, so the signature table is complete by now
-	// (including this class's own methods)
+	// var initializers have all run, so the signature table is complete
 	loadTypeCheckerAnnotations()
 }
 
@@ -42,9 +39,7 @@ func (*suTypeChecker) Lookup(_ *Thread, method string) Value {
 
 var typecheckerMethods = methods("typechecker")
 
-// loadTypeCheckerAnnotations seeds the checker's builtin signature database.
-// The checker resolves calls like Object.Size() against these, so without it
-// every builtin call would be untyped.
+// without these, every builtin call would be untyped
 func loadTypeCheckerAnnotations() {
 	imported := make([]annotations.TypeSignature, len(builtinTypeSignatures))
 	for i, ts := range builtinTypeSignatures {
@@ -75,17 +70,14 @@ func typechecker_Annotations() Value {
 
 var _ = staticMethod(typechecker_Members, "() :object")
 
-// built on first call, not in a package level initializer: the staticMethod
-// registrations above fill typecheckerMethods via a side effect the
-// initialization order analysis cannot see, so a var initializer here would
-// capture whichever methods happened to be registered by then.
+// on first call, not a var initializer - registration order is not guaranteed
 func typechecker_Members() Value {
 	typecheckerMembersOnce.Do(func() {
 		names := slices.Sorted(maps.Keys(typecheckerMethods))
 		names = slices.DeleteFunc(names, func(s string) bool { return s == "Members" })
 		typecheckerMembers = SuObjectOfStrs(names)
 		typecheckerMembers.SetReadOnly()
-		typecheckerMembers.SetConcurrent() // shared, but read-only so no locking
+		typecheckerMembers.SetConcurrent() // ok since read-only
 	})
 	return typecheckerMembers
 }
@@ -93,8 +85,6 @@ func typechecker_Members() Value {
 var typecheckerMembersOnce sync.Once
 var typecheckerMembers *SuObject
 
-// runTypeChecker mirrors the JSON protocol the standalone binary spoke:
-// same two argument forms, same response envelope.
 func runTypeChecker(method, meth string, arguments, references, config Value) Value {
 	res, err := typeinfer.Process(typeinfer.Request{
 		Method:     method,
@@ -113,9 +103,7 @@ func runTypeChecker(method, meth string, arguments, references, config Value) Va
 	return ob
 }
 
-// sourceEntries accepts either wire form for each list element:
-// a bare source string, or an object with src and optional name.
-// Unnamed entries get Class0, Class1, ... to match the JSON protocol.
+// each element is a source string, or an object with src and optional name
 func sourceEntries(v Value, meth, kind string) []typeinfer.SourceEntry {
 	ob := ToContainer(v)
 	entries := make([]typeinfer.SourceEntry, ob.ListSize())
@@ -143,8 +131,7 @@ func sourceEntries(v Value, meth, kind string) []typeinfer.SourceEntry {
 	return entries
 }
 
-// configMap reads the named members as strings. Unrecognized keys are ignored
-// by the checker, and a bad value is reported by it, not here.
+// bad keys and values are reported by the checker, not here
 func configMap(v Value) map[string]string {
 	ob := ToContainer(v)
 	if ob.NamedSize() == 0 {
@@ -158,8 +145,7 @@ func configMap(v Value) map[string]string {
 	return cfg
 }
 
-// resultsOb converts one result per argument: TypeInfer yields inferred types,
-// TypeAnnotate yields the source with annotations spliced in.
+// TypeInfer yields types, TypeAnnotate yields annotated source
 func resultsOb(results []any, meth string) Value {
 	ob := &SuObject{}
 	for _, r := range results {
@@ -186,8 +172,7 @@ func typeInfoOb(ti typeinfer.TypeInfo) Value {
 	return ob
 }
 
-// typeMapOb builds name -> type. Keys are sorted so repeated calls on the
-// same source produce identical objects (Go map order is randomized).
+// sorted so repeated calls produce identical objects
 func typeMapOb(m map[string]string) Value {
 	ob := &SuObject{}
 	for _, k := range slices.Sorted(maps.Keys(m)) {
@@ -213,8 +198,7 @@ func diagListOb(ds []typeinfer.ResultDiagnostic) Value {
 		e.Put(nil, SuStr("line"), IntVal(d.Line))
 		e.Put(nil, SuStr("col"), IntVal(d.Col))
 		e.Put(nil, SuStr("msg"), SuStr(d.Msg))
-		// omitted when there is no flag, as in the JSON protocol
-		if flag := d.Flag.String(); flag != "" {
+		if flag := d.Flag.String(); flag != "" { // omitted when there is none
 			e.Put(nil, SuStr("flag"), SuStr(flag))
 		}
 		ob.Add(e)
@@ -222,7 +206,7 @@ func diagListOb(ds []typeinfer.ResultDiagnostic) Value {
 	return ob
 }
 
-// the signature table never changes after startup, so build the object once
+// never changes after startup
 var builtinSignaturesOnce sync.Once
 var builtinSignatures *SuObject
 
@@ -238,7 +222,7 @@ func builtinSignaturesOb() Value {
 			builtinSignatures.Add(e)
 		}
 		builtinSignatures.SetReadOnly()
-		builtinSignatures.SetConcurrent() // shared, but read-only so no locking
+		builtinSignatures.SetConcurrent() // ok since read-only
 	})
 	return builtinSignatures
 }

@@ -23,7 +23,7 @@ func (r Registries) Seed(env *TypeEnv) {
 	env.ClassMethodSigs = r.Sigs
 }
 
-// refs must arrive base-first; earlier refs are visible to later ones; a ref that panics is skipped silently, never fatal
+// refs must arrive base-first; a ref that panics is skipped silently
 //
 //nolint:gocognit // sequential registry build; stages share too much state to split cleanly
 func BuildReferenceRegistry(refs []RefSource) Registries {

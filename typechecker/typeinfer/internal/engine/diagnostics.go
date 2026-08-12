@@ -4,9 +4,7 @@ import (
 	"github.com/apmckinlay/gsuneido/typechecker/typeinfer/diagnostics"
 )
 
-// Aliases so the passes can talk about diagnostics without each importing the
-// diagnostics package. Only what the passes actually use lives here; session.go
-// calls diagnostics directly for the config and filtering it needs.
+// aliases so the passes don't each import the diagnostics package
 type (
 	Diagnostic = diagnostics.Diagnostic
 	Severity   = diagnostics.Severity

@@ -16,9 +16,7 @@ type (
 var builtinAnnotations = AnnotationSet{}
 
 func LoadAnnotations(imported []annotations.TypeSignature) {
-	// Load also reports the signatures it could not parse; nothing consumes
-	// that here, and annotations_test.go covers the skip reporting directly.
-	builtinAnnotations, _ = annotations.Load(imported)
+	builtinAnnotations, _ = annotations.Load(imported) // nothing here needs the skips
 }
 
 func Annotations() AnnotationSet {
