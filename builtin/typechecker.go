@@ -53,11 +53,11 @@ func typechecker_Infer(arguments, references, config Value) Value {
 	return runTypeChecker("TypeInfer", "Infer", arguments, references, config)
 }
 
-var _ = staticMethod(typechecker_InlayHints,
+var _ = staticMethod(typechecker_Annotate,
 	"(arguments :object, references :object = #(), config :object = #()) :object")
 
-func typechecker_InlayHints(arguments, references, config Value) Value {
-	return runTypeChecker("TypeAnnotate", "InlayHints", arguments, references, config)
+func typechecker_Annotate(arguments, references, config Value) Value {
+	return runTypeChecker("TypeAnnotate", "Annotate", arguments, references, config)
 }
 
 var _ = staticMethod(typechecker_Annotations, "() :object")
