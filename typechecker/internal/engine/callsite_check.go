@@ -9,7 +9,8 @@ import (
 	"github.com/apmckinlay/gsuneido/core"
 )
 
-func CallsiteCheckPass(cls *ClassObject, env TypeEnv, annotations AnnotationSet) {
+func CallsiteCheckPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
+	annotations := pctx.Annotations
 	for name, fn := range cls.SortedMethods {
 		ctx := callCheckCtx{env: env, annotations: annotations, method: name}
 		for _, stmt := range fn.Body {
@@ -18,6 +19,7 @@ func CallsiteCheckPass(cls *ClassObject, env TypeEnv, annotations AnnotationSet)
 			}
 		}
 	}
+	return false
 }
 
 type callCheckCtx struct {

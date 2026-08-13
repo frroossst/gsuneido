@@ -15,7 +15,7 @@ import (
 //	}                    is demoted because New provably always assigns non-false
 //
 // ```
-func ConstructorExecPass(cls *ClassObject, env TypeEnv) bool {
+func ConstructorExecPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	newFn, ok := cls.Methods["New"]
 	if !ok {
 		return false

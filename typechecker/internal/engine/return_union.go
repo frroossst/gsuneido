@@ -28,7 +28,7 @@ import (
 //	}
 //
 // ```
-func ReturnUnionPass(cls *ClassObject, env TypeEnv) {
+func ReturnUnionPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for name, fn := range cls.SortedMethods {
 		if declared, ok := env.AnnotatedReturns[name]; ok {
 			checkBodyReturns(name, fn, env, declared)
@@ -37,6 +37,7 @@ func ReturnUnionPass(cls *ClassObject, env TypeEnv) {
 			env.PublishReturn(name, inferBodyReturnReachable(fn, freeParamOverrides(fn), env))
 		}
 	}
+	return false
 }
 
 func collectReturns(n ast.Node, env TypeEnv, acc *DynType) {

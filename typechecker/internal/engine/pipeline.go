@@ -6,8 +6,48 @@ import (
 	"strings"
 )
 
-type Pipeline struct {
-	Annotations AnnotationSet
+// PassCtx carries what individual passes need beyond the class and the env.
+// Most passes use none of it.
+type PassCtx struct {
+	Annotations   AnnotationSet
+	ParentReturns map[string]DynType
+}
+
+// NewPassCtx builds the context for one run. Annotations() copies the builtin
+// signature table, so hoist this out of any loop over classes.
+func NewPassCtx() *PassCtx {
+	return &PassCtx{Annotations: Annotations()}
+}
+
+// Pass reports whether it changed anything that warrants re-running other
+// passes. Only AssertMemberPass, ConstructorExecPass and RequirementPass can
+// say yes; the rest always return false.
+type Pass func(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool
+
+// every pipeline pass, checked against Pass at compile time
+var _ = [...]Pass{
+	ArityCheckPass,
+	AssertAssignmentCheckPass,
+	AssertMemberPass,
+	BooleanConditionCheckPass,
+	CallsiteCheckPass,
+	CallsiteResolutionPass,
+	CapabilityCheckPass,
+	ComputeSummaries,
+	ConstructorExecPass,
+	DateNarrowingPass,
+	FlowNarrowingPass,
+	GuessTaintPass,
+	LocalInference,
+	MemberAssignmentPass,
+	MemberDirtyPass,
+	NameResolutionPass,
+	RefreshTrinaryTypes,
+	RequirementPass,
+	ReturnUnionPass,
+	StaticMemberCheckPass,
+	SuperCallsiteResolutionPass,
+	TypeCheckPass,
 }
 
 const maxFixpointPasses = 64
@@ -54,11 +94,8 @@ func iterateToFixpoint(env TypeEnv, body func()) {
 	}
 }
 
-func DefaultPipeline() Pipeline {
-	return Pipeline{Annotations: Annotations()}
-}
-
-func (p Pipeline) Run(cls *ClassObject, env TypeEnv, parentReturns map[string]DynType) {
+func RunPipeline(cls *ClassObject, env TypeEnv, pctx *PassCtx,
+	parentReturns map[string]DynType) {
 	if parentReturns == nil {
 		parentReturns = map[string]DynType{}
 	}
@@ -66,74 +103,77 @@ func (p Pipeline) Run(cls *ClassObject, env TypeEnv, parentReturns map[string]Dy
 	// sigs must be bound before the first CallsiteResolutionPass
 	env = env.WithClass(cls, buildMethodSigs(cls))
 
-	DateNarrowingPass(cls, env)
+	pctx.ParentReturns = parentReturns
 
-	LocalInference(cls, env)
-	NameResolutionPass(cls, env)
-	MemberAssignmentPass(cls, env)
-	ReturnUnionPass(cls, env)
+	DateNarrowingPass(cls, env, pctx)
+
+	LocalInference(cls, env, pctx)
+	NameResolutionPass(cls, env, pctx)
+	MemberAssignmentPass(cls, env, pctx)
+	ReturnUnionPass(cls, env, pctx)
 
 	iterateToFixpoint(env, func() {
-		CallsiteResolutionPass(cls, env, p.Annotations)
-		SuperCallsiteResolutionPass(cls, env, parentReturns)
-		NameResolutionPass(cls, env)
-		MemberAssignmentPass(cls, env)
-		ReturnUnionPass(cls, env)
+		CallsiteResolutionPass(cls, env, pctx)
+		SuperCallsiteResolutionPass(cls, env, pctx)
+		NameResolutionPass(cls, env, pctx)
+		MemberAssignmentPass(cls, env, pctx)
+		ReturnUnionPass(cls, env, pctx)
 	})
 
-	MemberDirtyPass(cls, env)
+	MemberDirtyPass(cls, env, pctx)
 	// MemberAssignmentPass is deliberately NOT re-run after MemberDirtyPass
-	NameResolutionPass(cls, env)
-	ReturnUnionPass(cls, env)
+	NameResolutionPass(cls, env, pctx)
+	ReturnUnionPass(cls, env, pctx)
 
 	// after member unions have settled, before the narrowing phase; re-stamp only if it pinned something
-	if AssertMemberPass(cls, env) {
-		NameResolutionPass(cls, env)
-		ReturnUnionPass(cls, env)
+	if AssertMemberPass(cls, env, pctx) {
+		NameResolutionPass(cls, env, pctx)
+		ReturnUnionPass(cls, env, pctx)
 	}
 
-	if ConstructorExecPass(cls, env) {
+	if ConstructorExecPass(cls, env, pctx) {
 		env.CaptureSeedReturns()
-		CallsiteResolutionPass(cls, env, p.Annotations)
-		ReturnUnionPass(cls, env)
+		CallsiteResolutionPass(cls, env, pctx)
+		ReturnUnionPass(cls, env, pctx)
 	}
 
 	// NameResolutionPass is intentionally omitted from this loop (it would undo the narrowing)
 	iterateToFixpoint(env, func() {
-		FlowNarrowingPass(cls, env)
-		RefreshTrinaryTypes(cls, env)
-		CallsiteResolutionPass(cls, env, p.Annotations)
-		SuperCallsiteResolutionPass(cls, env, parentReturns)
+		FlowNarrowingPass(cls, env, pctx)
+		RefreshTrinaryTypes(cls, env, pctx)
+		CallsiteResolutionPass(cls, env, pctx)
+		SuperCallsiteResolutionPass(cls, env, pctx)
 		clearReturnDiagnostics(env) // scrub warnings from earlier iterations that later ones invalidated
-		ReturnUnionPass(cls, env)
+		ReturnUnionPass(cls, env, pctx)
 	})
 
 	// check passes from here down: order-independent among themselves, strictly after the narrowing loop
 
 	// taint locals fed by guesses so the checks below can downgrade
-	GuessTaintPass(cls, env)
+	GuessTaintPass(cls, env, pctx)
 
 	// after taint (so guessed sigs are excluded), before the checks that
 	// consume the inferred param requirements
-	RequirementPass(cls, env)
+	// its "changed" result matters only to the registry fixpoint, not here
+	RequirementPass(cls, env, pctx)
 
 	// after the narrowing loop so RHS stamps inside guards are narrowed.
-	AssertAssignmentCheckPass(cls, env)
+	AssertAssignmentCheckPass(cls, env, pctx)
 
-	TypeCheckPass(cls, env)
+	TypeCheckPass(cls, env, pctx)
 
 	// after FlowNarrowing (above) so narrowed condition types are visible.
-	BooleanConditionCheckPass(cls, env)
+	BooleanConditionCheckPass(cls, env, pctx)
 
-	CallsiteCheckPass(cls, env, p.Annotations)
+	CallsiteCheckPass(cls, env, pctx)
 
-	ArityCheckPass(cls, env)
+	ArityCheckPass(cls, env, pctx)
 
-	StaticMemberCheckPass(cls, env)
+	StaticMemberCheckPass(cls, env, pctx)
 
-	CapabilityCheckPass(cls, env)
+	CapabilityCheckPass(cls, env, pctx)
 
-	ComputeSummaries(cls, env)
+	ComputeSummaries(cls, env, pctx)
 }
 
 // keep in sync with the "return type ..." diagnostics ReturnUnionPass emits

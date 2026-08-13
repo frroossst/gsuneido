@@ -147,7 +147,7 @@ var typeStringTargets = map[string][]DynType{
 	"Block":    {TBlock},
 }
 
-func FlowNarrowingPass(cls *ClassObject, env TypeEnv) {
+func FlowNarrowingPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	assignedFalse := membersAssignedFalse(cls, env)
 	writes := ComputeMemberWrites(cls)
 	postconds := ComputeBoolPostconditions(cls, env, assignedFalse, writes)
@@ -158,6 +158,7 @@ func FlowNarrowingPass(cls *ClassObject, env TypeEnv) {
 		sc.postconds = postconds
 		walkBlock(fn.Body, env, sc)
 	}
+	return false
 }
 
 func initialNarrowScope(fn *ast.Function, env TypeEnv) narrowScope {

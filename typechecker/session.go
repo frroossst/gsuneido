@@ -148,13 +148,13 @@ func Process(req Request) (Result, error) {
 
 	env := engine.NewTypeEnv()
 	regs.Seed(&env)
-	pipeline := engine.DefaultPipeline()
+	pctx := engine.NewPassCtx()
 	parentReturns := map[string]typealgebra.DynType{}
 	results := make([]any, len(parsed))
 	var collected []rankedDiag
 	for i, c := range parsed {
 		class := req.Arguments[i].Name
-		pipeline.Run(c, env, parentReturns)
+		engine.RunPipeline(c, env, pctx, parentReturns)
 		switch req.Method {
 		case "TypeInfer":
 			results[i] = TypeInfo{

@@ -28,7 +28,7 @@ quiet: true }`
 		t.Fatal("class did not parse")
 	}
 	env := NewTypeEnv()
-	LocalInference(cls, env)
+	LocalInference(cls, env, &PassCtx{})
 
 	if got := env.Members["Pub"]; func() bool {
 		u, ok := got.(Union)

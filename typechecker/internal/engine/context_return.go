@@ -296,15 +296,16 @@ func computeSummary(fn *ast.Function, env TypeEnv) ReturnSummary {
 //	^^^^^^^ non-false arm -> the argument's type
 //
 // ```
-func ComputeSummaries(cls *ClassObject, env TypeEnv) {
+func ComputeSummaries(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	if env.Summaries == nil {
-		return
+		return false
 	}
 	for name, fn := range cls.SortedMethods {
 		if s := computeSummary(fn, env); s.Param != "" {
 			env.Summaries[name] = s
 		}
 	}
+	return false
 }
 
 func resolveDiscriminatorType(s ReturnSummary, args []ast.Arg, env TypeEnv) (DynType, bool) {

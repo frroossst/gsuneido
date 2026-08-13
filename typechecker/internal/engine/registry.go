@@ -33,7 +33,7 @@ func BuildReferenceRegistry(refs []RefSource) Registries {
 		Bases:     make(map[string]string, len(refs)),
 		Sigs:      make(map[string]map[string]*Signature, len(refs)),
 	}
-	pipeline := DefaultPipeline()
+	pctx := NewPassCtx()
 	type refState struct {
 		cls *ClassObject
 		env TypeEnv
@@ -49,7 +49,7 @@ func BuildReferenceRegistry(refs []RefSource) Registries {
 			if cls.Base != "" {
 				parentReturns = r.Returns[cls.Base]
 			}
-			pipeline.Run(cls, env, parentReturns)
+			RunPipeline(cls, env, pctx, parentReturns)
 			r.Sigs[ref.Name] = ClassMethodSignatures(cls)
 
 			env = env.WithClass(cls, r.Sigs[ref.Name])
@@ -93,8 +93,8 @@ func BuildReferenceRegistry(refs []RefSource) Registries {
 			s := &states[i]
 			func() {
 				defer func() { _ = recover() }()
-				CallsiteResolutionPass(s.cls, s.env, pipeline.Annotations)
-				if RequirementPass(s.cls, s.env) {
+				CallsiteResolutionPass(s.cls, s.env, pctx)
+				if RequirementPass(s.cls, s.env, pctx) {
 					changed = true
 				}
 			}()

@@ -17,7 +17,7 @@ func memberName(n ast.Node) (string, bool) {
 
 type scope map[string]DynType
 
-func NameResolutionPass(cls *ClassObject, env TypeEnv) {
+func NameResolutionPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for _, fn := range cls.SortedMethods {
 		sc := make(scope, len(fn.Params)+8)
 		for i := range fn.Params {
@@ -37,6 +37,7 @@ func NameResolutionPass(cls *ClassObject, env TypeEnv) {
 		}
 		walkStmtList(fn.Body, env, sc)
 	}
+	return false
 }
 
 func walkStmtList(stmts []ast.Statement, env TypeEnv, sc scope) {

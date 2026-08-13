@@ -26,7 +26,7 @@ import (
 //	                class-wide, overriding the assignment union
 //
 // ```
-func AssertMemberPass(cls *ClassObject, env TypeEnv) bool {
+func AssertMemberPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	gts := collectAssertGroundTruths(cls, env)
 	checkLocalAssertContradictions(cls, env, gts)
 	if len(gts) == 0 {
@@ -45,15 +45,16 @@ type AssertFact struct {
 	Pos    int
 }
 
-func AssertAssignmentCheckPass(cls *ClassObject, env TypeEnv) {
+func AssertAssignmentCheckPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	if len(env.AssertedMembers) == 0 {
-		return
+		return false
 	}
 	gts := map[string]assertGroundTruth{}
 	for name, f := range env.AssertedMembers {
 		gts[name] = assertGroundTruth{ty: f.Ty, method: f.Method, pos: f.Pos}
 	}
 	checkAssertAssignments(cls, env, gts)
+	return false
 }
 
 func checkLocalAssertContradictions(cls *ClassObject, env TypeEnv, gts map[string]assertGroundTruth) {

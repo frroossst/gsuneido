@@ -18,7 +18,7 @@ import (
 // clears every inferred slot and the iteration re-derives from scratch under
 // the larger (sticky, grow-only) conflict set. once conflicts stabilize the
 // system is monotone, so the result is order-independent
-func RequirementPass(cls *ClassObject, env TypeEnv) bool {
+func RequirementPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	changed := false
 	for range maxFixpointPasses {
 		before := len(env.ReqConflicts)

@@ -11,9 +11,10 @@ import (
 //	              not this class's overrides
 //
 // ```
-func SuperCallsiteResolutionPass(cls *ClassObject, env TypeEnv, parentReturns map[string]DynType) {
+func SuperCallsiteResolutionPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
+	parentReturns := pctx.ParentReturns
 	if len(parentReturns) == 0 {
-		return
+		return false
 	}
 	for _, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
@@ -22,6 +23,7 @@ func SuperCallsiteResolutionPass(cls *ClassObject, env TypeEnv, parentReturns ma
 			}
 		}
 	}
+	return false
 }
 
 func annotateSuperCalls(n ast.Node, env TypeEnv, parentReturns map[string]DynType) {

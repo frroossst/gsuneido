@@ -17,12 +17,13 @@ import (
 //	^^^^^^^^^^^^ literal never parses -> False
 //
 // ```
-func DateNarrowingPass(cls *ClassObject, env TypeEnv) {
+func DateNarrowingPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for _, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
 			walkDateCalls(stmt, env)
 		}
 	}
+	return false
 }
 
 type dateProof int

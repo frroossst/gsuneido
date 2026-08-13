@@ -16,7 +16,7 @@ import (
 //	^ checks on v warn, never error
 //
 // ```
-func GuessTaintPass(cls *ClassObject, env TypeEnv) {
+func GuessTaintPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for name, fn := range cls.SortedMethods {
 		for changed := true; changed; {
 			changed = false
@@ -27,6 +27,7 @@ func GuessTaintPass(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 func taintWalk(n ast.Node, method string, env TypeEnv) bool {

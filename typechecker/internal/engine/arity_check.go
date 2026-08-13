@@ -19,7 +19,7 @@ import (
 //	^^^^^^^^^^^^ too many arguments
 //
 // ```
-func ArityCheckPass(cls *ClassObject, env TypeEnv) {
+func ArityCheckPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for name, fn := range cls.SortedMethods {
 		if fn == nil {
 			continue
@@ -31,6 +31,7 @@ func ArityCheckPass(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 type arityCtx struct {

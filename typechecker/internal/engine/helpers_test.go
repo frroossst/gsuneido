@@ -32,7 +32,7 @@ func runPassesWith(src, name string, seed func(*TypeEnv)) (*ClassObject, TypeEnv
 	if seed != nil {
 		seed(&env)
 	}
-	DefaultPipeline().Run(cls, env, nil)
+	RunPipeline(cls, env, NewPassCtx(), nil)
 	return cls, env
 }
 

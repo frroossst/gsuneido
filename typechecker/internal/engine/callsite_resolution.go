@@ -4,7 +4,8 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 )
 
-func CallsiteResolutionPass(cls *ClassObject, env TypeEnv, annotations AnnotationSet) {
+func CallsiteResolutionPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
+	annotations := pctx.Annotations
 	for _, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
 			if stmt != nil {
@@ -12,6 +13,7 @@ func CallsiteResolutionPass(cls *ClassObject, env TypeEnv, annotations Annotatio
 			}
 		}
 	}
+	return false
 }
 
 func annotateCallNodes(n ast.Node, env TypeEnv, annotations AnnotationSet) {
@@ -168,7 +170,7 @@ func dispatchFreeCall(name string, args []ast.Arg, env TypeEnv, annotations Anno
 			s := &annotations[name][i]
 			return callDispatch{
 				Kind:    dispatchMatched,
-				Returns: sig.Returns,
+				Returns: blockFormReturn(s, args),
 				Sig:     s,
 				Method:  name,
 			}

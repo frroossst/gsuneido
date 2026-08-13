@@ -10,7 +10,7 @@ import (
 )
 
 // collects and types simple class literals for a given class
-func LocalInference(cls *ClassObject, env TypeEnv) {
+func LocalInference(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	// these are simple members for which we can 100% know the types like
 	// ```suneido
 	// class {
@@ -90,6 +90,7 @@ func LocalInference(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 func paramAnnotationType(p *ast.Param, fnName string, env TypeEnv) (DynType, bool) {
@@ -194,7 +195,7 @@ func trinaryType(x *ast.Trinary, env TypeEnv) DynType {
 	}
 }
 
-func RefreshTrinaryTypes(cls *ClassObject, env TypeEnv) {
+func RefreshTrinaryTypes(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for _, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
 			if stmt != nil {
@@ -202,6 +203,7 @@ func RefreshTrinaryTypes(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 func refreshExprWalk(n ast.Node, env TypeEnv) {

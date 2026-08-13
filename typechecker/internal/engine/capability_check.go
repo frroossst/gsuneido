@@ -13,7 +13,7 @@ import (
 //	^^^^ throws on every path where Query1 returned false
 //
 // ```
-func CapabilityCheckPass(cls *ClassObject, env TypeEnv) {
+func CapabilityCheckPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for name, fn := range cls.SortedMethods {
 		ctx := capCheckCtx{
 			env:    env,
@@ -29,6 +29,7 @@ func CapabilityCheckPass(cls *ClassObject, env TypeEnv) {
 			ctx.walk(stmt, 0)
 		}
 	}
+	return false
 }
 
 type capability int

@@ -27,7 +27,7 @@ func safeRun(cls *ClassObject) (env TypeEnv, panicMsg string) {
 		}
 	}()
 	env = NewTypeEnv()
-	DefaultPipeline().Run(cls, env, nil)
+	RunPipeline(cls, env, NewPassCtx(), nil)
 	return env, ""
 }
 

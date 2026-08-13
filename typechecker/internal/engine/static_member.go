@@ -21,7 +21,7 @@ func ClassStaticMemberTypes(cls *ClassObject) map[string]DynType {
 //	               (SuClass get1: own members, then the base chain)
 //
 // ```
-func StaticMemberCheckPass(cls *ClassObject, env TypeEnv) {
+func StaticMemberCheckPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for name, fn := range cls.SortedMethods {
 		targets := map[ast.Node]bool{}
 		for _, stmt := range fn.Body {
@@ -31,6 +31,7 @@ func StaticMemberCheckPass(cls *ClassObject, env TypeEnv) {
 			checkStaticReads(stmt, name, env, targets)
 		}
 	}
+	return false
 }
 
 func collectCallTargets(n ast.Node, targets map[ast.Node]bool) {

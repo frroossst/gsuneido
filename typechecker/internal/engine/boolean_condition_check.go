@@ -14,7 +14,7 @@ import (
 //	^^^^^^ Number - not a valid boolean condition
 //
 // ```
-func BooleanConditionCheckPass(cls *ClassObject, env TypeEnv) {
+func BooleanConditionCheckPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for name, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
 			if stmt != nil {
@@ -22,6 +22,7 @@ func BooleanConditionCheckPass(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 func checkConditionsIn(n ast.Node, method string, env TypeEnv) {

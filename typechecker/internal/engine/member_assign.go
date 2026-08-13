@@ -19,7 +19,7 @@ import (
 //	}
 //
 // ```
-func MemberAssignmentPass(cls *ClassObject, env TypeEnv) {
+func MemberAssignmentPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for _, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
 			if stmt != nil {
@@ -27,6 +27,7 @@ func MemberAssignmentPass(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 // matches `this.name = rhs` with a literal member name
@@ -79,7 +80,7 @@ func collectThisAssignments(n ast.Node, env TypeEnv) {
 //	}
 //
 // ```
-func MemberDirtyPass(cls *ClassObject, env TypeEnv) {
+func MemberDirtyPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for _, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
 			if stmt != nil {
@@ -87,6 +88,7 @@ func MemberDirtyPass(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 func dirtyThisAssignments(n ast.Node, env TypeEnv) {

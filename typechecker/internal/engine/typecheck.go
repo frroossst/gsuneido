@@ -7,7 +7,7 @@ import (
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 )
 
-func TypeCheckPass(cls *ClassObject, env TypeEnv) {
+func TypeCheckPass(cls *ClassObject, env TypeEnv, pctx *PassCtx) bool {
 	for name, fn := range cls.SortedMethods {
 		for _, stmt := range fn.Body {
 			if stmt != nil {
@@ -15,6 +15,7 @@ func TypeCheckPass(cls *ClassObject, env TypeEnv) {
 			}
 		}
 	}
+	return false
 }
 
 func checkOperatorsIn(n ast.Node, method string, env TypeEnv) {
