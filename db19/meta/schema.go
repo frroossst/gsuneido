@@ -121,7 +121,6 @@ func ReadSchema(_ *stor.Stor, r *stor.Reader) *Schema {
 // Ixspecs sets up the ixspecs for a table's indexes.
 func (ts *Schema) Ixspecs(nold int) {
 	ts.setPrimary()
-	ts.setContainsKey()
 	for i := nold; i < len(ts.Indexes); i++ {
 		ix := &ts.Indexes[i]
 		assert.That(ix.Mode == 'k' || ix.BestKey != nil)
@@ -178,21 +177,6 @@ outer:
 			}
 		}
 		keys[i].Primary = true
-	}
-}
-
-func (ts *Schema) setContainsKey() {
-	for i := range ts.Indexes {
-		ix := &ts.Indexes[i]
-		if ix.Mode == 'u' {
-			for j := range ts.Indexes {
-				key := &ts.Indexes[j]
-				if key.Mode == 'k' && subset(ix.Columns, key.Columns) {
-					ix.ContainsKey = true
-					break
-				}
-			}
-		}
 	}
 }
 

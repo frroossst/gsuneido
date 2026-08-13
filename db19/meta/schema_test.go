@@ -10,7 +10,6 @@ import (
 
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
 	"github.com/apmckinlay/gsuneido/db19/stor"
-	"github.com/apmckinlay/gsuneido/util/ascii"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/hamt"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -95,9 +94,6 @@ func TestOptimizeIndexes(t *testing.T) {
 			if ix.Primary {
 				mode = 'K'
 			}
-			if ix.ContainsKey {
-				mode = ascii.ToUpper(mode)
-			}
 			sb.WriteString(" ")
 			sb.WriteByte(mode)
 			sb.WriteString("(")
@@ -117,8 +113,7 @@ func TestOptimizeIndexes(t *testing.T) {
 		idx('i', "x,y,z")}
 	ts.SetBestKeys(0)
 	ts.setPrimary()
-	ts.setContainsKey()
-	assert.This(str(ts)).Is("K(a) K(z,x) i(b+a) u(c+a) i(b,a) U(c,a) i(x,y,z)")
+	assert.This(str(ts)).Is("K(a) K(z,x) i(b+a) u(c+a) i(b,a) u(c,a) i(x,y,z)")
 
 	ts.Indexes = []schema.Index{idx('k', "a_lower!"), idx('i', "b")}
 	ts.SetBestKeys(0)
@@ -130,8 +125,7 @@ func TestOptimizeIndexes(t *testing.T) {
 
 	ts.Indexes = []schema.Index{idx('k', "a_lower!"), idx('k', "x"),
 		idx('u', "b,a"), idx('u', "b,a_lower!"), idx('u', "x_lower!")}
-	ts.setContainsKey()
-	assert.This(str(ts)).Is("k(a_lower!) k(x) U(b,a) U(b,a_lower!) u(x_lower!)")
+	assert.This(str(ts)).Is("k(a_lower!) k(x) u(b,a) u(b,a_lower!) u(x_lower!)")
 }
 
 func TestSetBestKeys(t *testing.T) {
