@@ -19,12 +19,11 @@ func LoadAnnotations(imported []annotations.TypeSignature) {
 	builtinAnnotations, _ = annotations.Load(imported)
 }
 
+// shared, not copied - passes only read it, which
+// TestPropSharedAnnotationsNotMutated enforces. Written once by LoadAnnotations
+// at startup, so concurrent runs are reading a table nobody writes.
 func Annotations() AnnotationSet {
-	m := make(AnnotationSet, len(builtinAnnotations))
-	for name, sigs := range builtinAnnotations {
-		m[name] = append([]Signature(nil), sigs...)
-	}
-	return m
+	return builtinAnnotations
 }
 
 func ParseTypeAnnotation(s string) (DynType, error) {
