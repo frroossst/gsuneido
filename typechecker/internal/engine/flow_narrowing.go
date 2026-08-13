@@ -1,54 +1,78 @@
 package engine
 
 import (
+	"maps"
+
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	tok "github.com/apmckinlay/gsuneido/compile/tokens"
 	"github.com/apmckinlay/gsuneido/core"
 )
 
+// a narrowed type and whether a guard proved it. Only in-guard entries are
+// visible to reads, so the two travel together - see refinements.guarded.
+type refinement struct {
+	Typ     DynType
+	InGuard bool
+}
+
+type refinements map[string]refinement
+
+// typ answers whatever type is recorded, guard-proven or not
+func (r refinements) typ(name string) (DynType, bool) {
+	f, ok := r[name]
+	if !ok || f.Typ == nil {
+		return nil, false
+	}
+	return f.Typ, true
+}
+
+// guarded answers only when a guard proved the type
+func (r refinements) guarded(name string) (DynType, bool) {
+	f, ok := r[name]
+	if !ok || !f.InGuard || f.Typ == nil {
+		return nil, false
+	}
+	return f.Typ, true
+}
+
+func (r refinements) prove(name string, t DynType) {
+	r[name] = refinement{Typ: t, InGuard: true}
+}
+
+// setType types a name without claiming a guard proved it
+func (r refinements) setType(name string, t DynType) {
+	f := r[name]
+	f.Typ = t
+	r[name] = f
+}
+
 type narrowScope struct {
-	Types               map[string]DynType
-	InGuard             map[string]bool
-	Members             map[string]DynType
-	MemberInGuard       map[string]bool
+	Locals              refinements
+	Members             refinements
 	memberAssignedFalse map[string]bool // computed once per pass, shared read-only across forks; never mutate
 	writes              *classMemberWrites
 	postconds           boolPostconds
 	postHook            func(*ast.Return, narrowScope)
 }
 
-// set by tests to enforce the lockstep invariant at mutation points; nil in production
-var lockstepCheck func(sc narrowScope, site string)
-
-func assertLockstep(sc narrowScope, site string) {
-	if lockstepCheck != nil {
-		lockstepCheck(sc, site)
+func (s narrowScope) kind(members bool) refinements {
+	if members {
+		return s.Members
 	}
+	return s.Locals
 }
 
 func newNarrowScope(size int) narrowScope {
 	return narrowScope{
-		Types:         make(map[string]DynType, size),
-		InGuard:       make(map[string]bool, size),
-		Members:       make(map[string]DynType, size),
-		MemberInGuard: make(map[string]bool, size),
+		Locals:  make(refinements, size),
+		Members: make(refinements, size),
 	}
 }
 
 func (s narrowScope) clone() narrowScope {
-	c := newNarrowScope(len(s.Types))
-	for k, v := range s.Types {
-		c.Types[k] = v
-	}
-	for k, v := range s.InGuard {
-		c.InGuard[k] = v
-	}
-	for k, v := range s.Members {
-		c.Members[k] = v
-	}
-	for k, v := range s.MemberInGuard {
-		c.MemberInGuard[k] = v
-	}
+	c := newNarrowScope(len(s.Locals))
+	maps.Copy(c.Locals, s.Locals)
+	maps.Copy(c.Members, s.Members)
 	c.memberAssignedFalse = s.memberAssignedFalse // shared, read-only
 	c.writes = s.writes                           // shared, read-only
 	c.postconds = s.postconds                     // shared, read-only
@@ -167,10 +191,10 @@ func initialNarrowScope(fn *ast.Function, env TypeEnv) narrowScope {
 		p := &fn.Params[i]
 		name := p.Name.ParamName()
 		if t, ok := env.Params[p]; ok {
-			sc.Types[name] = t
+			sc.Locals.setType(name, t)
 		} else if len(p.Name.Name) > 0 && p.Name.Name[0] == '.' {
 			if t, ok := env.LookupMember(name); ok {
-				sc.Types[name] = t
+				sc.Locals.setType(name, t)
 			}
 		}
 	}
@@ -239,15 +263,15 @@ func narrowWalk(n ast.Node, env TypeEnv, sc narrowScope) {
 			return
 		}
 	case *ast.Ident:
-		if !isGlobalIdent(x.Name) && sc.InGuard[x.Name] {
-			if t, ok := sc.Types[x.Name]; ok && t != nil {
+		if !isGlobalIdent(x.Name) {
+			if t, ok := sc.Locals.guarded(x.Name); ok {
 				env.SetType(x, t)
 			}
 		}
 		return
 	case *ast.Mem:
-		if name, _, ok := unwrapThisMember(x); ok && sc.MemberInGuard[name] {
-			if t, ok2 := sc.Members[name]; ok2 && t != nil {
+		if name, _, ok := unwrapThisMember(x); ok {
+			if t, ok2 := sc.Members.guarded(name); ok2 {
 				env.SetType(x, t)
 			}
 		}
@@ -276,12 +300,10 @@ func narrowChildren(n ast.Node, env TypeEnv, sc narrowScope) {
 func killRefinement(target ast.Expr, sc narrowScope) {
 	if name, _, ok := unwrapThisMember(target); ok {
 		delete(sc.Members, name)
-		delete(sc.MemberInGuard, name)
 		return
 	}
 	if id, ok := target.(*ast.Ident); ok && !isGlobalIdent(id.Name) {
-		delete(sc.Types, id.Name)
-		delete(sc.InGuard, id.Name)
+		delete(sc.Locals, id.Name)
 	}
 }
 
@@ -336,42 +358,35 @@ func narrowCall(x *ast.Call, env TypeEnv, sc narrowScope) {
 			continue // refinement survives: call can't touch k
 		}
 		if t, keep := memberTypeAcrossCall(k, sc, env); keep {
-			sc.Members[k] = t
+			sc.Members.setType(k, t)
 			continue
 		}
 		delete(sc.Members, k)
-		delete(sc.MemberInGuard, k)
 	}
-	assertLockstep(sc, "call")
 }
 
 func narrowEqAssign(x *ast.Binary, env TypeEnv, sc narrowScope) {
 	narrowWalk(x.Rhs, env, sc)
 	if id, ok := x.Lhs.(*ast.Ident); ok && !isGlobalIdent(id.Name) {
 		// new value invalidates any prior guard refinement
-		delete(sc.Types, id.Name)
-		delete(sc.InGuard, id.Name)
+		delete(sc.Locals, id.Name)
 		rhsT := env.GetType(x.Rhs)
 		lhsT := env.GetType(id)
 		if isNarrower(rhsT, lhsT) {
-			sc.Types[id.Name] = rhsT
-			sc.InGuard[id.Name] = true
+			sc.Locals.prove(id.Name, rhsT)
 			env.SetType(id, rhsT)
 		}
 	} else if name, mem, ok := unwrapThisMember(x.Lhs); ok {
 		delete(sc.Members, name)
-		delete(sc.MemberInGuard, name)
 		rhsT := env.GetType(x.Rhs)
 		lhsT := env.GetType(mem)
 		if isNarrower(rhsT, lhsT) {
-			sc.Members[name] = rhsT
-			sc.MemberInGuard[name] = true
+			sc.Members.prove(name, rhsT)
 			env.SetType(mem, rhsT)
 		}
 	} else {
 		narrowWalk(x.Lhs, env, sc)
 	}
-	assertLockstep(sc, "assign")
 }
 
 func loopEntryScope(body ast.Statement, inc []ast.Expr, sc narrowScope, env TypeEnv) narrowScope {
@@ -381,8 +396,7 @@ func loopEntryScope(body ast.Statement, inc []ast.Expr, sc narrowScope, env Type
 		w.scan(e)
 	}
 	for name := range w.locals {
-		delete(out.Types, name)
-		delete(out.InGuard, name)
+		delete(out.Locals, name)
 	}
 	for name := range out.Members {
 		if !w.opaque && !w.callMembers[name] && !w.members[name] {
@@ -390,14 +404,12 @@ func loopEntryScope(body ast.Statement, inc []ast.Expr, sc narrowScope, env Type
 		}
 		if !w.members[name] {
 			if t, keep := memberTypeAcrossCall(name, sc, env); keep {
-				out.Members[name] = t
+				out.Members.setType(name, t)
 				continue
 			}
 		}
 		delete(out.Members, name)
-		delete(out.MemberInGuard, name)
 	}
-	assertLockstep(out, "loopEntryScope")
 	return out
 }
 

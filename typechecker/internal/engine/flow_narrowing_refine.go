@@ -133,11 +133,10 @@ func mergeForkedRefinements(exprs []ast.Expr, sc narrowScope, polarity bool, env
 		applyRefinement(e, perOp[i], polarity, env, allowMembers)
 		restoreEnvStamps(saved, env)
 	}
-	mergeForkedKind(sc.Types, sc.InGuard, perOp, false)
+	mergeForkedKind(sc.Locals, perOp, false)
 	if allowMembers {
-		mergeForkedKind(sc.Members, sc.MemberInGuard, perOp, true)
+		mergeForkedKind(sc.Members, perOp, true)
 	}
-	assertLockstep(sc, "mergeForkedRefinements")
 }
 
 type savedNode struct {
@@ -158,7 +157,7 @@ func overrideEnvWithScopeBaseline(e ast.Expr, sc narrowScope, env TypeEnv) []sav
 		switch x := n.(type) {
 		case *ast.Ident:
 			if !isGlobalIdent(x.Name) {
-				if t, ok := sc.Types[x.Name]; ok && t != nil {
+				if t, ok := sc.Locals.typ(x.Name); ok {
 					prev, present := env.Nodes[n]
 					saved = append(saved, savedNode{node: n, present: present, ty: prev})
 					env.Nodes[n] = t
@@ -166,7 +165,7 @@ func overrideEnvWithScopeBaseline(e ast.Expr, sc narrowScope, env TypeEnv) []sav
 			}
 		case *ast.Mem:
 			if name, mem, ok := unwrapThisMember(x); ok {
-				if t, ok2 := sc.Members[name]; ok2 && t != nil {
+				if t, ok2 := sc.Members.typ(name); ok2 {
 					prev, present := env.Nodes[mem]
 					saved = append(saved, savedNode{node: mem, present: present, ty: prev})
 					env.Nodes[mem] = t
@@ -193,46 +192,40 @@ func restoreEnvStamps(saved []savedNode, env TypeEnv) {
 	}
 }
 
-func mergeForkedKind(scTypes map[string]DynType, scInGuard map[string]bool, perOp []narrowScope, members bool) {
+func mergeForkedKind(r refinements, perOp []narrowScope, members bool) {
 	cand := map[string]bool{}
 	for _, op := range perOp {
-		opIn := op.InGuard
-		if members {
-			opIn = op.MemberInGuard
-		}
-		for name := range opIn {
-			cand[name] = true
+		for name, f := range op.kind(members) {
+			if f.InGuard {
+				cand[name] = true
+			}
 		}
 	}
 	for name := range cand {
-		merged, every := mergeForkedName(name, scTypes, scInGuard, perOp, members)
+		merged, every := mergeForkedName(name, r, perOp, members)
 		if !every || merged == nil {
 			continue
 		}
-		scTypes[name] = merged
-		scInGuard[name] = true
+		r.prove(name, merged)
 	}
 }
 
-func mergeForkedName(name string, scTypes map[string]DynType, scInGuard map[string]bool,
+func mergeForkedName(name string, r refinements,
 	perOp []narrowScope, members bool) (DynType, bool) {
 	var merged DynType
+	cur := r[name]
 	for _, op := range perOp {
-		opTypes, opIn := op.Types, op.InGuard
-		if members {
-			opTypes, opIn = op.Members, op.MemberInGuard
-		}
-		if !opIn[name] {
+		opF, ok := op.kind(members)[name]
+		if !ok || !opF.InGuard {
 			return nil, false
 		}
-		opT := opTypes[name]
-		if scInGuard[name] && dynEqual(opT, scTypes[name]) {
+		if cur.InGuard && dynEqual(opF.Typ, cur.Typ) {
 			return nil, false
 		}
 		if merged == nil {
-			merged = opT
+			merged = opF.Typ
 		} else {
-			merged = U(merged, opT)
+			merged = U(merged, opF.Typ)
 		}
 	}
 	return merged, true
@@ -270,10 +263,8 @@ func dynEqual(a, b DynType) bool {
 
 func existingType(sc narrowScope, tgt narrowTarget, env TypeEnv) DynType {
 	if tgt.isMember {
-		if sc.MemberInGuard[tgt.name] {
-			if t, ok := sc.Members[tgt.name]; ok && t != nil {
-				return t
-			}
+		if t, ok := sc.Members.guarded(tgt.name); ok {
+			return t
 		}
 		if t := env.GetType(tgt.node); t != TUnknown {
 			return t
@@ -283,10 +274,8 @@ func existingType(sc narrowScope, tgt narrowTarget, env TypeEnv) DynType {
 		}
 		return TUnknown
 	}
-	if sc.InGuard[tgt.name] {
-		if t, ok := sc.Types[tgt.name]; ok && t != nil {
-			return t
-		}
+	if t, ok := sc.Locals.guarded(tgt.name); ok {
+		return t
 	}
 	return env.GetType(tgt.node)
 }
@@ -332,13 +321,10 @@ func storeRefinement(sc narrowScope, tgt narrowTarget, t DynType, allowMembers b
 		if !allowMembers {
 			return
 		}
-		sc.Members[tgt.name] = t
-		sc.MemberInGuard[tgt.name] = true
+		sc.Members.prove(tgt.name, t)
 		return
 	}
-	sc.Types[tgt.name] = t
-	sc.InGuard[tgt.name] = true
-	assertLockstep(sc, "storeRefinement")
+	sc.Locals.prove(tgt.name, t)
 }
 
 func targetAndLiteral(b *ast.Binary) (narrowTarget, *ast.Constant, bool) {

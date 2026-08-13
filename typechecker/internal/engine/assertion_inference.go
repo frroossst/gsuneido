@@ -143,18 +143,18 @@ func assertedMembers(cond ast.Expr, env TypeEnv, inlineInit map[string]bool) map
 	applyRefinement(cond, sc, true, env, true)
 
 	out := map[string]DynType{}
-	for name, ty := range sc.Members {
+	for name, f := range sc.Members {
 		// public members are externally mutable - not a sound ground truth
 		if isPublicMember(name) {
 			continue
 		}
-		if ty != nil && ty != TUnknown {
-			out[name] = ty
+		if f.Typ != nil && f.Typ != TUnknown {
+			out[name] = f.Typ
 		}
 	}
-	for name, ty := range sc.Types {
-		if inlineInit[name] && ty != nil && ty != TUnknown {
-			out[name] = ty
+	for name, f := range sc.Locals {
+		if inlineInit[name] && f.Typ != nil && f.Typ != TUnknown {
+			out[name] = f.Typ
 		}
 	}
 	return out

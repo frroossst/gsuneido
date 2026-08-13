@@ -9,8 +9,8 @@ func narrowIf(x *ast.If, env TypeEnv, sc narrowScope) {
 	narrowWalk(x.Cond, env, sc)
 	// snapshot before the branches fork - joinBranchKills needs the pre-if
 	// facts both as the key set to re-check and as the no-else fall-through
-	preTypes := factsInGuard(sc.Types, sc.InGuard)
-	preMembers := factsInGuard(sc.Members, sc.MemberInGuard)
+	preTypes := factsInGuard(sc.Locals)
+	preMembers := factsInGuard(sc.Members)
 	thenScope := refineCond(x.Cond, sc, true, env, true)
 	narrowWalk(x.Then, env, thenScope)
 	var elseScope narrowScope
@@ -48,7 +48,6 @@ func narrowIf(x *ast.If, env TypeEnv, sc narrowScope) {
 	} else if elseExits && !thenExits {
 		applyRefinement(x.Cond, sc, true, env, true)
 	}
-	assertLockstep(sc, "narrowIf")
 }
 
 func joinNoElseLocals(x *ast.If, env TypeEnv, sc narrowScope) {
@@ -58,32 +57,28 @@ func joinNoElseLocals(x *ast.If, env TypeEnv, sc narrowScope) {
 	}
 	negScope := refineCond(x.Cond, sc, false, env, false)
 	for name := range assigned {
-		if !negScope.InGuard[name] {
+		elseT, ok := negScope.Locals.guarded(name)
+		if !ok {
 			continue
 		}
 		thenT := lastTopLevelAssignType(x.Then, name, env)
 		if thenT == nil {
 			continue
 		}
-		elseT := negScope.Types[name]
 		var merged DynType
-		switch {
-		case elseT == TUnknown:
+		if elseT == TUnknown {
 			entryT := condEntryType(x.Cond, name, env)
 			if entryT == nil || entryT == TUnknown {
 				continue
 			}
 			merged = thenT
-		case elseT != nil:
+		} else {
 			merged = U(thenT, elseT)
-		default:
-			continue
 		}
 		if merged == nil || merged == TUnknown {
 			continue
 		}
-		sc.Types[name] = merged
-		sc.InGuard[name] = true
+		sc.Locals.prove(name, merged)
 	}
 }
 
@@ -94,31 +89,30 @@ func joinNoElseMembers(x *ast.If, env TypeEnv, sc narrowScope) {
 	}
 	negScope := refineCond(x.Cond, sc, false, env, true)
 	for name := range assignedM {
-		if !negScope.MemberInGuard[name] {
+		elseT, ok := negScope.Members.guarded(name)
+		if !ok || elseT == TUnknown {
 			continue
 		}
 		thenT := lastTopLevelMemberAssignType(x.Then, name, env)
-		elseT := negScope.Members[name]
-		if thenT == nil || elseT == nil || elseT == TUnknown {
+		if thenT == nil {
 			continue
 		}
 		merged := U(thenT, elseT)
 		if merged == TUnknown || typeHasBoolish(merged) {
 			continue
 		}
-		sc.Members[name] = merged
-		sc.MemberInGuard[name] = true
+		sc.Members.prove(name, merged)
 	}
 }
 
 // factsInGuard snapshots a scope's live refinements as a plain name->type map.
-// Only in-guard entries count: the parallel guard map is what makes a
-// refinement visible to reads (see narrowWalk's *ast.Ident and *ast.Mem cases).
-func factsInGuard(vals map[string]DynType, guard map[string]bool) map[string]DynType {
-	out := make(map[string]DynType, len(vals))
-	for name, t := range vals {
-		if t != nil && guard[name] {
-			out[name] = t
+// Only in-guard entries count: being in a guard is what makes a refinement
+// visible to reads (see narrowWalk's *ast.Ident and *ast.Mem cases).
+func factsInGuard(r refinements) map[string]DynType {
+	out := make(map[string]DynType, len(r))
+	for name, f := range r {
+		if f.InGuard && f.Typ != nil {
+			out[name] = f.Typ
 		}
 	}
 	return out
@@ -146,8 +140,8 @@ func joinBranchKills(x *ast.If, sc narrowScope, preTypes, preMembers map[string]
 	thenScope, elseScope narrowScope) {
 	var types, members []map[string]DynType
 	if !branchAlwaysExits(x.Then) {
-		types = append(types, factsInGuard(thenScope.Types, thenScope.InGuard))
-		members = append(members, factsInGuard(thenScope.Members, thenScope.MemberInGuard))
+		types = append(types, factsInGuard(thenScope.Locals))
+		members = append(members, factsInGuard(thenScope.Members))
 	}
 	switch {
 	case x.Else == nil:
@@ -155,15 +149,14 @@ func joinBranchKills(x *ast.If, sc narrowScope, preTypes, preMembers map[string]
 		types = append(types, preTypes)
 		members = append(members, preMembers)
 	case !branchAlwaysExits(x.Else):
-		types = append(types, factsInGuard(elseScope.Types, elseScope.InGuard))
-		members = append(members, factsInGuard(elseScope.Members, elseScope.MemberInGuard))
+		types = append(types, factsInGuard(elseScope.Locals))
+		members = append(members, factsInGuard(elseScope.Members))
 	}
 	if len(types) == 0 {
 		return // every route exits - no siblings below the if to protect
 	}
-	joinReachingFacts(preTypes, types, sc.Types, sc.InGuard)
-	joinReachingFacts(preMembers, members, sc.Members, sc.MemberInGuard)
-	assertLockstep(sc, "joinBranchKills")
+	joinReachingFacts(preTypes, types, sc.Locals)
+	joinReachingFacts(preMembers, members, sc.Members)
 }
 
 // joinReachingFacts intersects the pre-if refinements against every route that
@@ -171,7 +164,7 @@ func joinBranchKills(x *ast.If, sc narrowScope, preTypes, preMembers map[string]
 // its refinement only if all routes still refine it, at the union of the types
 // they give it; whatever any route dropped is dropped here too!
 func joinReachingFacts(pre map[string]DynType, routes []map[string]DynType,
-	vals map[string]DynType, guard map[string]bool) {
+	r refinements) {
 	for name := range pre {
 		var merged DynType
 		for _, r := range routes {
@@ -187,12 +180,10 @@ func joinReachingFacts(pre map[string]DynType, routes []map[string]DynType,
 			}
 		}
 		if merged == nil || merged == TUnknown {
-			delete(vals, name)
-			delete(guard, name)
+			delete(r, name)
 			continue
 		}
-		vals[name] = merged
-		guard[name] = true
+		r.prove(name, merged)
 	}
 }
 

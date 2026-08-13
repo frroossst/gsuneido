@@ -109,8 +109,8 @@ func (c *postCollector) collect(r *ast.Return, sc narrowScope) {
 
 func (c *postCollector) join(dst *[]map[string]DynType, sc narrowScope) {
 	snap := make(map[string]DynType, len(sc.Members))
-	for k, v := range sc.Members {
-		snap[k] = v
+	for k, f := range sc.Members {
+		snap[k] = f.Typ
 	}
 	*dst = append(*dst, snap)
 }
