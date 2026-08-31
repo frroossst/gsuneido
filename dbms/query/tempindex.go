@@ -6,9 +6,11 @@ package query
 import (
 	"log"
 	"slices"
+	"strings"
 
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
+	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/sortlist"
 	"github.com/apmckinlay/gsuneido/util/str"
 	"github.com/apmckinlay/gsuneido/util/tsc"
@@ -38,14 +40,11 @@ const derivedWarn = 8_000_000 // ??? // derivedWarn is also used by Project
 
 func NewTempIndex(src Query, order []string, tran QueryTran) *TempIndex {
 	order = src.Fixed().RemoveFrom(order)
-	if len(order) == 0 {
-		panic("ERROR: empty TempIndex")
-	}
-	ti := TempIndex{order: order, tran: tran, selOrg: selMin, selEnd: selMax}
-	ti.source = src
-	ti.header = src.Header().Dup() // dup because sortlist is concurrent
-	ti.keys = src.Keys()
-	ti.fixed = src.Fixed()
+	ti := TempIndex{order: order, tran: tran, selOrg: selMin, selEnd: selMax,
+		source: src,
+		header: src.Header().Dup(), // dup because sortlist is concurrent
+		keys:   src.Keys(),
+		fixed:  src.Fixed()}
 	ti.setNrows(src.Nrows())
 	ti.rowSiz.Set(src.rowSize())
 	ti.singleTbl.Set(src.SingleTable())
@@ -59,20 +58,17 @@ func (ti *TempIndex) String() string {
 }
 
 func (ti *TempIndex) Transform() Query {
-	return ti
+	panic(assert.ShouldNotReachHere())
 }
 
 // optimize is only used by fuzz_test.go
 func (ti *TempIndex) optimize(mode Mode, req Require) (Cost, Cost, any) {
-	srcReq := NoneReq(req.frac)
-	fixcost, varcost := Optimize(ti.source, mode, srcReq)
-	return fixcost, varcost, nil
+	panic(assert.ShouldNotReachHere())
 }
 
 // setApproach is only used by fuzz_test.go
 func (ti *TempIndex) setApproach(req Require, _ any, tran QueryTran) {
-	srcReq := NoneReq(req.frac)
-	SetApproach(ti.source, srcReq, tran)
+	panic(assert.ShouldNotReachHere())
 }
 
 // execution --------------------------------------------------------
@@ -125,13 +121,6 @@ func (ti *TempIndex) Lookup(th *Thread, sels Sels) Row {
 	if row == nil || !ti.matches(row, key) {
 		return nil
 	}
-	for _, sel := range sels {
-		if !slices.Contains(ti.order, sel.col) {
-			if row.GetRawVal(ti.header, sel.col, ti.th, ti.st) != sel.val {
-				return nil
-			}
-		}
-	}
 	return row
 }
 
@@ -151,8 +140,9 @@ func (ti *TempIndex) makeKey(sels Sels, full bool) []string {
 }
 
 func (ti *TempIndex) matches(row Row, key []string) bool {
+	rr := NewRowRec(row, ti.header, ti.th, ti.st)
 	for i, col := range ti.order {
-		x := row.GetRawVal(ti.header, col, ti.th, ti.st)
+		x := rr.GetRawVal(col)
 		y := key[i]
 		if x != y {
 			return false
@@ -214,9 +204,10 @@ func (ti *TempIndex) selected(row Row) bool {
 	if ti.satisfied() {
 		return true
 	}
+	rr := NewRowRec(row, ti.header, ti.th, ti.st)
 	for i, sel := range ti.selOrg {
 		col := ti.order[i]
-		x := row.GetRawVal(ti.header, col, ti.th, ti.st)
+		x := rr.GetRawVal(col)
 		if x != sel {
 			return false
 		}
@@ -280,11 +271,13 @@ func (ti *TempIndex) single() rowIter {
 }
 
 func (ti *TempIndex) less(th *Thread, xrow, yrow Row) bool {
+	xrr := NewRowRec(xrow, ti.header, th, ti.st)
+	yrr := NewRowRec(yrow, ti.header, th, ti.st)
 	for _, col := range ti.order {
-		x := xrow.GetRawVal(ti.header, col, th, ti.st)
-		y := yrow.GetRawVal(ti.header, col, th, ti.st)
-		if x != y {
-			return x < y
+		x := xrr.GetRawVal(col)
+		y := yrr.GetRawVal(col)
+		if cmp := strings.Compare(x, y); cmp != 0 {
+			return cmp < 0
 		}
 	}
 	return false
@@ -293,6 +286,7 @@ func (ti *TempIndex) less(th *Thread, xrow, yrow Row) bool {
 // less2 is used for Seek
 func (ti *TempIndex) less2(th *Thread, row Row, key []string) bool {
 	n := max(len(ti.order), len(key))
+	rr := NewRowRec(row, ti.header, th, ti.st)
 	for i := range n {
 		if i >= len(key) {
 			return false
@@ -300,10 +294,10 @@ func (ti *TempIndex) less2(th *Thread, row Row, key []string) bool {
 		if i >= len(ti.order) {
 			return true
 		}
-		x := row.GetRawVal(ti.header, ti.order[i], th, ti.st)
+		x := rr.GetRawVal(ti.order[i])
 		y := key[i]
-		if x != y {
-			return x < y
+		if cmp := strings.Compare(x, y); cmp != 0 {
+			return cmp < 0
 		}
 	}
 	return false
@@ -417,9 +411,11 @@ func (ti *TempIndex) knowExactNrows() bool {
 func (ti *TempIndex) Simple(th *Thread) []Row {
 	rows := ti.source.Simple(th)
 	slices.SortFunc(rows, func(a, b Row) int {
+		arr := NewRowRec(a, ti.header, th, ti.st)
+		brr := NewRowRec(b, ti.header, th, ti.st)
 		for _, col := range ti.order {
-			x := a.GetRawVal(ti.header, col, th, ti.st)
-			y := b.GetRawVal(ti.header, col, th, ti.st)
+			x := arr.GetRawVal(col)
+			y := brr.GetRawVal(col)
 			if x < y {
 				return -1
 			}

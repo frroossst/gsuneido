@@ -8,33 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/apmckinlay/gsuneido/compile"
 	. "github.com/apmckinlay/gsuneido/core"
-	"github.com/apmckinlay/gsuneido/db19"
 	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/util/assert"
 )
-
-type r struct {
-	key    []string
-	i1, i2 int
-}
-type s []string
-
-func TestUnion_MergeIndexes(t *testing.T) {
-	var list []r
-	callback := func(key []string, i1, i2 int) {
-		list = append(list, r{key, i1, i2})
-	}
-	mergeIndexes(
-		[][]string{{"a", "b"}},
-		[][]string{{"b", "a", "x"}, {"a", "b"}},
-		[][]string{{"b", "a", "y"}, {"b", "z", "a"}, {"b", "a", "z"}},
-		callback)
-	assert.This(list).Is([]r{
-		{s{"a", "b"}, -1, -1},
-		{s{"a", "b"}, 0, 0},
-		{s{"a", "b"}, 0, 2}})
-}
 
 func TestUnion_MergeSwitchDir(t *testing.T) {
 	db := heapDb()
@@ -90,17 +68,17 @@ func TestUnion_MergeSwitchDir(t *testing.T) {
 	}
 }
 
-func TestUnion_removeNonexistentEmpty(t *testing.T) {
+func TestUnion_selsForCols(t *testing.T) {
 	srccols := []string{"a", "b", "c"}
 	test := func(selsIn, selsOut Sels) {
-		assert.This(removeNonexistentEmpty(srccols, selsIn)).Is(selsOut)
+		assert.This(selsForCols(selsIn, srccols)).Is(selsOut)
 	}
 	test(nil, nil)
 	test(Sels{}, Sels{})
 	test(Sels{{"a", "1"}, {"c", "2"}, {"x", "3"}},
-		Sels{{"a", "1"}, {"c", "2"}, {"x", "3"}})
+		Sels{{"a", "1"}, {"c", "2"}})
 	test(Sels{{"a", "1"}, {"n", ""}, {"c", "2"}, {"x", "3"}},
-		Sels{{"a", "1"}, {"c", "2"}, {"x", "3"}})
+		Sels{{"a", "1"}, {"c", "2"}})
 	test(Sels{{"x", ""}, {"y", ""}}, nil)
 }
 
@@ -132,90 +110,6 @@ func TestUnion_DisjointRequiredIndexNoKey(t *testing.T) {
 
 	fixcost, varcost := Optimize(u, CursorMode, OrderReq(index, 1))
 	assert.T(t).That(fixcost+varcost < impossible)
-}
-
-func TestIndexContainsKey(t *testing.T) {
-	assert := assert.T(t)
-
-	// Empty keys list
-	assert.This(indexContainsKey([]string{"a", "b"}, nil)).Is(nil)
-
-	// Index contains key
-	assert.This(indexContainsKey(
-		[]string{"a", "b", "c"},
-		[][]string{{"a", "b"}},
-	)).Is([]string{"a", "b"})
-
-	// Index doesn't contain key
-	assert.This(indexContainsKey(
-		[]string{"a", "b"},
-		[][]string{{"a", "b", "c"}},
-	)).Is(nil)
-
-	// Multiple keys, first match returned
-	assert.This(indexContainsKey(
-		[]string{"a", "b", "c"},
-		[][]string{{"d", "e"}, {"a", "c"}},
-	)).Is([]string{"a", "c"})
-}
-
-func TestKeyPrefixOfIndex(t *testing.T) {
-	assert := assert.T(t)
-	// last key field is at position 1
-	assert.This(keyPrefixOfIndex(
-		[]string{"a", "b", "c"},
-		[]string{"b", "d"},
-	)).Is([]string{"a", "b"})
-	// all index fields are in key
-	assert.This(keyPrefixOfIndex(
-		[]string{"a", "b", "c"},
-		[]string{"a", "b", "c"},
-	)).Is([]string{"a", "b", "c"})
-	// no key fields in index
-	assert.This(keyPrefixOfIndex(
-		[]string{"a", "b"},
-		[]string{"x", "y"},
-	)).Is(nil)
-}
-
-func TestKeyFieldOrder(t *testing.T) {
-	assert := assert.T(t)
-
-	// Basic case
-	assert.This(keyFieldOrder(
-		[]string{"c", "b", "a"},
-		[]string{"a", "c", "b"},
-	)).Is([]string{"c", "b", "a"})
-
-	// Key fields in different order in index
-	assert.This(keyFieldOrder(
-		[]string{"a", "x", "b"},
-		[]string{"a", "b"},
-	)).Is([]string{"a", "b"})
-
-	// Empty key
-	assert.This(keyFieldOrder(
-		[]string{"a", "b"},
-		[]string{},
-	)).Is([]string{})
-}
-
-func TestSameKeyFieldOrder(t *testing.T) {
-	assert := assert.T(t)
-
-	// Same order
-	assert.That(sameKeyFieldOrder(
-		[]string{"c", "b", "d", "a"},
-		[]string{"b", "a", "c"},
-		[]string{"c", "b", "a"},
-	))
-
-	// Different order
-	assert.That(!sameKeyFieldOrder(
-		[]string{"a", "b", "c"},
-		[]string{"a", "b", "c"},
-		[]string{"c", "b", "a"},
-	))
 }
 
 func TestUnion_StrictCompareDb(t *testing.T) {
@@ -265,20 +159,22 @@ func TestUnionLookupBug(t *testing.T) {
 	queryHashAll(db.Database, `cus2 union (cus union cus)`)
 }
 
-func queryHashAll(db *db19.Database, query string) {
-	tran := db.NewReadTran()
-	q := ParseQuery(query, tran, nil)
-	th := &Thread{}
+func TestUnionBug(t *testing.T) {
+	db := heapDb()
+	db.adm("create cus (c1, c2, c3, c4, ck) key (ck)")
+	db.act(`insert {ck: '3', c1: "18", c2: "16", c3: '2', c4: '8'} into cus`)
+	db.act(`insert {ck: '5', c1: "14", c2: "19"} into cus`)
+	queryHashAll(db.Database,
+		`((((((cus union cus) extend r0, i4 = r0)))) union cus)`)
+}
 
-	h1 := NewQueryHasher(q.Header()).CheckDups()
-	for _, row := range q.Simple(th) {
-		h1.Row(row)
-	}
-
-	q, _, _ = Setup(q, ReadMode, tran)
-	h2 := NewQueryHasher(q.Header()).CheckDups()
-	for row := q.Get(th, Next); row != nil; row = q.Get(th, Next) {
-		h2.Row(row)
-	}
-	assert.This(h2.Result(true)).Is(h1.Result(true))
+func TestUnionBug2(t *testing.T) {
+	Global.TestDef("Rule_r", compile.Constant("function() { .x }"))
+	db := heapDb()
+	db.adm("create t1 (k, x, R) key (k)")
+	db.act(`insert {k: 1, x: 2} into t1`)
+	db.adm("create t2 (k, x, R) key (k)")
+	db.act(`insert {k: 1, x: 2} into t2`)
+	queryHashAll(db.Database,
+		`t1 extend y = r union t2`)
 }

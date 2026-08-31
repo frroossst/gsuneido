@@ -86,10 +86,10 @@ func (ts *Schema) Write(w *stor.Writer) {
 }
 
 func ReadSchema(_ *stor.Stor, r *stor.Reader) *Schema {
-	ts := Schema{}
-	ts.Table = r.GetStr()
-	ts.Columns = r.GetStrs()
-	ts.Derived = r.GetStrs()
+	ts := Schema{
+		Table:   r.GetStr(),
+		Columns: r.GetStrs(),
+		Derived: r.GetStrs()}
 	if n := r.Get1(); n > 0 {
 		ts.Indexes = make([]schema.Index, n)
 		for i := range n {
@@ -121,7 +121,6 @@ func ReadSchema(_ *stor.Stor, r *stor.Reader) *Schema {
 // Ixspecs sets up the ixspecs for a table's indexes.
 func (ts *Schema) Ixspecs(nold int) {
 	ts.setPrimary()
-	ts.setContainsKey()
 	for i := nold; i < len(ts.Indexes); i++ {
 		ix := &ts.Indexes[i]
 		assert.That(ix.Mode == 'k' || ix.BestKey != nil)
@@ -178,21 +177,6 @@ outer:
 			}
 		}
 		keys[i].Primary = true
-	}
-}
-
-func (ts *Schema) setContainsKey() {
-	for i := range ts.Indexes {
-		ix := &ts.Indexes[i]
-		if ix.Mode == 'u' {
-			for j := range ts.Indexes {
-				key := &ts.Indexes[j]
-				if key.Mode == 'k' && subset(ix.Columns, key.Columns) {
-					ix.ContainsKey = true
-					break
-				}
-			}
-		}
 	}
 }
 
@@ -286,11 +270,11 @@ outer:
 }
 
 func (m *Meta) newSchemaTomb(table string) *Schema {
-	return &Schema{Schema: schema.Schema{Table: table}}
+	return &Schema{Table: table}
 }
 
 func (m *Meta) newSchemaView(name, def string) *Schema {
-	return &Schema{Schema: schema.Schema{Table: "=" + name, Columns: []string{def}}}
+	return &Schema{Table: "=" + name, Columns: []string{def}}
 }
 
 func (ts *Schema) IsTomb() bool {

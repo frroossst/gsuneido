@@ -10,7 +10,6 @@ import (
 
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
 	"github.com/apmckinlay/gsuneido/db19/stor"
-	"github.com/apmckinlay/gsuneido/util/ascii"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/hamt"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -23,13 +22,10 @@ func TestSchema(t *testing.T) {
 	randStr := str.UniqueRandom(4, 4)
 	for i := range n {
 		data[i] = randStr()
-		tbl.Put(&Schema{Schema: schema.Schema{
+		tbl.Put(&Schema{
 			Table:   data[i],
 			Columns: []string{"one", "two"},
-			Indexes: []schema.Index{
-				{Mode: 'k', Columns: []string{"one"}},
-			},
-		}})
+			Indexes: []schema.Index{{Mode: 'k', Columns: []string{"one"}}}})
 	}
 	st := stor.HeapStor(32 * 1024)
 	st.Alloc(1) // avoid offset 0
@@ -61,14 +57,14 @@ func TestSetPrimary(t *testing.T) {
 	// }
 	primary := func() string {
 		ts.setPrimary()
-		var s strings.Builder
+		var sb strings.Builder
 		for i, ix := range ts.Indexes {
 			if ix.Primary {
-				s.WriteString(",")
-				s.WriteString(strconv.Itoa(i))
+				sb.WriteString(",")
+				sb.WriteString(strconv.Itoa(i))
 			}
 		}
-		return s.String()[1:]
+		return sb.String()[1:]
 	}
 	ts.Indexes = []schema.Index{key("")}
 	assert.This(primary()).Is("0")
@@ -89,27 +85,24 @@ func TestOptimizeIndexes(t *testing.T) {
 		return schema.Index{Mode: mode, Columns: str.Split(cols, ",")}
 	}
 	str := func(ts *Schema) string {
-		var s strings.Builder
+		var sb strings.Builder
 		for _, ix := range ts.Indexes {
 			mode := ix.Mode
 			if ix.Primary {
 				mode = 'K'
 			}
-			if ix.ContainsKey {
-				mode = ascii.ToUpper(mode)
-			}
-			s.WriteString(" ")
-			s.WriteString(string(mode))
-			s.WriteString("(")
-			s.WriteString(str.Join(",", ix.Columns))
+			sb.WriteString(" ")
+			sb.WriteByte(mode)
+			sb.WriteString("(")
+			sb.WriteString(str.Join(",", ix.Columns))
 			add := difference(ix.BestKey, ix.Columns)
 			if len(add) > 0 {
-				s.WriteString("+")
-				s.WriteString(str.Join(",", add))
+				sb.WriteString("+")
+				sb.WriteString(str.Join(",", add))
 			}
-			s.WriteString(")")
+			sb.WriteString(")")
 		}
-		return s.String()[1:]
+		return sb.String()[1:]
 	}
 	ts := &Schema{Schema: schema.Schema{}}
 	ts.Indexes = []schema.Index{idx('k', "a"), idx('k', "z,x"),
@@ -117,8 +110,7 @@ func TestOptimizeIndexes(t *testing.T) {
 		idx('i', "x,y,z")}
 	ts.SetBestKeys(0)
 	ts.setPrimary()
-	ts.setContainsKey()
-	assert.This(str(ts)).Is("K(a) K(z,x) i(b+a) u(c+a) i(b,a) U(c,a) i(x,y,z)")
+	assert.This(str(ts)).Is("K(a) K(z,x) i(b+a) u(c+a) i(b,a) u(c,a) i(x,y,z)")
 
 	ts.Indexes = []schema.Index{idx('k', "a_lower!"), idx('i', "b")}
 	ts.SetBestKeys(0)
@@ -130,8 +122,7 @@ func TestOptimizeIndexes(t *testing.T) {
 
 	ts.Indexes = []schema.Index{idx('k', "a_lower!"), idx('k', "x"),
 		idx('u', "b,a"), idx('u', "b,a_lower!"), idx('u', "x_lower!")}
-	ts.setContainsKey()
-	assert.This(str(ts)).Is("k(a_lower!) k(x) U(b,a) U(b,a_lower!) u(x_lower!)")
+	assert.This(str(ts)).Is("k(a_lower!) k(x) u(b,a) u(b,a_lower!) u(x_lower!)")
 }
 
 func TestSetBestKeys(t *testing.T) {
@@ -140,24 +131,24 @@ func TestSetBestKeys(t *testing.T) {
 		return schema.Index{Mode: mode, Columns: str.Split(cols, ",")}
 	}
 	bestKey := func(ts *Schema) string {
-		var s strings.Builder
+		var sb strings.Builder
 		for _, ix := range ts.Indexes {
-			if s.Len() > 0 {
-				s.WriteString(" ")
+			if sb.Len() > 0 {
+				sb.WriteString(" ")
 			}
-			s.WriteString(string(ix.Mode))
-			s.WriteString("(")
-			s.WriteString(str.Join(",", ix.Columns))
+			sb.WriteByte(ix.Mode)
+			sb.WriteString("(")
+			sb.WriteString(str.Join(",", ix.Columns))
 			if ix.BestKey != nil {
 				add := difference(ix.BestKey, ix.Columns)
 				if len(add) > 0 {
-					s.WriteString("+")
-					s.WriteString(str.Join(",", add))
+					sb.WriteString("+")
+					sb.WriteString(str.Join(",", add))
 				}
 			}
-			s.WriteString(")")
+			sb.WriteString(")")
 		}
-		return s.String()
+		return sb.String()
 	}
 
 	// basic: one key, one index

@@ -49,6 +49,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/opt"
 	"github.com/apmckinlay/gsuneido/util/set"
 )
@@ -156,7 +157,9 @@ type Query interface {
 	// Incoming Lookup should be consistent with the incoming Require.
 	// Outgoing Lookup should be consistent with the outgoing Require.
 	// It is valid for Require cols to specify a superset of key columns.
-	// Lookup implementations are required to apply (filter) all the sels.
+	// It is ok for sels to contain extra columns,
+	// BUT they will be ignored, not applied.
+	// The originator of the sels is responsible for comparing extra columns.
 	// Lookup generally corresponds to [UniqueReq]
 	Lookup(th *Thread, sels Sels) Row
 
@@ -167,7 +170,7 @@ type Query interface {
 	// Incoming Select should be consistent with the incoming Require.
 	// Outgoing Select should be consistent with the outgoing Require.
 	// It is ok for sels to contain extra columns,
-	// BUT they will be ignored, not applied (unlike Lookup)
+	// BUT they will be ignored, not applied.
 	// Select generally corresponds to [GroupReq]
 	Select(sels Sels)
 
@@ -364,8 +367,7 @@ type QueryTran interface {
 // It calls Transform, Optimize, and SetApproach.
 // The resulting Query is ready for execution.
 func Setup(q Query, mode Mode, t QueryTran) (Query, Cost, Cost) {
-	q = q.Transform()
-	return setup(q, mode, 1, t)
+	return SetupReq(q, mode, t, NoneReq(1))
 }
 
 // Setup1 is the same as Setup except it passes a frac of 1/nrows
@@ -375,11 +377,16 @@ func Setup1(q Query, mode Mode, t QueryTran) (Query, Cost, Cost) {
 	q = q.Transform()
 	nrows, _ := q.Nrows()
 	nrows = max(1, nrows) // avoid divide by zero
-	return setup(q, mode, 1/float64(nrows), t)
+	req := NoneReq(1 / float32(nrows))
+	return setupReq(q, mode, t, req)
 }
 
-func setup(q Query, mode Mode, frac float64, t QueryTran) (Query, Cost, Cost) {
-	req := NoneReq(float32(frac))
+func SetupReq(q Query, mode Mode, t QueryTran, req Require) (Query, Cost, Cost) {
+	q = q.Transform()
+	return setupReq(q, mode, t, req)
+}
+
+func setupReq(q Query, mode Mode, t QueryTran, req Require) (Query, Cost, Cost) {
 	fixcost, varcost := Optimize(q, mode, req)
 	if fixcost+varcost >= impossible {
 		panic("invalid query: " + String(q))
@@ -406,15 +413,9 @@ func SetupKey(q Query, mode Mode, t QueryTran) Query {
 	return q
 }
 
-// SetupIdx is like Setup but specifies an index
-// e.g. to test Select or Lookup
-func SetupIdx(q Query, mode Mode, t QueryTran, index []string) Query {
-	req := OrderReq(index, 1)
-	fixcost, varcost := Optimize(q, mode, req)
-	if fixcost+varcost >= impossible {
-		panic("invalid query: " + String(q))
-	}
-	q = SetApproach(q, req, t)
+// setupIndex is used for tests
+func setupIndex(q Query, mode Mode, t QueryTran, index []string) Query {
+	q, _, _ = SetupReq(q, mode, t, OrderReq(index, 1))
 	return q
 }
 
@@ -435,31 +436,31 @@ func Optimize(q Query, mode Mode, req Require) (fixcost, varcost Cost) {
 func optimize(q Query, mode Mode, req Require) (
 	fixcost, varcost Cost, approach any) {
 	assert.That(!math.IsNaN(float64(req.frac)) && !math.IsInf(float64(req.frac), 0))
-	if !set.Subset(q.Columns(), req.cols) {
+	if !set.HasSubset(q.Columns(), req.cols) {
 		return impossible, impossible, nil
 	}
 
 	// this condition must match SetApproach
-	// A fastSingle node (or one whose fixed covers req.cols) trivially
-	// satisfies any require, so the qualitative aspect (cols/use) is
-	// irrelevant. Clear cols AND nseeks
+	// A fastSingle node or ReqOrder covered by fixed
+	// trivially satisfies the requirement so we clear it.
 	// frac is kept as it scales the (single) row's varcost.
-	if q.fastSingle() || q.Fixed().All(req.cols) {
+	if q.fastSingle() ||
+		(req.use == ReqOrder && q.Fixed().All(req.cols)) {
 		req.cols = nil
 		req.nseeks = 0
 		req.use = ReqNone
 	}
-	if fixcost, varcost, app := q.cacheGet(req); varcost >= 0 {
-		return fixcost, varcost, app
+	if fixcost, varcost, ap := q.cacheGet(req); varcost >= 0 {
+		return fixcost, varcost, ap
 	}
-	fixcost, varcost, app := optTempIndex(q, mode, req)
+	fixcost, varcost, ap := optTempIndex(q, mode, req)
 	assert.That(fixcost >= 0 && varcost >= 0)
-	q.cacheAdd(req, fixcost, varcost, app)
-	return fixcost, varcost, app
+	q.cacheAdd(req, fixcost, varcost, ap)
+	return fixcost, varcost, ap
 }
 
 // optTempIndex determines if a TempIndex is a benefit
-// and if it is, returns a special tempIndex approach
+// and if it is, returns a tiApproach
 // that is processed by SetApproach which creates the actual TempIndex
 func optTempIndex(q Query, mode Mode, req Require) (
 	fixcost, varcost Cost, approach any) {
@@ -475,15 +476,44 @@ func optTempIndex(q Query, mode Mode, req Require) (
 	indexedFixCost, indexedVarCost, indexedApp := q.optimize(mode, req)
 	assert.That(indexedFixCost >= 0 && indexedVarCost >= 0)
 
-	u := req.use
-	if u == ReqNone || !tempIndexable(mode) {
+	if u := req.use; u == ReqNone || !tempIndexable(mode) {
 		traceQO(indexedFixCost + indexedVarCost)
 		return indexedFixCost, indexedVarCost, indexedApp
 	}
 
+	best := optTempIndexBest(q, mode, req)
+	indexedCost := indexedFixCost + indexedVarCost
+	if indexedCost <= best.cost() {
+		traceQO("indexed", indexedCost, "<=", best.cost())
+		return indexedFixCost, indexedVarCost, indexedApp
+	}
+	traceQO("tempindex", best.data.srcOrder, best.cost(), "<", indexedCost)
+	return best.fixcost, best.varcost, &best.data
+}
+
+func tempIndexable(mode Mode) bool {
+	if mode == ReadMode {
+		return true
+	}
+	if mode == CursorMode {
+		return false
+	}
+	// else updateMode
+	return true
+	// BUG this matches jSuneido, but it is not correct.
+	// A temp index allows reading deleted or old versions of records.
+	// But there is a big performance penalty
+	// especially from the key sort added by QueryApply.
+}
+
+// optTempIndexBest evaluates the cost of building a TempIndex
+// (as an alternative to the indexed approach) and returns the best candidate.
+func optTempIndexBest(q Query, mode Mode, req Require) best[tiApproach] {
 	nrows, _ := q.Nrows()
 	assert.That(nrows >= 0)
 	best := newBest[tiApproach]()
+
+	u := req.use
 
 	// with no index
 	noIdxOrder := req.cols
@@ -492,29 +522,21 @@ func optTempIndex(q Query, mode Mode, req Require) (
 	}
 	optTI(&best, q, mode, NoneReq(req.frac), nrows, factorNone, noIdxOrder)
 
-	// with required index
-	optTI(&best, q, mode, req, nrows, factorAll, req.cols)
-
-	// with "best" index
-	if bestIndex := tempIndexBest(q, req.cols); bestIndex != nil {
-		optTI(&best, q, mode, OrderReq(bestIndex, req.frac), nrows, factorPre, req.cols)
-	}
-
-	// key-subset candidates for ReqUnique
+	// source-order strategies (required + best prefix)
 	if u == ReqUnique {
 		fixed := q.Fixed()
-		nReqColsUnfixed := countUnfixed(req.cols, fixed)
 		for _, key := range q.Keys() {
 			if !indexCovered(key, req.cols, fixed) {
 				continue
 			}
-			nKeyUnfixed := countUnfixed(key, fixed)
-			if nKeyUnfixed == 0 || nKeyUnfixed >= nReqColsUnfixed {
+			if countUnfixed(key, fixed) == 0 {
 				continue
 			}
 			keyUnfixed := fixed.RemoveFrom(key)
-			optTI(&best, q, mode, UniqueReq(keyUnfixed, req.nseeks), nrows, factorAll, keyUnfixed)
+			optTempIndexFor(&best, q, mode, req, nrows, keyUnfixed)
 		}
+	} else {
+		optTempIndexFor(&best, q, mode, req, nrows, req.cols)
 	}
 
 	// for ReqUnique or ReqGroup with nseeks, add per-lookup cost on temp index
@@ -525,18 +547,7 @@ func optTempIndex(q Query, mode Mode, req Require) (
 		}
 		best.varcost += Cost(req.nseeks) * perLookup
 	}
-
-	tempIndexCost := best.cost()
-	indexedCost := indexedFixCost + indexedVarCost
-	if indexedCost <= tempIndexCost {
-		traceQO("indexed", indexedCost, "<=", tempIndexCost)
-		return indexedFixCost, indexedVarCost, indexedApp
-	}
-	traceQO("tempindex", best.data.index, tempIndexCost, "<", indexedCost)
-	return best.fixcost, best.varcost,
-		&tempIndex{index: best.data.tiOrder, srcapp: best.data.srcapp,
-			srcindex:   best.data.index,
-			srcfixcost: best.data.srcfixcost, srcvarcost: best.data.srcvarcost}
+	return best
 }
 
 // tempIndexKey finds the smallest key (by unfixed count) that's covered by cols.
@@ -564,13 +575,16 @@ func tempIndexKey(q Query, cols []string) []string {
 	return cols
 }
 
+// optTI evaluates a single temp-index candidate: source ordered by req.cols
+// (via OrderReq inside), building a TempIndex on tiOrder, and records it in
+// best if it beats the current best.
 func optTI(best *best[tiApproach], q Query, mode Mode, req Require, nrows, factor int, tiOrder []string) {
 	srcReq := OrderReq(req.cols, 1)
 	srcfixcost, srcvarcost, srcapp := q.optimize(mode, srcReq)
 	assert.That(srcfixcost >= 0 && srcvarcost >= 0)
-	fixcost, varcost := ticost(srcfixcost+srcvarcost, q, req.cols, nrows, float64(req.frac), factor)
+	fixcost, varcost := ticost(srcfixcost+srcvarcost, q, tiOrder, nrows, float64(req.frac), factor)
 	best.update(fixcost, varcost, tiApproach{
-		index:      req.cols,
+		srcOrder:   req.cols,
 		tiOrder:    tiOrder,
 		srcfixcost: srcfixcost,
 		srcvarcost: srcvarcost,
@@ -578,18 +592,19 @@ func optTI(best *best[tiApproach], q Query, mode Mode, req Require, nrows, facto
 	})
 }
 
-//-------------------------------------------------------------------
-
-const factorAll = 105  // ???
-const factorPre = 110  // ???
-const factorNone = 256 // ???
-
 var ticostAdj = 0 // for tests, to discourage temp indexes
 
+// ticost estimates the cost of building a TempIndex on index (tiOrder).
+// srccost is the cost of producing the source rows; factor scales the sort
+// cost depending on how well the source order matches index (factorNone =
+// unordered/full sort, factorPre = prefix/partial sort, factorAll = already
+// ordered/no sort). frac scales the per-row variable cost of the lookup.
 func ticost(srccost int, q Query, index []string, nrows int, frac float64,
 	factor int) (Cost, Cost) {
 	fixcost := srccost + ticostAdj + 1000 // ???
-	fixcost += 100 * len(index)           // prefer fewer fields
+	// prefer fewer fields; NewTempIndex drops fixed columns from the order,
+	// so count only the fields the actual TempIndex will have
+	fixcost += 100 * len(q.Fixed().RemoveFrom(index))
 	if nrows > 0 {
 		fnrows := float64(nrows)
 		fixcost += factor * Cost(fnrows*math.Log(fnrows)) // empirical
@@ -599,6 +614,19 @@ func ticost(srccost int, q Query, index []string, nrows int, frac float64,
 		varcost *= 2 // ???
 	}
 	return fixcost, varcost
+}
+
+// optTempIndexFor evaluates the source-order strategies for building a
+// temp index on tiOrder: source = tiOrder (factorAll), or source = the
+// longest common prefix (factorPre).
+func optTempIndexFor(best *best[tiApproach], q Query, mode Mode, req Require,
+	nrows int, tiOrder []string) {
+	// with required index
+	optTI(best, q, mode, OrderReq(tiOrder, req.frac), nrows, factorAll, tiOrder)
+	// with "best" index
+	if bestIndex := tempIndexBest(q, tiOrder); bestIndex != nil {
+		optTI(best, q, mode, OrderReq(bestIndex, req.frac), nrows, factorPre, tiOrder)
+	}
 }
 
 // tempIndexBest finds the index that has the longest common prefix.
@@ -621,49 +649,32 @@ func tempIndexBest(q Query, index []string) []string {
 	return bestIndex
 }
 
-type tiApproach struct {
-	index      []string
-	tiOrder    []string
-	srcfixcost Cost
-	srcvarcost Cost
-	srcapp     any
-}
+const factorAll = 105  // ???
+const factorPre = 110  // ???
+const factorNone = 256 // ???
 
-// tempIndex is a special approach that is added by optTempIndex
+// tiApproach is a special approach that is added by optTempIndex
 // to be used by SetApproach to insert a TempIndex when required
-type tempIndex struct {
-	index      []string
-	srcapp     any
-	srcindex   []string
+type tiApproach struct {
+	srcOrder   []string // source order
+	tiOrder    []string // temp index order
 	srcfixcost Cost
 	srcvarcost Cost
+	srcapp     any
 }
 
-func tempIndexable(mode Mode) bool {
-	if mode == ReadMode {
-		return true
-	}
-	if mode == CursorMode {
-		return false
-	}
-	// else updateMode
-	return true
-	// BUG this matches jSuneido, but it is not correct.
-	// A temp index allows reading deleted or old versions of records.
-	// But there is a big performance penalty
-	// especially from the key sort added by QueryApply.
-}
+//-------------------------------------------------------------------
 
 func min3(fixcost1, varcost1 Cost, app1 any, fixcost2, varcost2 Cost, app2 any,
 	fixcost3, varcost3 Cost, app3 any) (Cost, Cost, any) {
-	fixcost, varcost, app := fixcost1, varcost1, app1
+	fixcost, varcost, ap := fixcost1, varcost1, app1
 	if fixcost2+varcost2 < fixcost+varcost {
-		fixcost, varcost, app = fixcost2, varcost2, app2
+		fixcost, varcost, ap = fixcost2, varcost2, app2
 	}
 	if fixcost3+varcost3 < fixcost+varcost {
-		fixcost, varcost, app = fixcost3, varcost3, app3
+		fixcost, varcost, ap = fixcost3, varcost3, app3
 	}
-	return fixcost, varcost, app
+	return fixcost, varcost, ap
 }
 
 var tempIndexCount atomic.Int64
@@ -673,7 +684,8 @@ var _ = AddInfo("query.tempindex", &tempIndexCount)
 // It also adds temp indexes where required.
 func SetApproach(q Query, req Require, tran QueryTran) Query {
 	// must match optimize's guard (see comment there)
-	if q.fastSingle() || q.Fixed().All(req.cols) {
+	if q.fastSingle() ||
+		(req.use == ReqOrder && q.Fixed().All(req.cols)) {
 		req.cols = nil
 		req.nseeks = 0
 		req.use = ReqNone
@@ -684,10 +696,10 @@ func SetApproach(q Query, req Require, tran QueryTran) Query {
 		panic("SetApproach: not found in cache")
 	}
 	assert.That(fixcost >= 0 && varcost >= 0)
-	if app, ok := approach.(*tempIndex); ok {
-		q.Metrics().setCost(1, app.srcfixcost, app.srcvarcost)
-		q.setApproach(OrderReq(app.srcindex, 1), app.srcapp, tran)
-		ti := NewTempIndex(q, app.index, tran)
+	if ap, ok := approach.(*tiApproach); ok {
+		q.Metrics().setCost(1, ap.srcfixcost, ap.srcvarcost)
+		q.setApproach(OrderReq(ap.srcOrder, 1), ap.srcapp, tran)
+		ti := NewTempIndex(q, ap.tiOrder, tran)
 		ti.setCost(float64(req.frac), fixcost, varcost)
 		tempIndexCount.Add(1)
 		return ti
@@ -699,33 +711,41 @@ func SetApproach(q Query, req Require, tran QueryTran) Query {
 
 // execution --------------------------------------------------------
 
-// GetNext1 returns the next row from q if it matches sels, else nil.
-// Used when Lookup is implemented with Select+Get —
-// Select only restricts by the physical index prefix,
-// so GetNext1 verifies the row matches all of sels.
-func GetNext1(q Query, th *Thread, sels Sels) Row {
-	// this should *not* have to loop because the index should be unique
-	row := q.Get(th, Next)
-	if row != nil {
-		debug.assert(q.Get(th, Next) == nil)
-		if singletonFilter(q.Header(), row, sels) {
-			return row
-		}
-	}
-	return nil
-}
-
 // lookupViaSelectGet implements Lookup via Select+Get,
-// verifying the row matches all sels (since Select only restricts
-// by the physical index prefix) and clearing the select afterwards.
+// clearing the select afterwards.
+// Does not filter on "extra" columns
+// because sels origin is responsible for filtering.
 func lookupViaSelectGet(q Query, th *Thread, sels Sels) Row {
 	q.Select(sels)
 	defer q.Select(nil)
-	return GetNext1(q, th, sels)
+	return getNext1(q, th)
 }
 
-func lookup(q Query, th *Thread, sels Sels) Row {
-	return q.Lookup(th, sels)
+// getNext1 gets the next row from q, asserting there is only one
+func getNext1(q Query, th *Thread) Row {
+	// this does *not* need to loop because the index is unique
+	row := q.Get(th, Next)
+	dbg.Assert(func() bool { return row == nil || q.Get(th, Next) == nil })
+	return row
+}
+
+func lookup(q Query, sels Sels, th *Thread, st *SuTran) Row {
+	row := q.Lookup(th, sels)
+	return lookupFilter(q.Header(), row, sels, th, st)
+}
+
+func lookupFilter(hdr *Header, row Row, sels Sels, th *Thread, st *SuTran) Row {
+	if row != nil {
+		rr := NewRowRec(row, hdr, th, st)
+		for _, sel := range sels {
+			x := rr.GetRawVal(sel.col)
+			assert.That(len(x) == 0 || x[0] != PackForward)
+			if x != sel.val {
+				return nil
+			}
+		}
+	}
+	return row
 }
 
 // Query1 -----------------------------------------------------------
@@ -817,17 +837,4 @@ func (q2 *Query2) Source2() Query {
 // 		}
 // 	}
 // 	return vals
-// }
-
-//-------------------------------------------------------------------
-
-var debug debugT
-
-type debugT struct{}
-
-func (debugT) assert(cond bool) {
-	assert.That(cond)
-}
-
-// func (debugT) assert(cond bool) {
 // }

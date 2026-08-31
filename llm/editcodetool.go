@@ -25,6 +25,7 @@ This tool is the preferred way to edit existing code.
 - For deletions with replace_lines: Set 'code' to an empty string
 - Always call suneido_read_code before this to ensure line numbers are current
 - Do NOT include line numbers in the replacement code, just the code itself
+- Preserve the exact indentation (leading tabs/spaces) of the lines being edited
 `,
 	params: []stringParam{
 		{name: "library", description: "Name of the library (e.g. 'stdlib')", required: true, kind: paramString},
@@ -32,7 +33,7 @@ This tool is the preferred way to edit existing code.
 		{name: "mode", description: "Operation mode: 'insert_before', 'insert_after', or 'replace_lines'", required: true, kind: paramString},
 		{name: "line", description: "Line number (1-based)", required: true, kind: paramNumber},
 		{name: "count", description: "Number of lines to replace (only for replace_lines mode)", required: false, kind: paramNumber},
-		{name: "code", description: "Replacement code", required: true, kind: paramString},
+		{name: "code", description: "Replacement code, preserving the original indentation (leading tabs/spaces)", required: true, kind: paramString},
 	},
 	summarize: func(args map[string]any) string {
 		line := argInt(args, "line", 0)
@@ -263,18 +264,19 @@ func applyLineEdit(oldText string, mode string, line, count int, insert string) 
 	}
 
 	insert = normalizeCRLF(insert)
+	insert = addMissingIndent(insert, lineIndent(oldText, line))
 
-	var b strings.Builder
-	b.Grow(len(oldText) - (endOff - startOff) + len(insert))
-	b.WriteString(oldText[:startOff])
-	b.WriteString(insert)
+	var sb strings.Builder
+	sb.Grow(len(oldText) - (endOff - startOff) + len(insert))
+	sb.WriteString(oldText[:startOff])
+	sb.WriteString(insert)
 	if endOff < len(oldText) {
 		if insert != "" && !strings.HasSuffix(insert, "\n") && !strings.HasSuffix(insert, "\r\n") {
-			b.WriteString("\r\n")
+			sb.WriteString("\r\n")
 		}
-		b.WriteString(oldText[endOff:])
+		sb.WriteString(oldText[endOff:])
 	}
-	return b.String(), nil
+	return sb.String(), nil
 }
 
 func findFromTo(from int, to int, oldText string) (int, int, error) {
@@ -323,6 +325,42 @@ func findFromTo(from int, to int, oldText string) (int, int, error) {
 	return startOff, endOff, nil
 }
 
+// lineIndent returns the leading whitespace (tabs/spaces) of the given
+// 1-based line, or "" if the line is out of range or has no indentation.
+func lineIndent(text string, line int) string {
+	start := 0
+	for l := 1; l < line; l++ {
+		i := strings.IndexByte(text[start:], '\n')
+		if i == -1 {
+			return ""
+		}
+		start += i + 1
+	}
+	end := start
+	for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
+		end++
+	}
+	return text[start:end]
+}
+
+// addMissingIndent prepends indent to insert when the first line of insert has
+// no leading whitespace, so it matches the indentation of the surrounding code.
+func addMissingIndent(insert, indent string) string {
+	if insert == "" || indent == "" {
+		return insert
+	}
+	before, _, ok := strings.Cut(insert, "\n")
+	first := insert
+	if ok {
+		first = before
+	}
+	first = strings.TrimSuffix(first, "\r")
+	if first != "" && first[0] != ' ' && first[0] != '\t' {
+		return indent + insert
+	}
+	return insert
+}
+
 func normalizeCRLF(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\r", "\n")
@@ -361,19 +399,13 @@ func extractContext(text string, start, end int) string {
 	}
 
 	// Calculate context range (4 lines before and after)
-	contextStart := start - 4
-	if contextStart < 1 {
-		contextStart = 1
-	}
-	contextEnd := end + 4
-	if contextEnd > len(lines) {
-		contextEnd = len(lines)
-	}
+	contextStart := max(start-4, 1)
+	contextEnd := min(end+4, len(lines))
 
 	// Build result with line numbers
-	var b strings.Builder
+	var sb strings.Builder
 	for i := contextStart; i <= contextEnd; i++ {
-		fmt.Fprintf(&b, "%4d: %s\n", i, lines[i-1])
+		fmt.Fprintf(&sb, "[%4d]%s\n", i, lines[i-1])
 	}
-	return b.String()
+	return sb.String()
 }

@@ -12,6 +12,7 @@ import (
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/core/trace"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/set"
 	"github.com/apmckinlay/gsuneido/util/slc"
 	"github.com/apmckinlay/gsuneido/util/str"
@@ -37,7 +38,6 @@ type joinBase struct {
 	sel2        Sels // from an incoming Select, used by Get/filter2
 	qt          QueryTran
 	st          *SuTran
-	lookup      *lookupInfo
 	lookupCache lookupCache
 	by          []string
 	prevFixed1  Fixed
@@ -52,12 +52,6 @@ type joinBase struct {
 type Join struct {
 	joinBase
 	conflict bool
-}
-
-type lookupInfo struct {
-	keys1    [][]string
-	fixed1   Fixed
-	fallback bool
 }
 
 type joinApproach struct {
@@ -304,15 +298,15 @@ func (jt joinType) reverse() joinType {
 	return jt
 }
 
-type joinCost2 struct {
+type joinCost struct {
 	req1, req2       Require
 	fixcost, varcost Cost
 }
 
 func (jn *Join) optimize(mode Mode, req Require) (Cost, Cost, any) {
-	fwd := joinopt2(jn.source1, jn.source2, jn.Nrows, jn.joinType,
+	fwd := jn.optDir(jn.source1, jn.source2, jn.Nrows, jn.joinType,
 		mode, req, jn.by)
-	rev := joinopt2(jn.source2, jn.source1, jn.Nrows, jn.joinType.reverse(),
+	rev := jn.optDir(jn.source2, jn.source1, jn.Nrows, jn.joinType.reverse(),
 		mode, req, jn.by)
 	rev.fixcost += outOfOrder + joinRev
 	if trace.JoinOpt.On() {
@@ -336,11 +330,13 @@ func (jn *Join) optimize(mode Mode, req Require) (Cost, Cost, any) {
 	return fwd.fixcost, fwd.varcost, approach
 }
 
-func joinopt2(src1, src2 Query, nrows func() (int, int), jt joinType,
-	mode Mode, req Require, by []string) joinCost2 {
+// optDir returns the cost of one direction (forward or reverse).
+// It deliberately does not take the receiver to avoid getting direction wrong.
+func (*joinBase) optDir(src1, src2 Query, nrows func() (int, int), jt joinType,
+	mode Mode, req Require, by []string) joinCost {
 	fixcost1, varcost1 := Optimize(src1, mode, req)
 	if fixcost1+varcost1 >= impossible {
-		return joinCost2{fixcost: impossible}
+		return joinCost{fixcost: impossible}
 	}
 	nrows1, _ := src1.Nrows()
 	nrows2, _ := src2.Nrows()
@@ -357,9 +353,9 @@ func joinopt2(src1, src2 Query, nrows func() (int, int), jt joinType,
 	}
 	fixcost2, varcost2 := Optimize(src2, mode, req2)
 	if fixcost2+varcost2 >= impossible {
-		return joinCost2{fixcost: impossible}
+		return joinCost{fixcost: impossible}
 	}
-	return joinCost2{req1: req, req2: req2,
+	return joinCost{req1: req, req2: req2,
 		fixcost: fixcost1 + fixcost2,
 		varcost: varcost1 + varcost2,
 	}
@@ -454,7 +450,7 @@ func (jn *Join) Get(th *Thread, dir Dir) Row {
 			jn.row2 = jn.source2.Get(th, dir)
 		}
 		if jn.row2 != nil {
-			// assert.That(jn.equalBy(th, jn.st, jn.row1, jn.row2))
+			dbg.Assert(func() bool { return jn.equalBy(th, jn.st, jn.row1, jn.row2) })
 			jn.ngets++
 			return JoinRows(jn.row1, jn.row2)
 		}
@@ -467,12 +463,11 @@ func (jn *Join) nextRow1(th *Thread, dir Dir) bool {
 		return false
 	}
 	// fmt.Println("Join row1", jn.row1)
-	// assert.That(set.Disjoint(jn.by, jn.sel2))
 	sel2 := slc.With(jn.sel2, jn.projectRow1(th, jn.row1)...)
 	if jn.joinType == many_to_one {
 		jn.lookupRow = jn.cachedLookup(th, sel2)
 	} else if jn.joinType == one_to_one {
-		jn.lookupRow = lookup(jn.source2, th, sel2)
+		jn.lookupRow = lookup(jn.source2, sel2, th, jn.st)
 	} else {
 		jn.source2.Select(sel2)
 	}
@@ -480,7 +475,7 @@ func (jn *Join) nextRow1(th *Thread, dir Dir) bool {
 }
 
 func (jb *joinBase) cachedLookup(th *Thread, sels Sels) Row {
-	return jb.lookupCache.Lookup(th, jb.source2, sels, jb.st)
+	return jb.lookupCache.Lookup(jb.source2, sels, th, jb.st)
 }
 
 func (jb *joinBase) projectRow1(th *Thread, row Row) Sels {
@@ -522,13 +517,6 @@ func (jn *Join) Lookup(th *Thread, sels Sels) Row {
 	// fmt.Println(jn.strategy(), "Lookup", cols, unpack(vals))
 	jn.nlooks++
 	sel1, sel2 := jn.splitSelect(sels)
-	if jn.lookupFallback(sel1) {
-		jn.rewind()
-		jn.source1.Select(sel1)
-		defer jn.Select(nil)
-		jn.sel2 = sel2
-		return GetNext1(jn, th, slc.With(sel1, sel2...))
-	}
 	row1 := jn.source1.Lookup(th, sel1)
 	if row1 == nil {
 		return nil
@@ -538,51 +526,17 @@ func (jn *Join) Lookup(th *Thread, sels Sels) Row {
 	if jn.joinType == many_to_one {
 		row2 = jn.cachedLookup(th, sel2)
 	} else if jn.joinType == one_to_one {
-		row2 = lookup(jn.source2, th, sel2)
+		row2 = lookup(jn.source2, sel2, th, jn.st)
 	} else {
 		jn.source2.Select(sel2)
 		defer jn.Select(nil)
-		row2 = GetNext1(jn.source2, th, sel2)
+		row2 = getNext1(jn.source2, th)
 	}
 	if row2 == nil {
 		return nil
 	}
-	// assert.That(jn.equalBy(th, jn.st, row1, row2))
+	dbg.Assert(func() bool { return jn.equalBy(th, jn.st, row1, row2) })
 	return JoinRows(row1, row2)
-}
-
-func (jb *joinBase) lookupFallback(sel1 Sels) bool {
-	if jb.lookup == nil { // memoize
-		jb.lookup = &lookupInfo{
-			keys1:  jb.source1.Keys(),
-			fixed1: jb.source1.Fixed(),
-		}
-	}
-	if !selHasKey(sel1, jb.lookup.keys1, jb.lookup.fixed1) {
-		// can't do lookup on source1
-		// this can happen (rarely) because there's no way to tell Optimize
-		// that we want to do lookups with the index
-		if !jb.lookup.fallback {
-			jb.lookup.fallback = true
-			// log.Println("INFO query", which, "Lookup fallback to Select & Get")
-			// fmt.Println("sel1cols", sel1cols, "keys1", jb.lookup.keys1, "fixed1", jb.lookup.fixed1)
-		}
-		return true
-	}
-	return false
-}
-
-func selHasKey(sels Sels, keys [][]string, fixed Fixed) bool {
-outer:
-	for _, key := range keys {
-		for _, k := range key {
-			if !fixed.Single(k) && !sels.HasCol(k) {
-				continue outer
-			}
-		}
-		return true
-	}
-	return false
 }
 
 func (jn *Join) Simple(th *Thread) []Row {
@@ -601,13 +555,7 @@ func (jn *Join) Simple(th *Thread) []Row {
 }
 
 func (jb *joinBase) equalBy(th *Thread, st *SuTran, row1, row2 Row) bool {
-	for _, f := range jb.by {
-		if row1.GetRawVal(jb.source1.Header(), f, th, st) !=
-			row2.GetRawVal(jb.source2.Header(), f, th, st) {
-			return false
-		}
-	}
-	return true
+	return EqualRows(jb.source1.Header(), row1, jb.source2.Header(), row2, jb.by, th, st)
 }
 
 // LeftJoin ---------------------------------------------------------
@@ -712,7 +660,7 @@ func fixedConflict(fixed1, fixed2 Fixed) bool {
 }
 
 func (lj *LeftJoin) optimize(mode Mode, req Require) (Cost, Cost, any) {
-	jc := joinopt2(lj.source1, lj.source2, lj.Nrows, lj.joinType,
+	jc := lj.optDir(lj.source1, lj.source2, lj.Nrows, lj.joinType,
 		mode, req, lj.by)
 	if jc.fixcost == impossible {
 		return impossible, impossible, nil
@@ -791,7 +739,7 @@ func (lj *LeftJoin) Get(th *Thread, dir Dir) (r Row) {
 			if lj.joinType == many_to_one {
 				lj.lookupRow = lj.cachedLookup(th, sels)
 			} else if lj.joinType == one_to_one {
-				lj.lookupRow = lookup(lj.source2, th, sels)
+				lj.lookupRow = lookup(lj.source2, sels, th, lj.st)
 			} else {
 				lj.source2.Select(sels)
 			}
@@ -809,8 +757,8 @@ func (lj *LeftJoin) Get(th *Thread, dir Dir) (r Row) {
 			row2 := lj.row2
 			if row2 == nil {
 				row2 = lj.empty2
-				// } else {
-				// assert.That(lj.equalBy(th, lj.st, lj.row1, row2))
+			} else {
+				dbg.Assert(func() bool { return lj.equalBy(th, lj.st, lj.row1, row2) })
 			}
 			if lj.filter2(row2) {
 				lj.ngets++
@@ -844,12 +792,6 @@ func (lj *LeftJoin) Lookup(th *Thread, sels Sels) Row {
 	defer lj.Select(nil)
 	sel1, sel2 := lj.splitSelect(sels)
 	lj.sel2 = sel2
-	if lj.lookupFallback(sel1) {
-		// log.Println("INFO LeftJoin Lookup fallback to Select & Get")
-		lj.rewind()
-		lj.source1.Select(sel1)
-		return GetNext1(lj, th, sel1)
-	}
 	row1 := lj.source1.Lookup(th, sel1)
 	if row1 == nil {
 		return nil
@@ -859,15 +801,15 @@ func (lj *LeftJoin) Lookup(th *Thread, sels Sels) Row {
 	if lj.joinType == many_to_one {
 		row2 = lj.cachedLookup(th, sel)
 	} else if lj.joinType == one_to_one {
-		row2 = lookup(lj.source2, th, sel)
+		row2 = lookup(lj.source2, sel, th, lj.st)
 	} else {
 		lj.source2.Select(sel)
 		row2 = lj.source2.Get(th, Next)
 	}
 	if row2 == nil {
 		row2 = lj.empty2
-		// } else {
-		// assert.That(lj.equalBy(th, lj.st, row1, row2))
+	} else {
+		dbg.Assert(func() bool { return lj.equalBy(th, lj.st, row1, row2) })
 	}
 	if !lj.filter2(row2) {
 		return nil

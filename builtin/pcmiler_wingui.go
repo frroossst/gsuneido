@@ -11,7 +11,6 @@ import (
 	"unsafe"
 
 	. "github.com/apmckinlay/gsuneido/core"
-	"golang.org/x/exp/maps"
 	"golang.org/x/sys/windows"
 )
 
@@ -40,7 +39,7 @@ var pcmMethods = methods("pcm")
 var _ = staticMethod(pcm_Members, "() :object")
 
 func pcm_Members() Value {
-	return SuObjectOfStrs(maps.Keys(pcmMethods))
+	return methodList(pcmMethods)
 }
 
 var pcmsrv = windows.NewLazyDLL("pcmsrv64.dll")

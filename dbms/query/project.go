@@ -12,6 +12,7 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/hash"
 	"github.com/apmckinlay/gsuneido/util/set"
 	"github.com/apmckinlay/gsuneido/util/shmap"
@@ -74,7 +75,7 @@ func NewProject(src Query, cols []string) *Project {
 	assert.That(len(cols) > 0)
 	cols = set.Unique(cols)
 	srcCols := src.Columns()
-	if !set.Subset(srcCols, cols) {
+	if !set.HasSubset(srcCols, cols) {
 		panic("project: nonexistent column(s): " +
 			str.Join(", ", set.Difference(cols, srcCols)))
 	}
@@ -111,7 +112,7 @@ func newProject(src Query, cols []string) Query {
 }
 
 func newProject2(src Query, cols []string, includeDeps bool) *Project {
-	p := &Project{Query1: Query1{source: src}}
+	p := &Project{source: src}
 	if hasKey(cols, src.Keys(), src.Fixed()) {
 		p.unique = true
 		if includeDeps {
@@ -153,24 +154,27 @@ func (*Project) includeDeps(cols, srcCols []string) []string {
 }
 
 func (p *Project) getHeader() *Header {
-	srcFlds := p.source.Header().Fields
-	newflds := make([][]string, len(srcFlds))
-	for i, fs := range srcFlds {
-		newflds[i] = projectFields(fs, p.columns)
-	}
-	return NewHeader(newflds, p.columns)
+	return projectHeader(p.source.Header(), p.columns)
 }
 
-func projectFields(fs []string, pcols []string) []string {
-	flds := make([]string, len(fs))
-	for i, f := range fs {
-		if slices.Contains(pcols, f) {
-			flds[i] = f
-		} else {
-			flds[i] = "-"
+// projectHeader builds a Header with the given columns.
+// Physical fields not in cols are replaced with "-" so Fields stays
+// parallel one-to-one with the underlying records.
+func projectHeader(src *Header, cols []string) *Header {
+	srcFlds := src.Fields
+	newflds := make([][]string, len(srcFlds))
+	for i, fs := range srcFlds {
+		flds := make([]string, len(fs))
+		for j, f := range fs {
+			if slices.Contains(cols, f) {
+				flds[j] = f
+			} else {
+				flds[j] = "-"
+			}
 		}
+		newflds[i] = flds
 	}
-	return flds
+	return NewHeader(newflds, cols)
 }
 
 func (p *Project) String() string {
@@ -209,7 +213,7 @@ func (p *Project) SetTran(t QueryTran) {
 func projectKeys(keys [][]string, cols []string) [][]string {
 	var keys2 [][]string
 	for _, k := range keys {
-		if set.Subset(cols, k) {
+		if set.HasSubset(cols, k) {
 			keys2 = append(keys2, k)
 		}
 	}
@@ -274,7 +278,7 @@ func (p *Project) Transform() Query {
 		if len(cols) == 0 { // no summaries left
 			return newProject(q.source, p.columns).Transform()
 		}
-		if set.Subset(p.columns, q.by) {
+		if set.HasSubset(p.columns, q.by) {
 			return NewSummarize(q.source, q.hint, q.by, cols, ops, ons).Transform()
 		}
 	case *Rename:
@@ -284,17 +288,17 @@ func (p *Project) Transform() Query {
 	case *Times:
 		return NewTimes(p.splitOver(&q.Query2)).Transform()
 	case *Join:
-		if set.Subset(p.columns, q.by) {
+		if set.HasSubset(p.columns, q.by) {
 			src1, src2 := p.splitOver(&q.Query2)
 			return q.With(src1, src2).Transform()
 		}
 	case *SemiJoin:
-		if set.Subset(p.columns, q.by) {
+		if set.HasSubset(p.columns, q.by) {
 			src1 := newProject(q.source1, p.columns)
 			return q.With(src1, q.source2).Transform()
 		}
 	case *LeftJoin:
-		if set.Subset(p.columns, q.by) {
+		if set.HasSubset(p.columns, q.by) {
 			src1, src2 := p.splitOver(&q.Query2)
 			return q.With(src1, src2).Transform()
 		}
@@ -326,14 +330,14 @@ func (p *Project) transformRename(r *Rename) Query {
 	var newFrom, newTo []string
 	from := r.from
 	to := r.to
-	for i := len(to) - 1; i >= 0; i-- {
-		ck := to[i]
+	for i, ck := range slices.Backward(to) {
+
 		if p.unique {
-			ck = strings.TrimSuffix(to[i], "_deps")
+			ck = strings.TrimSuffix(ck, "_deps")
 		}
 		if slices.Contains(p.columns, ck) || slices.Contains(newFrom, ck) {
 			newFrom = append(newFrom, from[i])
-			newTo = append(newTo, to[i])
+			newTo = append(newTo, to[i]) // not ck
 		}
 	}
 	slices.Reverse(newFrom)
@@ -456,15 +460,15 @@ func (p *Project) optimize(mode Mode, req Require) (Cost, Cost, any) {
 		return fixcost, varcost, &projectApproach{strat: projCopy, req: req}
 	}
 	// non-unique: merge incoming req with own ReqGroup(p.columns)
-	seqFix, seqVar, seqApp := p.seqCost(mode, req)
-	mapFix, mapVar, mapApp := p.mapCost(mode, req)
+	seqFix, seqVar, seqApp := p.optSeq(mode, req)
+	mapFix, mapVar, mapApp := p.optMap(mode, req)
 	if seqFix+seqVar <= mapFix+mapVar {
 		return seqFix, seqVar, seqApp
 	}
 	return mapFix, mapVar, mapApp
 }
 
-func (p *Project) seqCost(mode Mode, req Require) (Cost, Cost, any) {
+func (p *Project) optSeq(mode Mode, req Require) (Cost, Cost, any) {
 	fixed := p.source.Fixed()
 	nColsUnfixed := countUnfixed(p.columns, fixed)
 	nrows, _ := p.Nrows()
@@ -480,58 +484,27 @@ func (p *Project) seqCost(mode Mode, req Require) (Cost, Cost, any) {
 		}
 	case ReqUnique:
 		// req.cols must cover the output key (all columns, since non-unique).
-		debug.assert(indexCovered(p.columns, req.cols, p.Fixed()))
+		dbg.Assert(func() bool { return indexCovered(p.columns, req.cols, p.Fixed()) })
 		// we can use GroupReq because Lookup is implemented by Select + Get
 		srcReq := GroupReq(req.cols, req.SelectFrac(nrows), req.nseeks)
 		fixcost, varcost := Optimize(p.source, mode, srcReq)
 		return fixcost, varcost, &projectApproach{strat: projSeq, req: srcReq}
 	case ReqGroup:
 		if len(req.cols) == len(p.columns) {
-			debug.assert(set.Equal(req.cols, p.columns)) // only key is all columns
+			dbg.Assert(func() bool { return set.Equal(req.cols, p.columns) }) // only key is all columns
 			fixcost, varcost := Optimize(p.source, mode, srcReq)
 			return fixcost, varcost, &projectApproach{strat: projSeq, req: srcReq}
-		}
-		if !eitherSubset(req.cols, p.columns) {
-			return impossible, impossible, nil
-		}
-		// requires are different ReqGroup
-		// this can't be handled with a single Require
-		// so we need to search here
-		nColsUnfixedReq := countUnfixed(req.cols, fixed)
-		best := newBest[Require]()
-		for _, idx := range p.source.Indexes() {
-			if grouped(idx, req.cols, nColsUnfixedReq, fixed) &&
-				grouped(idx, p.columns, nColsUnfixed, fixed) {
-				// source req must be ordered so it doesn't ignore column order
-				// which is necessary to satisfy both groupings
-				srcReq := OrderReq(idx, req.SelectFrac(nrows))
-				srcReq.nseeks = req.nseeks
-				f, v := Optimize(p.source, mode, srcReq)
-				best.update(f, v, srcReq)
-			}
-		}
-		if best.found() {
-			return best.fixcost, best.varcost,
-				&projectApproach{strat: projSeq, req: best.data}
 		}
 	}
 	return impossible, impossible, nil
 }
 
-// eitherSubset returns true if x is a subset of y or y is a subset of x
-func eitherSubset(x, y []string) bool {
-	if len(x) > len(y) {
-		x, y = y, x
-	}
-	return set.Subset(x, y)
-}
-
 const mapCost = 20 // ???
 
-// mapCost estimates the cost of projMap.
+// optMap estimates the cost of projMap.
 // The map is built incrementally during iteration (not up front),
 // so the map build cost is added to varcost, not fixcost.
-func (p *Project) mapCost(mode Mode, req Require) (Cost, Cost, any) {
+func (p *Project) optMap(mode Mode, req Require) (Cost, Cost, any) {
 	nrows, _ := p.Nrows()
 	if mode != ReadMode || nrows > mapThreshold {
 		return impossible, impossible, nil
@@ -665,7 +638,7 @@ func (p *Project) getMap(th *Thread, dir Dir) Row {
 			hfn := func(k rowHash) uint64 { return k.hash }
 			eqfn := func(x, y rowHash) bool {
 				return x.hash == y.hash &&
-					equalCols(x.row, y.row, p.source.Header(), p.columns, p.th, p.st)
+					equalCols(x.row, y.row, p.Header(), p.columns, p.th, p.st)
 			}
 			p.dedup = shmap.NewMapFuncs[rowHash, struct{}](hfn, eqfn)
 		}
@@ -690,20 +663,18 @@ func (p *Project) getMap(th *Thread, dir Dir) Row {
 }
 
 func hashCols(row Row, hdr *Header, cols []string, th *Thread, st *SuTran) uint64 {
+	assert.That(th != nil)
+	rr := NewRowRec(row, hdr, th, st)
 	h := uint64(31)
 	for _, col := range cols {
-		x := row.GetRawVal(hdr, col, th, st)
+		x := rr.GetRawVal(col)
 		h = 31*h + hash.String(x)
 	}
 	return h
 }
 func equalCols(x, y Row, hdr *Header, cols []string, th *Thread, st *SuTran) bool {
-	for _, col := range cols {
-		if x.GetRawVal(hdr, col, th, st) != y.GetRawVal(hdr, col, th, st) {
-			return false
-		}
-	}
-	return true
+	assert.That(th != nil)
+	return EqualRows(hdr, x, hdr, y, cols, th, st)
 }
 
 func (p *Project) buildDedup(th *Thread) {
@@ -722,7 +693,7 @@ func (p *Project) buildDedup(th *Thread) {
 // else the new row and false
 func (p *Project) dedupRow(th *Thread, row Row) (Row, bool) {
 	rh := rowHash{row: row,
-		hash: hashCols(row, p.source.Header(), p.columns, th, p.st)}
+		hash: hashCols(row, p.Header(), p.columns, th, p.st)}
 	k, existed := p.dedup.GetInit(rh)
 	if existed {
 		return k.row, true
@@ -770,6 +741,7 @@ func (p *Project) Lookup(th *Thread, sels Sels) Row {
 }
 
 func (p *Project) Simple(th *Thread) []Row {
+	assert.That(th != nil)
 	hdr := p.Header()
 	dst := 0
 	rows := p.source.Simple(th)

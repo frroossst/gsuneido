@@ -4,6 +4,7 @@
 package builtin
 
 import (
+	"log"
 	"runtime/metrics"
 	"slices"
 
@@ -19,26 +20,32 @@ import (
 
 var _ = exportMethods(&SuneidoObjectMethods, "suneido")
 
-var _ = staticMethod(suneido_Compile, "(source :string, errob = false) :unknown")
+var _ = staticMethod(suneido_Compile,
+	"(source :string, errob = false, name :string = '') :unknown")
 
 func suneido_Compile(th *Thread, args []Value) Value {
 	src := ToStr(args[0])
+	name := ToStr(args[2])
 	if args[1] == False {
+		if name != "" {
+			return compile.NamedConstant("", name, src, nil)
+		}
 		return compile.Constant(src)
 	}
 	ob := ToContainer(args[1])
-	val, checks := compile.Checked(th, src)
+	val, checks := compile.CheckedNamed(name, src, th)
 	for _, w := range checks {
 		ob.Add(SuStr(w))
 	}
 	return val
 }
 
-var _ = staticMethod(suneido_Parse, "(source :string) :unknown")
+var _ = staticMethod(suneido_Parse, "(source :string, name :string = '') :unknown")
 
 func suneido_Parse(th *Thread, args []Value) Value {
 	src := ToStr(args[0])
-	p := compile.AstParser(src)
+	name := ToStr(args[1])
+	p := compile.AstParserNamed(name, src)
 	ast := p.Const()
 	if p.Token != tokens.Eof {
 		p.Error("did not parse all input")
@@ -199,3 +206,10 @@ func suneido_LibraryTags(args Value) Value {
 var _ = AddInfo("library.tags", func() string {
 	return SuObjectOfStrs(options.LibraryTags).String()
 })
+
+var _ = staticMethod(suneido_ErrorLog, "(string) :void")
+
+func suneido_ErrorLog(arg Value) Value {
+	log.Println(ToStrOrString(arg))
+	return nil
+}

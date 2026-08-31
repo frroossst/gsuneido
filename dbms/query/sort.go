@@ -22,16 +22,16 @@ type Sort struct {
 }
 
 func NewSort(src Query, reverse bool, order []string) *Sort {
-	if !set.Subset(src.Columns(), order) {
+	if !set.HasSubset(src.Columns(), order) {
 		panic("sort: nonexistent columns: " +
 			str.Join(", ", set.Difference(order, src.Columns())))
 	}
-	sort := Sort{reverse: reverse}
-	sort.source = src
-	sort.order = order
-	sort.header = src.Header()
-	sort.keys = src.Keys()
-	sort.fixed = src.Fixed()
+	sort := Sort{reverse: reverse,
+		source: src,
+		order:  order,
+		header: src.Header(),
+		keys:   src.Keys(),
+		fixed:  src.Fixed()}
 	sort.setNrows(src.Nrows())
 	sort.rowSiz.Set(src.rowSize())
 	sort.fast1.Set(src.fastSingle())
@@ -119,9 +119,11 @@ func (sort *Sort) Simple(th *Thread) []Row {
 	}
 	rows := sort.source.Simple(th)
 	cmp := func(xrow, yrow Row) int {
+		xrr := NewRowRec(xrow, sort.header, th, nil)
+		yrr := NewRowRec(yrow, sort.header, th, nil)
 		for _, col := range sort.order {
-			x := xrow.GetRawVal(sort.header, col, th, nil)
-			y := yrow.GetRawVal(sort.header, col, th, nil)
+			x := xrr.GetRawVal(col)
+			y := yrr.GetRawVal(col)
 			if c := strings.Compare(x, y); c != 0 {
 				return c * rev
 			}

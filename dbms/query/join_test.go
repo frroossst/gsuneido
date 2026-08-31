@@ -13,10 +13,8 @@ import (
 func TestJoin_nrows(t *testing.T) {
 	test := func(n1, p1, n2, p2, expected int) {
 		t.Helper()
-		j1n := Join{}
-		j1n.joinType = one_to_many
-		jn1 := Join{}
-		jn1.joinType = many_to_one
+		j1n := Join{joinType: one_to_many}
+		jn1 := Join{joinType: many_to_one}
 		assert.T(t).Msg(n1, "/", p1, one_to_many, n2, "/", p2, "=>", expected).
 			This(j1n.nrows(n1, p1, n2, p2)).Is(expected)
 		assert.T(t).Msg(n1, "/", p1, many_to_one, n2, "/", p2, "=>", expected).
@@ -88,22 +86,11 @@ func TestJoin_EmptyTempIndexBug(t *testing.T) {
 	tran := sizeTran{db.NewReadTran()}
 	q := ParseQuery(query, tran, nil)
 	idx := []string{"ck", "ik"}
-	q = setupIndex(q, ReadMode, idx, tran)
+	q = setupIndex(q, ReadMode, tran, idx)
 	// fmt.Println(Strategy(q))
 	assert.T(t).Msg("empty TempIndex").
 		That(!strings.Contains(Strategy(q), "TEMPINDEX()"))
 	q.Select(Sels{{"ck", ""}, {"ik", ""}})
-}
-
-func setupIndex(q Query, mode Mode, index []string, tran QueryTran) Query {
-	q = q.Transform()
-	req := OrderReq(index, 1)
-	fixcost, varcost := Optimize(q, mode, req)
-	if fixcost+varcost >= impossible {
-		panic("impossible")
-	}
-	q = SetApproach(q, req, tran)
-	return q
 }
 
 func TestJoin_LookupBug(t *testing.T) {

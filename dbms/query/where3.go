@@ -81,11 +81,6 @@ func betterMinPre(a, b *idxSel) bool {
 	return a.prefixFrac < b.prefixFrac
 }
 
-func sameFrac(x, y float64) bool {
-	const epsilon = 1e-9
-	return math.Abs(x-y) < epsilon
-}
-
 func (w *Where) buildIdxSel(index []string, mode byte, perCol map[string][]span) *idxSel {
 	encode := mode != 'k' || len(index) > 1
 	isel := idxSel{index: index, encoded: encode, mode: mode}
@@ -93,7 +88,11 @@ func (w *Where) buildIdxSel(index []string, mode byte, perCol map[string][]span)
 	// Fast path: all prefix columns have single-value spans
 	if prefixLen, org, ok := allSingleValuePrefix(index, encode, perCol); ok {
 		isel.prefixLen = prefixLen
-		lookup := prefixLen == len(index)
+		// A unique 'u' index appends Ixspec.Fields2 (the table's best key)
+		// to the physical entry when the index value is entirely empty
+		// (to allow multiple empty entries), so a Lookup by value alone
+		// only works when the value is not empty.
+		lookup := prefixLen == len(index) && (mode != 'u' || org != "")
 		if lookup {
 			isel.prefixRanges = []pointRange{{Org: org}}
 		} else {
@@ -120,7 +119,8 @@ func (w *Where) buildIdxSel(index []string, mode byte, perCol map[string][]span)
 		for i := range comp {
 			c := &comp[i]
 			if c.isPoint() {
-				lookup := len(exploded[i]) == len(index)
+				// see comment above about unique 'u' index Lookup and empty values
+				lookup := len(exploded[i]) == len(index) && (mode != 'u' || c.Org != "")
 				if !lookup {
 					assert.That(encode)
 					c.End = c.Org + ixkey.Sep + ixkey.Max
@@ -383,7 +383,7 @@ func (w *Where) moreFilters(index []string, isel *idxSel) (bool, bool) {
 	dataFilter := false
 	for _, e := range w.expr.Exprs {
 		exprCols := e.Columns()
-		if len(exprCols) == 0 || !set.Subset(index, exprCols) {
+		if len(exprCols) == 0 || !set.HasSubset(index, exprCols) {
 			dataFilter = true
 		} else if !set.Disjoint(exprCols, unconstrained) {
 			// e.g. index(a,b) where a>1 and F(a,b)

@@ -76,21 +76,6 @@ func string_Asc(this Value) Value {
 	return SuInt(int(s[0]))
 }
 
-// TODO remove after we switch to Suneido.Compile (after jSuneido is gone)
-var _ = method(string_Compile, "(errob = false) :unknown")
-
-func string_Compile(th *Thread, this Value, args []Value) Value {
-	if args[0] == False {
-		return compile.Constant(ToStr(this))
-	}
-	ob := ToContainer(args[0])
-	val, checks := compile.Checked(th, ToStr(this))
-	for _, w := range checks {
-		ob.Add(SuStr(w))
-	}
-	return val
-}
-
 var _ = method(string_Count, "(string :string) :number")
 
 func string_Count(this, arg Value) Value {
@@ -270,17 +255,17 @@ func string_MapN(th *Thread, this Value, args []Value) Value {
 	s := ToStr(this)
 	n := IfInt(args[0])
 	block := args[1]
-	var buf strings.Builder
-	buf.Grow(len(s)) // ???
+	var sb strings.Builder
+	sb.Grow(len(s)) // ???
 	for i := 0; i < len(s); i += n {
 		end := min(i+n, len(s))
 		val := th.Call(block, SuStr1(s[i:end]))
 		if val != nil {
-			buf.WriteString(AsStr(val))
-			CheckStringSize("MapN", buf.Len())
+			sb.WriteString(AsStr(val))
+			CheckStringSize("MapN", sb.Len())
 		}
 	}
-	return SuStr(buf.String())
+	return SuStr(sb.String())
 }
 
 var _ = method(string_Match, "(pattern, pos=false, prev :boolean =false) :false|object")
@@ -496,14 +481,14 @@ var _ = method(string_Unescape, "() :string")
 
 func string_Unescape(this Value) Value {
 	s := ToStr(this)
-	var buf strings.Builder
-	buf.Grow(len(s))
+	var sb strings.Builder
+	sb.Grow(len(s))
 	for i := 0; i < len(s); i++ {
 		var c byte
 		c, i = str.Doesc(s, i)
-		buf.WriteByte(c)
+		sb.WriteByte(c)
 	}
-	return SuStr(buf.String())
+	return SuStr(sb.String())
 }
 
 var _ = method(string_Upper, "() :string")
@@ -548,7 +533,7 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) string
 
 	from := -1
 	nreps := 0
-	var buf strings.Builder
+	var sb strings.Builder
 	for cap := range pat.All(s) {
 		pos, end := cap[0], cap[1]
 
@@ -567,16 +552,16 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) string
 		if from == -1 { // no changes to original string yet
 			if r != s[pos:end] {
 				// initialize buffer only when we know we need to make changes
-				buf.Grow(len(s)) // ???
-				buf.WriteString(s[0:pos])
+				sb.Grow(len(s)) // ???
+				sb.WriteString(s[0:pos])
 				from = int(end)
-				buf.WriteString(r)
+				sb.WriteString(r)
 			}
 		} else {
 			// if we've already started making changes, continue appending
-			buf.WriteString(s[from:pos])
+			sb.WriteString(s[from:pos])
 			from = int(end)
-			buf.WriteString(r)
+			sb.WriteString(r)
 		}
 
 		nreps++
@@ -590,9 +575,9 @@ func replace(th *Thread, s string, patarg Value, reparg Value, count int) string
 	}
 
 	if from < len(s) {
-		buf.WriteString(s[from:])
+		sb.WriteString(s[from:])
 	}
-	return buf.String()
+	return sb.String()
 }
 
 func callable(v Value) bool {

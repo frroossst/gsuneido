@@ -34,6 +34,7 @@ func ssCallClass(th *Thread, as *ArgSpec, this Value, args []Value) Value {
 	name, port, as2 := ssArgs(th, as, this, args)
 	class := this.(interface{ Class() *SuClass }).Class()
 	sm := suServerMaster{SuInstance: class.New(th, as2)}
+	sm.SetConcurrent() // since it will be shallow copied per connection thread
 	sm.listen(th, ToStr(name), ToInt(port))
 	return nil
 }
@@ -137,7 +138,7 @@ func (sm *suServerMaster) listen(th *Thread, name string, port int) {
 				port, name)
 			return
 		}
-		go sm.connect(name, conn)
+		go sm.connect(name, conn) // goroutine per connection
 	}
 }
 
@@ -148,22 +149,22 @@ func (sm *suServerMaster) connect(name string, conn net.Conn) {
 		// no timeout to match jSuneido
 	}
 	sc := &suServerConnect{
-		SuInstance: sm.SuInstance.Copy(),
+		SuInstance: sm.SuInstance.Copy(), // copy of master per connection
 		client:     client,
 	}
 	defer sc.close()
-	t := NewThread(nil)
-	t.Name = str.BeforeFirst(t.Name, " ") + " " + name
-	if f := sc.Lookup(t, "Run"); f != nil {
-		threads.add(t)
+	th := NewThread(nil)
+	th.Name = str.BeforeFirst(th.Name, " ") + " " + name
+	if f := sc.Lookup(th, "Run"); f != nil {
+		threads.add(th)
 		defer func() {
-			t.Close()
-			threads.remove(t.Num)
+			th.Close()
+			threads.remove(th.Num)
 			if e := recover(); e != nil {
-				LogUncaught(t, "SocketServer", e)
+				LogUncaught(th, "SocketServer", e)
 			}
 		}()
-		f.Call(t, sc, &ArgSpec0)
+		f.Call(th, sc, &ArgSpec0)
 	}
 }
 

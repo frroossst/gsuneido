@@ -4,6 +4,7 @@
 package core
 
 import (
+	"fmt"
 	"math"
 	"strings"
 
@@ -54,15 +55,14 @@ func (row Row) GetVal(hdr *Header, fld string, th *Thread, tran *SuTran) Value {
 			val := Unpack(x)
 			return SuStr(str.ToLower(ToStr(val)))
 		}
-		if !hasRule(th, fld) {
-			return EmptyStr
+		if hasRule(th, fld) {
+			return SuRecordFromRow(row, hdr, "", tran).Get(th, SuStr(fld))
 		}
-		// else construct SuRecord to handle rules
-		return SuRecordFromRow(row, hdr, "", tran).Get(th, SuStr(fld))
+		return EmptyStr
 	}
 }
 
-// GetRaw handles _lower! but does NOT handle rules.
+// GetRaw handles _lower! but does NOT handle rules or PackForward.
 // It is used by SuRecord Get.
 func (row Row) GetRaw(hdr *Header, fld string) string {
 	if strings.HasSuffix(fld, "_lower!") {
@@ -76,6 +76,33 @@ func (row Row) GetRaw(hdr *Header, fld string) string {
 
 // GetRawVal is like GetVal (i.e. handles rules) but returns a raw/packed value.
 func (row Row) GetRawVal(hdr *Header, fld string, th *Thread, tran *SuTran) string {
+	var rec *SuRecord
+	return getRawVal(row, hdr, fld, th, tran, &rec)
+}
+
+// RowRec resolves raw values for multiple fields from a Row,
+// sharing a single lazily-built SuRecord for derived (rule) fields.
+type RowRec struct {
+	row  Row
+	hdr  *Header
+	th   *Thread
+	tran *SuTran
+	rec  *SuRecord
+}
+
+// NewRowRec returns a RowRec that shares one SuRecord for rule evaluation.
+func NewRowRec(row Row, hdr *Header, th *Thread, tran *SuTran) RowRec {
+	return RowRec{row: row, hdr: hdr, th: th, tran: tran}
+}
+
+// GetRawVal is like Row.GetRawVal but reuses the shared SuRecord
+// so rules are evaluated only once per RowRec.
+func (rr *RowRec) GetRawVal(fld string) string {
+	return getRawVal(rr.row, rr.hdr, fld, rr.th, rr.tran, &rr.rec)
+}
+
+func getRawVal(row Row, hdr *Header, fld string, th *Thread, tran *SuTran,
+	rec **SuRecord) string {
 	for {
 		if raw, ok := row.getRaw2(hdr, fld); ok {
 			if len(raw) > 0 && raw[0] == PackForward {
@@ -89,12 +116,14 @@ func (row Row) GetRawVal(hdr *Header, fld string, th *Thread, tran *SuTran) stri
 			x, _ := row.getRaw2(hdr, base)
 			return lowerRaw(x)
 		}
-		if !hasRule(th, fld) {
-			return ""
+		if hasRule(th, fld) {
+			if *rec == nil {
+				*rec = SuRecordFromRow(row, hdr, "", tran)
+			}
+			v := (*rec).Get(th, SuStr(fld))
+			return Pack(v.(Packable))
 		}
-		// else construct SuRecord to handle rules
-		v := SuRecordFromRow(row, hdr, "", tran).Get(th, SuStr(fld))
-		return Pack(v.(Packable))
+		return ""
 	}
 }
 
@@ -299,16 +328,18 @@ func (hdr *Header) GetFields() []string {
 	return result
 }
 
-// EqualRows is used by Project
+// EqualRows compares two rows with the same header, by hdr.Columns
 func (hdr *Header) EqualRows(r1, r2 Row, th *Thread, st *SuTran) bool {
 	return EqualRows(hdr, r1, hdr, r2, hdr.Columns, th, st)
 }
 
-// EqualRows is used by Compatible
+// EqualRows compares two rows with possibly different headers, by cols
 func EqualRows(hdr1 *Header, r1 Row, hdr2 *Header, r2 Row, cols []string,
 	th *Thread, st *SuTran) bool {
+	rr1 := NewRowRec(r1, hdr1, th, st)
+	rr2 := NewRowRec(r2, hdr2, th, st)
 	for _, col := range cols {
-		if r1.GetRawVal(hdr1, col, th, st) != r2.GetRawVal(hdr2, col, th, st) {
+		if rr1.GetRawVal(col) != rr2.GetRawVal(col) {
 			return false
 		}
 	}
@@ -366,4 +397,24 @@ func (hdr *Header) Physical() []string {
 		}
 	}
 	return result
+}
+
+// RowStr is used for debugging. It includes "" values.
+func RowStr(hdr *Header, row Row) string {
+	if row == nil {
+		return "Row(nil)"
+	}
+	cols := slices.Clone(hdr.Columns)
+	slices.Sort(cols)
+	th := &Thread{}
+	var sb strings.Builder
+	sb.WriteString("Row{")
+	sep := ""
+	for _, col := range cols {
+		val := row.GetVal(hdr, col, th, nil)
+		fmt.Fprint(&sb, sep, col, "=", val.String())
+		sep = " "
+	}
+	sb.WriteByte('}')
+	return sb.String()
 }

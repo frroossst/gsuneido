@@ -26,13 +26,16 @@ type Extend struct {
 	physical []string // cols with exprs
 	sels     Sels
 	srcFlds  []string
+	// fwd maps extend expr index -> PackForward + name, for exprs that are
+	// bare identifiers referencing a non-physical column (a forward ref).
+	// Stored lazily instead of evaluating; resolved on read by GetVal/GetRawVal.
 	fwd      map[int]string
 	hasExprs bool
 	conflict bool
 }
 
 func NewExtend(src Query, cols []string, exprs []ast.Expr) *Extend {
-	e := &Extend{Query1: Query1{source: src}, cols: cols, exprs: exprs}
+	e := &Extend{source: src, cols: cols, exprs: exprs}
 	e.checkDependencies()
 	srcCols := e.source.Columns()
 	if !set.Disjoint(e.cols, srcCols) {
@@ -62,6 +65,8 @@ func NewExtend(src Query, cols []string, exprs []ast.Expr) *Extend {
 		}
 		if id, ok := expr.(*ast.Ident); ok && !e.header.HasField(id.Name) {
 			assert.That(id.Name != e.cols[i])
+			// id is a forward ref to a non-physical column;
+			// store a lazy PackForward + name rather than evaluating.
 			if e.fwd == nil {
 				e.fwd = make(map[int]string)
 			}
@@ -77,7 +82,7 @@ func (e *Extend) checkDependencies() {
 	for i := range e.cols {
 		if e.exprs[i] != nil {
 			ecols := e.exprs[i].Columns()
-			if !set.Subset(avail, ecols) {
+			if !set.HasSubset(avail, ecols) {
 				panic("extend: invalid column(s) in expressions: " +
 					str.Join(", ", set.Difference(ecols, avail)))
 			}
@@ -116,19 +121,19 @@ func (e *Extend) SetTran(t QueryTran) {
 }
 
 func (e *Extend) String() string {
-	var s strings.Builder
-	s.WriteString("extend ")
+	var sb strings.Builder
+	sb.WriteString("extend ")
 	sep := ""
 	for i, c := range e.cols {
-		s.WriteString(sep)
-		s.WriteString(c)
+		sb.WriteString(sep)
+		sb.WriteString(c)
 		sep = ", "
 		if e.exprs[i] != nil {
-			s.WriteString(" = ")
-			s.WriteString(e.exprs[i].Echo())
+			sb.WriteString(" = ")
+			sb.WriteString(e.exprs[i].Echo())
 		}
 	}
-	return s.String()
+	return sb.String()
 }
 
 func (e *Extend) getRowSize() int {
@@ -211,7 +216,12 @@ func (e *Extend) optimize(mode Mode, req Require) (Cost, Cost, any) {
 		}
 		// Extend.Lookup handles extend-column sels via splitSelect + filter,
 		// so strip them before passing to the source.
-		req = UniqueReq(set.Difference(req.cols, e.cols), req.nseeks)
+		srcCols := set.Difference(req.cols, e.cols)
+		if len(srcCols) == 0 && !e.source.fastSingle() {
+			// can't do a keyed Lookup solely on derived columns
+			return impossible, impossible, nil
+		}
+		req = UniqueReq(srcCols, req.nseeks)
 	}
 	fixcost, varcost := Optimize(e.source, mode, req)
 	return fixcost, varcost, nil
@@ -265,6 +275,7 @@ func (e *Extend) extendRow(th *Thread, row Row) Record {
 				fld := f
 				rb.AddRaw(row.GetRawVal(e.header, fld, e.ctx.Th, e.ctx.Tran))
 			} else if f, ok := e.fwd[i]; ok {
+				// emit the PackForward + name marker; resolved on read
 				rb.AddRaw(f)
 			} else {
 				// incrementally build record so extends can see previous ones
@@ -277,6 +288,11 @@ func (e *Extend) extendRow(th *Thread, row Row) Record {
 	return rb.Trim().Build()
 }
 
+// filter checks e.sels (from Select or Lookup splitSelect)
+// against the extend record and source row.
+// It tries a fast indexed read on physical cols first;
+// if the col is non-physical or its value is a PackForward marker
+// it falls back to GetRawVal which resolves rules and follows forwards.
 func (e *Extend) filter(rec Record, th *Thread, row Row) bool {
 	var extrow Row
 	for _, sel := range e.sels {
@@ -334,9 +350,6 @@ func (e *Extend) Lookup(th *Thread, sels Sels) Row {
 		return row
 	}
 	rec := e.extendRow(th, row)
-	if !e.filter(rec, th, row) {
-		return nil
-	}
 	return append(row, DbRec{Record: rec})
 }
 

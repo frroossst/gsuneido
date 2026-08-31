@@ -12,6 +12,7 @@ import (
 	"github.com/apmckinlay/gsuneido/compile/ast"
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dbg"
 	"github.com/apmckinlay/gsuneido/util/set"
 	"github.com/apmckinlay/gsuneido/util/slc"
 	"github.com/apmckinlay/gsuneido/util/tsc"
@@ -34,7 +35,7 @@ type Union struct {
 }
 
 type unionApproach struct {
-	keyIndex   []string // not necessarily a key if disjoint
+	cols       []string // not necessarily a key if disjoint
 	strat      unionStrategy
 	reverse    bool
 	req1, req2 Require
@@ -95,10 +96,12 @@ func (u *Union) String() string {
 	}
 	switch u.strat {
 	case unionMerge:
-		s += "-merge" //+ str.Join("(,)", u.keyIndex)
+		s += "-merge"
+		// s += "^" + str.Join("(,)", u.mergeCols)
 	case unionLookup:
 		if u.disjoint == "" {
 			s += "-lookup"
+			// s += "^" + str.Join("(,)", u.lookupCols)
 		}
 	}
 	return s
@@ -231,17 +234,26 @@ func (u *Union) getFixed() Fixed {
 // optimize ---------------------------------------------------------
 
 func (u *Union) optimize(mode Mode, req Require) (Cost, Cost, any) {
+	if req.use == ReqUnique {
+		cols1 := set.Intersect(u.source1.Columns(), req.cols)
+		req1 := UniqueReq(cols1, req.nseeks)
+		fc1, vc1 := Optimize(u.source1, mode, req1)
+		cols2 := set.Intersect(u.source2.Columns(), req.cols)
+		req2 := UniqueReq(cols2, req.nseeks)
+		fc2, vc2 := Optimize(u.source2, mode, req2)
+		return fc1 + fc2, vc1 + vc2,
+			&unionApproach{strat: unionLookup, req1: req1, req2: req2,
+				cols: u.source2.Columns()}
+	}
+
 	// try merge versus lookup
 	fcMerge, vcMerge, appMerge := u.optMerge(mode, req)
-	// The lookup strategy just concatenates source1 then source2, with no
-	// merging. For ReqUnique/ReqGroup that is only valid when disjoint if
-	// req.cols includes the disjoint column - otherwise the same req.cols
-	// values can occur on both sides (they only differ by the disjoint
-	// column) and would end up split into two non-adjacent groups/lookups
-	// instead of being combined.
-	if req.use == ReqNone ||
-		(u.disjoint != "" && (req.use == ReqUnique || req.use == ReqGroup) &&
-			slices.Contains(req.cols, u.disjoint)) {
+	// unionLookup interates through source1 not in source2, followed by source2.
+	// For ReqGroup that is only valid when req.cols includes a disjoint column
+	// otherwise the same req.cols values can occur on both sides
+	// and could end up split into two non-adjacent groups
+	if req.use == ReqNone || (req.use == ReqGroup &&
+		u.disjoint != "" && slices.Contains(req.cols, u.disjoint)) {
 		fcLookup, vcLookup, appLookup := u.optLookup(mode, req)
 		if fcLookup+vcLookup < fcMerge+vcMerge {
 			return fcLookup, vcLookup, appLookup
@@ -252,10 +264,10 @@ func (u *Union) optimize(mode Mode, req Require) (Cost, Cost, any) {
 
 func (u *Union) optLookup(mode Mode, req Require) (Cost, Cost, *unionApproach) {
 	// try forward versus reverse
-	fc, vc, app := u.optLookup2(mode, req)
+	fc, vc, ap := u.optLookupDir(mode, req)
 
 	u.source1, u.source2 = u.source2, u.source1
-	fcRev, vcRev, appRev := u.optLookup2(mode, req)
+	fcRev, vcRev, appRev := u.optLookupDir(mode, req)
 	u.source1, u.source2 = u.source2, u.source1
 	fcRev += outOfOrder
 
@@ -263,10 +275,10 @@ func (u *Union) optLookup(mode Mode, req Require) (Cost, Cost, *unionApproach) {
 		appRev.reverse = true
 		return fcRev, vcRev, appRev
 	}
-	return fc, vc, app
+	return fc, vc, ap
 }
 
-func (u *Union) optLookup2(mode Mode, req Require) (Cost, Cost, *unionApproach) {
+func (u *Union) optLookupDir(mode Mode, req Require) (Cost, Cost, *unionApproach) {
 	nrows1, _ := u.source1.Nrows()
 	nseeks := req.SeekCount(nrows1)
 	req1 := req
@@ -292,7 +304,7 @@ func (u *Union) optLookup2(mode Mode, req Require) (Cost, Cost, *unionApproach) 
 		return impossible, impossible, nil
 	}
 	return fc1 + fc2, vc1 + vc2,
-		&unionApproach{strat: unionLookup, req1: req1, req2: req2, keyIndex: req2.cols}
+		&unionApproach{strat: unionLookup, req1: req1, req2: req2, cols: req2.cols}
 }
 
 func (u *Union) optMerge(mode Mode, req Require) (Cost, Cost, *unionApproach) {
@@ -303,11 +315,10 @@ func (u *Union) optMerge(mode Mode, req Require) (Cost, Cost, *unionApproach) {
 		fc2, vc2 := Optimize(u.source2, mode, mr)
 		if fc1+vc1 < impossible && fc2+vc2 < impossible {
 			return fc1 + fc2, vc1 + vc2,
-				&unionApproach{keyIndex: req.cols, strat: unionMerge, req1: mr, req2: mr}
+				&unionApproach{cols: req.cols, strat: unionMerge, req1: mr, req2: mr}
 		}
 	}
 	// Special case: if both sources have empty keys, allow unordered merge
-	// This matches the old optMergeWithOrder behavior
 	keys1 := u.source1.Keys()
 	keys2 := u.source2.Keys()
 	if isEmptyKey(keys1) && isEmptyKey(keys2) {
@@ -343,7 +354,7 @@ func (u *Union) optMerge(mode Mode, req Require) (Cost, Cost, *unionApproach) {
 		return impossible, impossible, nil
 	}
 	return best.fixcost, best.varcost,
-		&unionApproach{strat: unionMerge, keyIndex: best.data.order,
+		&unionApproach{strat: unionMerge, cols: best.data.order,
 			req1: best.data.req, req2: best.data.req}
 }
 
@@ -398,28 +409,31 @@ func (u *Union) mergeIndexes(req Require) [][]string {
 }
 
 func (u *Union) setApproach(req Require, approach any, tran QueryTran) {
-	app := approach.(*unionApproach)
-	u.strat = app.strat
-	if app.strat == 0 {
+	ap := approach.(*unionApproach)
+	u.strat = ap.strat
+	if ap.strat == 0 {
 		u.strat = unionLookup
 	}
 	if u.strat == unionMerge {
 		unionMergeCount.Add(1)
 		if u.disjoint != "" {
 			unionMergeDisjoint.Add(1)
+			u.mergeCols = ap.cols
+		} else {
+			u.mergeCols = set.Union(ap.cols, u.allCols)
 		}
-	} else {
+	} else { // unionLookup
 		unionLookupCount.Add(1)
+		u.lookupCols = ap.cols
 	}
 	if u.disjoint != "" {
 		unionDisjointCount.Add(1)
 	}
-	u.keyIndex = app.keyIndex
-	if app.reverse {
+	if ap.reverse {
 		u.source1, u.source2 = u.source2, u.source1
 	}
-	u.source1 = SetApproach(u.source1, app.req1, tran)
-	u.source2 = SetApproach(u.source2, app.req2, tran)
+	u.source1 = SetApproach(u.source1, ap.req1, tran)
+	u.source2 = SetApproach(u.source2, ap.req2, tran)
 	u.header = JoinHeaders(u.source1.Header(), u.source2.Header())
 	u.src1Only = set.Difference(u.source1.Columns(), u.source2.Columns())
 	u.empty1 = make(Row, len(u.source1.Header().Fields))
@@ -427,75 +441,6 @@ func (u *Union) setApproach(req Require, approach any, tran QueryTran) {
 	u.state = rewound
 	u.src1get = u.source1.Get
 	u.src2get = u.source2.Get
-}
-
-// keyPrefixOfIndex returns the prefix of index up to and including
-// the last field that belongs to key.
-// This is the minimum index prefix that both sources must share
-// for the merge to iterate in a compatible order.
-func keyPrefixOfIndex(index, key []string) []string {
-	for i := len(index) - 1; i >= 0; i-- {
-		if slices.Contains(key, index[i]) {
-			return index[:i+1]
-		}
-	}
-	return nil
-}
-
-// indexContainsKey returns a key from keys if the index contains all fields
-// of that key, otherwise nil.
-// See also [hasKey]
-func indexContainsKey(index []string, keys [][]string) []string {
-	for _, key := range keys {
-		if set.Subset(index, key) {
-			return key
-		}
-	}
-	return nil
-}
-
-// keyFieldOrder returns the order of the key fields as they appear in the index.
-func keyFieldOrder(index, key []string) []string {
-	result := make([]string, 0, len(key))
-	for _, col := range index {
-		if slices.Contains(key, col) {
-			result = append(result, col)
-		}
-	}
-	return result
-}
-
-// sameKeyFieldOrder returns true if the key fields appear in the same order
-// in the index as in keyOrder.
-func sameKeyFieldOrder(index, key []string, keyOrder []string) bool {
-	order := keyFieldOrder(index, key)
-	return slices.Equal(order, keyOrder)
-}
-
-func mergeIndexes(keys, indexes1, indexes2 [][]string,
-	callback func(key []string, i1, i2 int)) {
-	for _, key := range keys {
-		callback(key, -1, -1) // -1 means key
-		for i1, idx1 := range indexes1 {
-			if keyperm := keyPerm(idx1, key); keyperm != nil {
-				for i2, idx2 := range indexes2 {
-					if slc.HasPrefix(idx2, keyperm) {
-						callback(key, i1, i2)
-					}
-				}
-			}
-		}
-	}
-}
-
-func keyPerm(index, key []string) []string {
-	if len(index) >= len(key) {
-		index = index[:len(key)]
-		if set.Equal(index, key) {
-			return index
-		}
-	}
-	return nil
 }
 
 // execution --------------------------------------------------------
@@ -570,11 +515,6 @@ func (u *Union) getLookup(th *Thread, dir Dir) Row {
 }
 
 func (u *Union) getMerge(th *Thread, dir Dir) (r Row) {
-	if u.mergeCols == nil {
-		// compare keyIndex fields first
-		u.mergeCols = set.Union(u.keyIndex, u.allCols)
-	}
-
 	// refill row1 and row2
 	if u.state == rewound || (u.src1 && u.src2) {
 		u.get1(th, dir)
@@ -636,9 +576,11 @@ func (u *Union) get2(th *Thread, dir Dir) {
 }
 
 func (u *Union) compare(th *Thread, row1, row2 Row, cols []string) int {
+	rr1 := NewRowRec(row1, u.source1.Header(), th, u.st)
+	rr2 := NewRowRec(row2, u.source2.Header(), th, u.st)
 	for _, col := range cols {
-		x1 := row1.GetRawVal(u.source1.Header(), col, th, u.st)
-		x2 := row2.GetRawVal(u.source2.Header(), col, th, u.st)
+		x1 := rr1.GetRawVal(col)
+		x2 := rr2.GetRawVal(col)
 		if c := strings.Compare(x1, x2); c != 0 {
 			return c
 		}
@@ -676,7 +618,7 @@ func (u *Union) getMergeDisjoint(th *Thread, dir Dir) (r Row) {
 		return JoinRows(u.empty1, u.row2)
 	}
 
-	cmp := u.compare(th, u.row1, u.row2, u.keyIndex)
+	cmp := u.compare(th, u.row1, u.row2, u.mergeCols)
 	if dir == Next {
 		if cmp <= 0 {
 			u.src1 = true
@@ -696,36 +638,26 @@ func (u *Union) getMergeDisjoint(th *Thread, dir Dir) (r Row) {
 	}
 }
 
-func nothing(*Thread, Dir) Row { return nil }
-
 func (u *Union) Select(sels Sels) {
+	// Select requires optimize with ReqGroup which requires unionMerge
+	// which requires req.cols and sels to be on common columns
+	// so we don't need to split sels
+	dbg.Assert(func() bool { return checkSels(sels, u.source1.Columns()) })
+	dbg.Assert(func() bool { return checkSels(sels, u.source2.Columns()) })
 	u.nsels++
 	u.state = rewound
 	u.src1get = u.source1.Get
 	u.src2get = u.source2.Get
-	if sels == nil { // clear
-		u.source1.Select(nil)
-		u.source2.Select(nil)
-		return
-	}
-	if selConflict(u.source1.Columns(), sels) {
-		u.src1get = nothing
-	} else {
-		u.source1.Select(removeNonexistentEmpty(u.source1.Columns(), sels))
-	}
-	if selConflict(u.source2.Columns(), sels) {
-		u.src2get = nothing
-	} else {
-		u.source2.Select(removeNonexistentEmpty(u.source2.Columns(), sels))
-	}
+	u.source1.Select(sels)
+	u.source2.Select(sels)
 }
 
-func removeNonexistentEmpty(srccols []string, sels Sels) Sels {
+func selsForCols(sels Sels, srccols []string) Sels {
 	for i, sel := range sels {
-		if !slices.Contains(srccols, sel.col) && sel.val == "" {
+		if !slices.Contains(srccols, sel.col) {
 			newsels := slices.Clip(sels[:i])
 			for ; i < len(sels); i++ {
-				if slices.Contains(srccols, sels[i].col) || sels[i].val != "" {
+				if slices.Contains(srccols, sels[i].col) {
 					newsels = append(newsels, sels[i])
 				}
 			}
@@ -738,19 +670,30 @@ func removeNonexistentEmpty(srccols []string, sels Sels) Sels {
 	return sels
 }
 
-// selConflict is also used by Table
-func selConflict(srcCols []string, sels Sels) bool {
-	for _, sel := range sels {
-		if sel.val != "" && !slices.Contains(srcCols, sel.col) {
-			return true
-		}
-	}
-	return false
-}
-
 func (u *Union) Lookup(th *Thread, sels Sels) Row {
 	u.nlooks++
-	return lookupViaSelectGet(u, th, sels)
+	// We could use disjoint fixed to avoid some lookups
+	// but Extend and Where (the source of fixed)
+	// both already skip the actual lookup if fixed conflicts.
+	hdr := u.Header()
+	row1 := u.source1.Lookup(th, selsForCols(sels, u.source1.Columns()))
+	row2 := u.source2.Lookup(th, selsForCols(sels, u.source2.Columns()))
+	if row1 != nil {
+		row1 = JoinRows(row1, u.empty2)
+		row1 = lookupFilter(hdr, row1, sels, th, u.st)
+	}
+	if row2 != nil {
+		row2 = JoinRows(u.empty1, row2)
+		row2 = lookupFilter(hdr, row2, sels, th, u.st)
+	}
+	if row1 == nil {
+		return row2
+	}
+	if row2 == nil {
+		return row1
+	}
+	dbg.Assert(func() bool { return EqualRows(hdr, row1, hdr, row2, u.allCols, th, u.st) })
+	return row2 // to match unionLookup
 }
 
 func (u *Union) Simple(th *Thread) []Row {

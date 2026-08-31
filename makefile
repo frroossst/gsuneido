@@ -6,7 +6,7 @@
 # The windows amd64 gui version will run on Arm Windows with emulation.
 # requires sh (and date and rm) on path (e.g. from msys2)
 
-BUILT=$(shell date "+%b %-d %Y %R")
+BUILT=$(shell date "+%b %-d %Y %H:%M")
 
 GOOS = $(shell go env GOOS)
 GOARCH = $(shell go env GOARCH)
@@ -76,8 +76,8 @@ both: build gui
 deploy : git-status gs_windows_amd64.exe gs_windows_amd64_gui.exe \
 	gs_linux_arm64 gs_linux_amd64
 	@mkdir -p deploy
-	cp gs_windows_amd64.exe deploy\gsport.exe
-	cp gs_windows_amd64_gui.exe deploy\gsuneido.exe
+	cp gs_windows_amd64.exe deploy/gsport.exe
+	cp gs_windows_amd64_gui.exe deploy/gsuneido.exe
 	mv gs_linux_amd64 gs_linux_arm64 deploy
 	@echo Remember to tag the release and to update stdlib and suneidoc
 
@@ -85,11 +85,19 @@ deploy : git-status gs_windows_amd64.exe gs_windows_amd64_gui.exe \
 git-status :
 	@test -z "$(shell git status --porcelain)"
 
+PBT_PKGS     = ./typechecker/internal/engine/ ./typechecker/typealgebra/
+PBT_ITERS   ?= 500
+PBT_TIMEOUT ?= 30m
+
 test :
 	CGO_ENABLED=0 \
 	go test -short -vet=off -timeout 30s ./...
-	
-fulltest: build test
+
+pbt :
+	go test $(PBT_PKGS) -run TestProp -count=1 \
+	  -timeout $(PBT_TIMEOUT) -rapid.checks=$(PBT_ITERS)
+
+fulltest: build test pbt
 	go test -run "^$$" -fuzz=FuzzRandom -fuzztime=60s ./dbms/query/
 	./gs_$(GOOS)_$(GOARCH)$(EXE) etatests.ss	
 	./gs_$(GOOS)_$(GOARCH)$(EXE) "QueryFuzz.Cmdline(60)"	
@@ -166,5 +174,5 @@ help:
 	@echo "clean"
 	@echo "    remove built files"
 
-.PHONY : FORCE build test fulltest generate clean zap race racetest release \
+.PHONY : FORCE build test pbt fulltest generate clean zap race racetest release \
     help deploy git-status both gui sujs

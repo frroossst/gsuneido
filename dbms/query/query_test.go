@@ -146,6 +146,7 @@ func queryAll2(q Query) string {
 	return sb.String()
 }
 
+// row2str does not include "" values
 func row2str(hdr *Header, row Row) string {
 	if row == nil {
 		return "nil"
@@ -281,17 +282,17 @@ func TestLookupOnSingleton(t *testing.T) {
 	hdr := tbl.Header()
 
 	sels := Sels{{"a", Pack(IntVal(1))}, {"b", Pack(IntVal(2))}}
-	row := tbl.Lookup(nil, sels)
+	row := lookup(tbl, sels, nil, nil)
 	assert.T(t).This(row).Is(nil)
 
 	act(db, "insert {a: 1, b: 2, c: 3} into tmp")
 	tbl = NewTable(db.NewReadTran(), "tmp")
 	// existent row
-	row = tbl.Lookup(nil, sels)
+	row = lookup(tbl, sels, nil, nil)
 	assert.T(t).This(row2str(hdr, row)).Is("a=1 b=2 c=3")
 	// nonexistent row
 	sels = Sels{{"a", Pack(IntVal(3))}, {"b", Pack(IntVal(4))}}
-	row = tbl.Lookup(nil, sels)
+	row = lookup(tbl, sels, nil, nil)
 	assert.T(t).This(row).Is(nil)
 }
 
@@ -306,7 +307,7 @@ func TestSingleton(t *testing.T) {
 	act(db, "insert { a: 3, b: 4 } into tmp")
 	tran := sizeTran{db.NewReadTran()}
 	q := ParseQuery("tmp where a = 3", tran, nil)
-	q = SetupIdx(q, ReadMode, tran, []string{"b"})
+	q = setupIndex(q, ReadMode, tran, []string{"b"})
 	assert.This(String(q)).Is("tmp^(a) where*1 a is 3") // singleton
 	// reading by a, but singleton so we can Select/Lookup on b
 	bsels := Sels{{"b", Pack(SuInt(4))}}
@@ -342,6 +343,26 @@ func TestWhereSplitBug(t *testing.T) {
 		Is("a=1 b=2 hx=2")
 	assert.T(t).This(queryAll(db, "(tmp1 join (tmp2 extend hx)) where hx = 2")).
 		Is("a=1 b=2 hx=2")
+}
+
+func TestIntersectRuleBug(t *testing.T) {
+	Global.TestDef("Rule_r",
+		compile.Constant("function() { return 123 }"))
+	db := heapDb()
+	db.adm("create tmp (k, R) key(k)")
+	db.act("insert { k: 1 } into tmp")
+	s := queryAll(db.Database, "tmp intersect tmp")
+	assert.This(s).Is("k=1")
+}
+
+func TestJoinRuleBug(t *testing.T) {
+	Global.TestDef("Rule_r",
+		compile.Constant("function() { return 123 }"))
+	db := heapDb()
+	db.adm("create tmp (k, R) key(k)")
+	db.act("insert { k: 1 } into tmp")
+	s := queryAll(db.Database, "tmp join tmp")
+	assert.This(s).Is("k=1")
 }
 
 func TestJoin_splitSelect(t *testing.T) {
@@ -413,13 +434,8 @@ func TestTimesLookup(t *testing.T) {
 
 	tran := db.NewReadTran()
 	q := ParseQuery("tmp1 times tmp2", tran, nil)
-	q = q.Transform()
 	req := UniqueReq([]string{"a", "x"}, 1)
-	fixcost, varcost := Optimize(q, ReadMode, req)
-	if fixcost+varcost >= impossible {
-		t.Fatal("invalid query")
-	}
-	q = SetApproach(q, req, tran)
+	q, _, _ = SetupReq(q, ReadMode, tran, req)
 	test := func(a, x int, expected string) {
 		sels := Sels{{"a", Pack(SuInt(a))}, {"x", Pack(SuInt(x))}}
 		row := q.Lookup(nil, sels)
@@ -429,46 +445,6 @@ func TestTimesLookup(t *testing.T) {
 	test(1, 5, "[{1, 2} {5, 6}]")
 	test(3, 5, "[{3, 4} {5, 6}]")
 	test(1, 7, "[{1, 2} {7, 8}]")
-}
-
-// TestLookupOnUniqueIndexWithEmptyFields tests that lookup on a unique index
-// works correctly when the index fields are empty. For unique indexes,
-// when Fields values are empty, Fields2 (from BestKey) is added to make
-// the key unique. This test verifies that Lookup handles this case.
-func TestLookupOnUniqueIndexWithEmptyFields(t *testing.T) {
-	db := db19.CreateDb(stor.HeapStor(8192))
-	db19.StartConcur(db, 50*time.Millisecond)
-	defer db.Close()
-	MakeSuTran = func(qt QueryTran) *SuTran { return nil }
-
-	// Create a table with a unique index on column 'u'.
-	// When 'u' is empty, the key needs Fields2 (from key(k)) to be unique.
-	doAdmin(db, "create tmp (k, u, data) key(k) index unique(u)")
-
-	// Insert records where 'u' is empty - these should be allowed because
-	// the key(k) columns make them unique even though 'u' is the same (empty)
-	act(db, "insert { k: 1, u: '', data: 'first' } into tmp")
-	act(db, "insert { k: 2, u: '', data: 'second' } into tmp")
-	// Also insert a record with non-empty u
-	act(db, "insert { k: 3, u: 'x', data: 'third' } into tmp")
-
-	tran := db.NewReadTran()
-	tbl := NewTable(tran, "tmp").(*Table)
-	tbl.SetIndex([]string{"u"}, ReadMode) // Use the unique index on 'u'
-	hdr := tbl.Header()
-
-	// Test 1: Lookup by non-empty unique index value should work
-	row := tbl.Lookup(nil, Sels{{"u", Pack(SuStr("x"))}})
-	assert.T(t).Msg("lookup u='x'").This(row2str(hdr, row)).Is("data=third k=3 u=x")
-
-	// Test 2: Lookup by empty unique index value - this is the problematic case.
-	// There are two records with u='', so to get a unique lookup,
-	// the lookup needs to include the Fields2 columns (k) as well.
-	row = tbl.Lookup(nil, Sels{{"u", Pack(SuStr(""))}, {"k", Pack(SuInt(1))}})
-	assert.T(t).Msg("lookup u='', k=1").This(row2str(hdr, row)).Is("data=first k=1")
-
-	row = tbl.Lookup(nil, Sels{{"u", Pack(SuStr(""))}, {"k", Pack(SuInt(2))}})
-	assert.T(t).Msg("lookup u='', k=2").This(row2str(hdr, row)).Is("data=second k=2")
 }
 
 func TestWhereMatchOnUniqueIndexWithEmptyFields(t *testing.T) {

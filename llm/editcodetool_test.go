@@ -153,6 +153,79 @@ func TestEditCodeTool(t *testing.T) {
 	th3.Close()
 }
 
+func TestApplyLineEditAutoIndent(t *testing.T) {
+	assert := assert.T(t)
+
+	oldText := strings.Join([]string{
+		"function()",
+		"\t{",
+		"\treturn 1",
+		"\t}",
+	}, "\n")
+
+	// replace_lines: match the indentation of the first replaced line
+	newText, err := applyLineEdit(oldText, "replace_lines", 3, 1, "return 2")
+	assert.That(err == nil)
+	assert.This(newText).Is(strings.Join([]string{
+		"function()",
+		"\t{",
+		"\treturn 2\r",
+		"\t}",
+	}, "\n"))
+
+	// insert_before: match the indentation of the following line
+	newText, err = applyLineEdit(oldText, "insert_before", 3, 0, "// inserted")
+	assert.That(err == nil)
+	assert.This(newText).Is(strings.Join([]string{
+		"function()",
+		"\t{",
+		"\t// inserted\r",
+		"\treturn 1",
+		"\t}",
+	}, "\n"))
+
+	// insert_after: match the indentation of the preceding line
+	newText, err = applyLineEdit(oldText, "insert_after", 3, 0, "// after")
+	assert.That(err == nil)
+	assert.This(newText).Is(strings.Join([]string{
+		"function()",
+		"\t{",
+		"\treturn 1",
+		"\t// after\r",
+		"\t}",
+	}, "\n"))
+
+	// already-indented first line is left unchanged
+	newText, err = applyLineEdit(oldText, "replace_lines", 3, 1, "  return 2")
+	assert.That(err == nil)
+	assert.This(newText).Is(strings.Join([]string{
+		"function()",
+		"\t{",
+		"  return 2\r",
+		"\t}",
+	}, "\n"))
+
+	// top-level line with no indentation gets no extra indentation
+	newText, err = applyLineEdit(oldText, "replace_lines", 1, 1, "function()")
+	assert.That(err == nil)
+	assert.This(newText).Is(strings.Join([]string{
+		"function()\r",
+		"\t{",
+		"\treturn 1",
+		"\t}",
+	}, "\n"))
+}
+
+func TestLineIndent(t *testing.T) {
+	assert := assert.T(t)
+	text := "function()\n\t{\n  \treturn 1\n\t}"
+	assert.This(lineIndent(text, 1)).Is("")
+	assert.This(lineIndent(text, 2)).Is("\t")
+	assert.This(lineIndent(text, 3)).Is("  \t")
+	assert.This(lineIndent(text, 4)).Is("\t")
+	assert.This(lineIndent(text, 5)).Is("")
+}
+
 func TestValidateEditModeArgs(t *testing.T) {
 	assert := assert.T(t)
 
@@ -191,19 +264,19 @@ func TestExtractContext(t *testing.T) {
 
 	// Test context around middle lines
 	ctx := extractContext(text, 5, 5)
-	assert.This(ctx).Is("   1: line1\n   2: line2\n   3: line3\n   4: line4\n   5: line5\n   6: line6\n   7: line7\n   8: line8\n   9: line9\n")
+	assert.This(ctx).Is("[   1]line1\n[   2]line2\n[   3]line3\n[   4]line4\n[   5]line5\n[   6]line6\n[   7]line7\n[   8]line8\n[   9]line9\n")
 
 	// Test context at beginning
 	ctx = extractContext(text, 1, 1)
-	assert.This(ctx).Is("   1: line1\n   2: line2\n   3: line3\n   4: line4\n   5: line5\n")
+	assert.This(ctx).Is("[   1]line1\n[   2]line2\n[   3]line3\n[   4]line4\n[   5]line5\n")
 
 	// Test context at end
 	ctx = extractContext(text, 10, 10)
-	assert.This(ctx).Is("   6: line6\n   7: line7\n   8: line8\n   9: line9\n  10: line10\n")
+	assert.This(ctx).Is("[   6]line6\n[   7]line7\n[   8]line8\n[   9]line9\n[  10]line10\n")
 
 	// Test multi-line edit
 	ctx = extractContext(text, 4, 6)
-	assert.This(ctx).Is("   1: line1\n   2: line2\n   3: line3\n   4: line4\n   5: line5\n   6: line6\n   7: line7\n   8: line8\n   9: line9\n  10: line10\n")
+	assert.This(ctx).Is("[   1]line1\n[   2]line2\n[   3]line3\n[   4]line4\n[   5]line5\n[   6]line6\n[   7]line7\n[   8]line8\n[   9]line9\n[  10]line10\n")
 }
 
 func TestEditLineRange(t *testing.T) {

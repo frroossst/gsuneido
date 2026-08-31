@@ -44,7 +44,7 @@ func TestExtendSelect(t *testing.T) {
 
 	// where singleton
 	q := ParseQuery("cus where cnum=1 extend ex=cnum+1", rt, nil) // expression
-	q = SetupIdx(q, ReadMode, rt, ex)
+	q = setupIndex(q, ReadMode, rt, ex)
 	assert.That(q.fastSingle())
 
 	q.Select(Sels{{col: "ex", val: Pack(IntVal(0))}})
@@ -53,10 +53,13 @@ func TestExtendSelect(t *testing.T) {
 
 	two := Sels{{col: "ex", val: Pack(IntVal(2))}}
 	q.Select(two)
-	assert.That(q.Get(nil, Next) != nil)
+	assert.This(RowStr(q.Header(), q.Get(nil, Next))).
+		Is(`Row{abbrev='a' cnum=1 ex=2 name="axon"}`)
 	q.Select(nil)
 
-	assert.That(q.Lookup(nil, two) != nil)
+	assert.This(RowStr(q.Header(), lookup(q, two, nil, nil))).
+		Is(`Row{abbrev='a' cnum=1 ex=2 name="axon"}`)
+	assert.That(lookup(q, Sels{{col: "ex", val: Pack(IntVal(0))}}, nil, nil) == nil)
 }
 
 func TestExtendRuleBug(t *testing.T) {
@@ -78,7 +81,7 @@ func TestExtendRuleBug2(t *testing.T) {
 	db.act("insert { ck: 1, c4: 2  } into cus")
 	assert.This(queryAll(db.Database,
 		`(((cus extend r0, a3 = c4) union (cus union cus)) where r0 is "")`)).
-		Is("c4=2 ck=1 | a3=2 c4=2 ck=1")
+		Is("a3=2 c4=2 ck=1 | c4=2 ck=1")
 }
 
 func TestExtendRuleWhereRaw(t *testing.T) {

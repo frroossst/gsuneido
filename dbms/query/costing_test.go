@@ -20,10 +20,7 @@ func TestCosting_Table(t *testing.T) {
 	for range ncosting {
 		ft := testFT()
 		q := ft.NewFuzzTable()
-		q = q.Transform()
-		req := NoneReq(1)
-		fixcost, varcost := Optimize(q, ReadMode, req)
-		q = SetApproach(q, req, ft.rt)
+		q, fixcost, varcost := SetupReq(q, ReadMode, ft.rt, NoneReq(1))
 		q.SetTran(ft.rt)
 		iterate(q)
 		tbl := q.(*Table)
@@ -77,16 +74,20 @@ func fuzzProjectForCosting(ft *FT) Query {
 		// truncate to make len(data) divisible by projDupDiv
 		b.data = b.data[:len(b.data)-len(b.data)%projGrpDiv]
 
-		projCols := randomProjectCols(ft.rnd, b.columns, b.indexes)
+		projCols := randomProjectCols(ft.rnd, b.columns, b.indexes, b.ruleDeps)
 
 		if set.Equal(projCols, b.columns) {
 			continue // Transform would eliminate
 		}
 
-		if indexContainsKey(projCols, b.keys) == nil {
+		if !indexContainsKey(projCols, b.keys) {
 			if slices.ContainsFunc(b.keys,
 				func(key []string) bool { return !set.Disjoint(key, projCols) }) {
 				// can't alter key fields so we can't make groups duplicate
+				continue
+			}
+			if hasUniqueIndexOverlap(b, projCols) {
+				// can't alter unique index fields, that would violate uniqueness
 				continue
 			}
 			projIdxs := make([]int, len(projCols))
@@ -105,6 +106,40 @@ func fuzzProjectForCosting(ft *FT) Query {
 		src := b.finish()
 		return NewProject(src, projCols)
 	}
+}
+
+// isSingleColUniqueIndex returns true if col by itself is a unique index.
+func isSingleColUniqueIndex(b *buildFT, col string) bool {
+	for _, idx := range b.indexes {
+		if b.uniqueIdx[indexKey(idx)] && len(idx) == 1 && idx[0] == col {
+			return true
+		}
+	}
+	return false
+}
+
+// hasUniqueIndexOverlap returns true if projCols overlaps any column
+// of a "unique index" - such columns can't be forced to duplicate values
+// without violating the table's unique index constraint.
+func hasUniqueIndexOverlap(b *buildFT, projCols []string) bool {
+	for _, idx := range b.indexes {
+		if b.uniqueIdx[indexKey(idx)] && !set.Disjoint(idx, projCols) {
+			return true
+		}
+	}
+	return false
+}
+
+// indexContainsKey returns a key from keys if the index contains all fields
+// of that key, otherwise nil.
+// See also [hasKey]
+func indexContainsKey(index []string, keys [][]string) bool {
+	for _, key := range keys {
+		if set.HasSubset(index, key) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestCosting_Summarize(t *testing.T) {
@@ -186,6 +221,10 @@ func fuzzSummarizeForCosting(ft *FT) Query {
 				func(key []string) bool { return !set.Disjoint(key, by) }) {
 				continue
 			}
+			if b.uniqueIdx[indexKey(idx)] && prefixLen == len(idx) {
+				// forcing dups over the full unique index would violate it
+				continue
+			}
 			const sumDupDiv = 10
 			b.data = b.data[:len(b.data)-len(b.data)%sumDupDiv]
 			if len(b.data) == 0 {
@@ -225,6 +264,10 @@ func fuzzSummarizeForCosting(ft *FT) Query {
 				func(key []string) bool { return slices.Contains(key, col) }) {
 				continue
 			}
+			if isSingleColUniqueIndex(b, col) {
+				// forcing dups on a single-column unique index would violate it
+				continue
+			}
 			b.data = b.data[:len(b.data)-len(b.data)%sumGrpDiv]
 			if len(b.data) == 0 {
 				continue
@@ -242,10 +285,7 @@ func fuzzSummarizeForCosting(ft *FT) Query {
 }
 
 func costingSetup(q Query, ft *FT) (Query, Cost, Cost) {
-	q = q.Transform()
-	req := NoneReq(1)
-	fixcost, varcost := Optimize(q, ReadMode, req)
-	q = SetApproach(q, req, ft.rt)
+	q, fixcost, varcost := SetupReq(q, ReadMode, ft.rt, NoneReq(1))
 	q.SetTran(ft.rt)
 	iterate(q)
 	return q, fixcost, varcost

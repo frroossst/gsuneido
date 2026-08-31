@@ -70,7 +70,6 @@ var tests []registered
 func RunRegistered(t *testing.T) bool {
 	ok := true
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if !runSource(tc.source) {
 				ok = false
@@ -171,11 +170,11 @@ func Fmt(row []string, str []bool) string {
 		sb.WriteString(sep)
 		sep = ", "
 		if str[i] {
-			sb.WriteRune('`')
+			sb.WriteByte('`')
 		}
 		sb.WriteString(s)
 		if str[i] {
-			sb.WriteRune('`')
+			sb.WriteByte('`')
 		}
 	}
 	sb.WriteString("]")

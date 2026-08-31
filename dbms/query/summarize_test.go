@@ -28,7 +28,7 @@ func TestSummarizeSelectFilter(t *testing.T) {
 
 	tran := sizeTran{db.NewReadTran()}
 	q := ParseQuery("test summarize a, max c", tran, nil)
-	q, _, _ = Setup(q, ReadMode, tran)
+	q = SetupKey(q, ReadMode, tran)
 
 	// Test Select with summarized column (max_c)
 	// splitSelect should pass a to source, keep max_c for filtering
@@ -51,6 +51,52 @@ func TestSummarizeSelectFilter(t *testing.T) {
 	q.Select(sels)
 	row = q.Get(nil, Next)
 	assert.T(t).This(row).Is(nil)
+}
+
+func TestSummarize_ByOnConflict(t *testing.T) {
+	db := heapDb()
+	defer db.Close()
+	db.adm("create t (a, b, c) key(a)")
+
+	tran := db.NewReadTran()
+	assert.T(t).This(func() {
+		ParseQuery("t summarize a, average a", tran, nil)
+	}).Panics("summarize: by and on columns conflict: a")
+	assert.T(t).This(func() {
+		ParseQuery("t summarize a, b, total a", tran, nil)
+	}).Panics("summarize: by and on columns conflict: a")
+}
+
+func TestSummarize_OutputColConflicts(t *testing.T) {
+	db := heapDb()
+	defer db.Close()
+	db.adm("create t (a, count, total_a) key(a)")
+
+	tran := db.NewReadTran()
+	// output columns and input (on) columns are independent, so a name
+	// may appear in both (here "count" is both a count output and a source
+	// column read by total)
+	ParseQuery("t summarize count, total count", tran, nil)
+	assert.T(t).This(func() {
+		ParseQuery("t summarize total_a, total a", tran, nil)
+	}).Panics("summarize: output columns conflict with by: total_a")
+	assert.T(t).This(func() {
+		ParseQuery("t summarize total a, total a", tran, nil)
+	}).Panics("summarize: duplicate output column: total_a")
+}
+
+func TestSummarize_WholeRowConflict(t *testing.T) {
+	db := heapDb()
+	defer db.Close()
+	db.adm("create t (a, b) key(a)")
+
+	tran := db.NewReadTran()
+	assert.T(t).This(func() {
+		ParseQuery("t summarize a = min a", tran, nil)
+	}).Panics("summarize: output columns conflict with source columns: a")
+	assert.T(t).This(func() {
+		ParseQuery("t summarize b = min a", tran, nil)
+	}).Panics("summarize: output columns conflict with source columns: b")
 }
 
 func TestSummarize_Keys(t *testing.T) {
