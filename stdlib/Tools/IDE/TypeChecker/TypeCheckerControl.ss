@@ -1,18 +1,26 @@
 // Copyright (C) 2026 Suneido Software Corp. All rights reserved worldwide.
 PassthruController
 	{
-	Title:      "Suneido Type Checker"
-	binaryPath: ""
+	Title: "Type Checker"
 	orderedSrc: ()
 	tabImages: (ok: 0, warn: 1, error: 2)
+	CallClass(libview)
+		{
+		if BuiltDate() < #20260819
+			{
+			Alert("Type Checker requires BuiltDate > 2026-08-19")
+			return
+			}
+		Window([#TypeChecker, libview], keep_placement:)
+		}
+
 	New(.libview)
 		{
 		super(.buildLayout())
 		if false isnt tabs = .FindControl(#Tabs)
-			tabs.SetImageList(
-				[.tabImageSpec("checkmark.emf", CLR.ButtonGreen),
-					.tabImageSpec("triangle-warning.emf", CLR.WarnColor),
-					.tabImageSpec("cross.emf", CLR.ErrorColor)])
+			tabs.SetImageList([.tabImageSpec("checkmark.emf", CLR.ButtonGreen),
+				.tabImageSpec("triangle-warning.emf", CLR.WarnColor),
+				.tabImageSpec("cross.emf", CLR.ErrorColor)])
 		.Defer(.annotate) // so users dont need to click Check the first time around
 		.sub = PubSub.Subscribe(#LibraryRecordChange, .refreshIfStale)
 		}
@@ -48,14 +56,10 @@ PassthruController
 
 		.buildTabs(tabs = [#Tabs, close_button: false])
 
-		.binaryPath = TypeCheckHelper.BinaryPath()
-		return [#Vert, tabs,
-			[#Horz,
-				[#Record,
-					[#Vert,
-						[#Pair, [#Static, "TypeChecker Binary"],
-							TypeCheckerBinaryPicker(.binaryPath)], #Skip]],
-				[#Button, #Check], [#Skip, xstretch: 1], [#Button, #Policy], [#Skip]],
+		return [#Vert,
+			tabs,
+			[#Horz, #Skip, [#Button, #Check], #Skip, #Fill, [#Button, #Policy], #Skip],
+			#Skip,
 			[#TodoOutput name: #diagnostics, readonly:],
 			[#Horz, [#Skip, medium:], [#Static, "", name: #timeElapsed, xstretch: 1]]]
 		}
@@ -67,9 +71,8 @@ PassthruController
 			{
 			i -= 1
 			x = .orderedSrc[i]
-			tabs.Add(
-				[#CodeView data: [text: x.src, name: x.name, table: .lib], Tab: x.name,
-					readonly:])
+			tabs.Add([#CodeView data: [text: x.src, name: x.name, table: .lib],
+				Tab: x.name, readonly:])
 			}
 		}
 
@@ -84,11 +87,6 @@ PassthruController
 
 	On_Check()
 		{
-		if false isnt browse = .FindControl(#TypeCheckerBinary)
-			{
-			.binaryPath = browse.Get()
-			TypeCheckHelper.SetBinaryPath(.binaryPath)
-			}
 		.annotate()
 		}
 
@@ -125,7 +123,7 @@ PassthruController
 		{
 		skipLineageOrLibName = false
 		src = Query1Cached(.lib, name: .rec, group: -1).text
-		if not Libraries().Has?(.lib) or Function?(src.Compile())
+		if not Libraries().Has?(.lib) or Function?(Suneido.Compile(src))
 			skipLineageOrLibName = .lib
 
 		return skipLineageOrLibName
@@ -136,13 +134,6 @@ PassthruController
 		if false is tctrl = .FindControl(#Tabs)
 			return
 		.ensureConstructed(tctrl)
-
-		if not TypeCheckHelper.BinaryExists?()
-			{
-			.AlertError("Type Checker",
-				"Binary not found at:\n" $ TypeCheckHelper.BinaryPath())
-			return
-			}
 
 		// response is in the same order as the request: base->child->...->grandchild.
 		// tabs are in the opposite order (leaf-first), so reverse-index when splicing.
@@ -166,11 +157,9 @@ PassthruController
 			{
 			names = .orderedSrc.Map({ it.name }).Join(", ")
 			msg_limit = 200
-			AlertError(
-				"suneidotypes: failed to decode response\n\n" $ "Exception:\n" $
-					String(e) $ "\n\n" $ "Request method: " $ method $ "\n" $
-					"Request sources: " $ names $ "\n\n" $ "Response:\n" $
-					String(response[..msg_limit]))
+			AlertError("Type checker failed\n\n" $ "Exception:\n" $ String(e) $ "\n\n" $
+				"Request method: " $ method $ '\n' $ "Request sources: " $ names $
+				"\n\n" $ "Response:\n" $ String(response[..msg_limit]))
 			}
 		}
 
@@ -237,7 +226,7 @@ PassthruController
 			return
 
 		errors, warnings = TypeCheckHelper.FormatDiagnostics(diagnostics)
-		dctrl.Set(Opt(errors.Join("\n"), "\n") $ warnings.Join("\n"))
+		dctrl.Set(Opt(errors.Join('\n'), '\n') $ warnings.Join('\n'))
 		}
 
 	Scintilla_DoubleClick(source)
@@ -281,7 +270,6 @@ PassthruController
 
 	Destroy()
 		{
-		TypeCheckHelper.StopServer()
 		if .Member?(#sub)
 			.sub.Unsubscribe()
 		super.Destroy()

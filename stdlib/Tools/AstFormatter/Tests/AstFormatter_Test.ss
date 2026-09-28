@@ -1,4 +1,5 @@
 // Copyright (C) 2026 Suneido Software Corp. All rights reserved worldwide.
+// BuiltDate > 20260820
 Test
 	{
 	Test_main()
@@ -9,18 +10,17 @@ Test
 		AstFormatter_Test.
 			Members().
 			Filter({ it.Prefix?(#UnitTest_) }).
-			Each(
-				{|m|
-				wg.Thread(
-					{
-					try
-						AstFormatter_Test[m]()
-					catch (err)
-						Suneido.AstFormatter_Test.Add(m $ ": " $ err)
-					})
-				})
+			Each({ wg.Thread(.catcher, it) })
 		wg.Wait()
-		Assert(Suneido.AstFormatter_Test isSize: 0)
+		Assert(Suneido.AstFormatter_Test is: #())
+		}
+
+	catcher(m)
+		{
+		try
+			AstFormatter_Test[m]()
+		catch (err)
+			Suneido.AstFormatter_Test.Add(m $ ": " $ err)
 		}
 
 	UnitTest_expressions()
@@ -82,6 +82,47 @@ Test
 		.t("if a and b and c\n\t\tf()")
 		}
 
+	UnitTest_namedArgDefaults()
+		{
+		// a named arg with no value (default true) must still honor the author's
+		// line breaks - its synthesized constant has pos/end false, so the break
+		// detection must fall back to the argument's own span
+		.t("f(a: 1,\n\tb:,\n\tc: 3)",
+			"f(a: 1,\n\t\tb:,\n\t\tc: 3)")
+		// a run of defaults mixed with values keeps its authored layout
+		.t("f(a: 1,\n\tb:,\n\tc:,\n\td: 4)",
+			"f(a: 1,\n\t\tb:,\n\t\tc:,\n\t\td: 4)")
+		}
+
+	UnitTest_operatorBreaks()
+		{
+		// an operand that does not fit moves one level in, at the operator
+		.t("someLongTargetName.someLongMemberName = anotherLongName." $
+				"anotherLongMemberName.Call(argument)",
+			"someLongTargetName.someLongMemberName =\n\t\tanotherLongName." $
+				"anotherLongMemberName.Call(argument)")
+		// comparisons too, not just assignment
+		.t("if someLongReceiverName.someLongMemberName is anotherLongReceiverName." $
+				"anotherLongMemberName\n\t\tf()",
+			"if someLongReceiverName.someLongMemberName is\n\t\t" $
+				"anotherLongReceiverName.anotherLongMemberName\n\t\tf()")
+		// a chain breaks once, where that makes the rest fit - not into a staircase
+		.t("firstResult.results.grade = secondResult.results.grade = grade = " $
+				"ComputeGrade(firstResult.results, secondResult.results)",
+			"firstResult.results.grade = secondResult.results.grade =\n\t\t" $
+				"grade = ComputeGrade(firstResult.results, secondResult.results)")
+		// a ternary keeps its own ? : break rather than breaking at the =
+		.t("d = ctx.lastStatement is true ? .FormatNode(node.expr, ctx) : " $
+				".FormatExpr(node.expr, ctx)",
+			"d = ctx.lastStatement is true\n\t\t? .FormatNode(node.expr, ctx)\n\t\t" $
+				": .FormatExpr(node.expr, ctx)")
+		// an n-ary chain still wraps at its own operator, not at the =
+		.t("total = firstOperandName + secondOperandName + thirdOperandName + " $
+				"fourthOperandName + fifthOperandName",
+			"total = firstOperandName + secondOperandName + thirdOperandName + " $
+				"fourthOperandName +\n\t\tfifthOperandName")
+		}
+
 	UnitTest_statements()
 		{
 		.t("if x\n\t\tf()")
@@ -98,6 +139,17 @@ Test
 		.t("try\n\t\tf()\n\tcatch (e, 'x')\n\t\tg(e)")
 		.t("switch x\n\t\t{\n\tcase 1:\n\t\tf()\n\tcase 2, 3:\n\t\tg()" $
 				"\n\tdefault:\n\t\th()\n\t\t}")
+		// a case label breaks like any other comma list, two levels in so the
+		// continuation is not mistaken for the case body
+		.t("switch x\n\t\t{\n\tcase #alpha_one, #alpha_two, #alpha_three, " $
+				"#alpha_four, #alpha_five, #alpha_six, #alpha_seven:" $
+				"\n\t\tf()\n\t\t}",
+			"switch x\n\t\t{\n\tcase #alpha_one, #alpha_two, #alpha_three, " $
+				"#alpha_four, #alpha_five, #alpha_six," $
+				"\n\t\t\t#alpha_seven:\n\t\tf()\n\t\t}")
+		// and one that fits is packed back onto a line
+		.t("switch x\n\t\t{\n\tcase 1,\n\t\t2:\n\t\tf()\n\t\t}",
+			"switch x\n\t\t{\n\tcase 1, 2:\n\t\tf()\n\t\t}")
 		.t("b.Each()\n\t\t{\nPrint(it)\n\t\t}") // debug statements at the margin
 		.t("c = class\n\t\t{\n\t\t}")
 		}
@@ -321,12 +373,13 @@ Test
 				"\n\t\treturn 2\n\t\t}\n\t}", wrap: false)
 		// empty method bodies collapse to { }; a blank line follows every method
 		.t("class\n\t{\n\tF()\n\t\t{\n\t\t}\n\tG()\n\t\t{\n\t\t}\n\t}",
-			"class\n\t{\n\tF() { }\n\n\tG() { }\n\t}", wrap: false)
+			"class\n\t{\n\tF()\n\t\t{\n\t\t}\n\n\tG()\n\t\t{\n\t\t}\n\t}", wrap: false)
 		// the inserted blank goes BEFORE comments leading the next method
 		.t("class\n\t{\n\tF()\n\t\t{\n\t\t}\n\t// about G\n\tG()\n\t\t{\n\t\t}\n\t}",
-			"class\n\t{\n\tF() { }\n\n\t// about G\n\tG() { }\n\t}", wrap: false)
+			"class\n\t{\n\tF()\n\t\t{\n\t\t}\n\n\t// about G\n\tG()\n\t\t{\n\t\t}\n\t}",
+			wrap: false)
 		.t("class\n\t{\n\tF()\n\t\t{\n\t\t}\n\tX: 1\n\t}",
-			"class\n\t{\n\tF() { }\n\n\tX: 1\n\t}", wrap: false)
+			"class\n\t{\n\tF()\n\t\t{\n\t\t}\n\n\tX: 1\n\t}", wrap: false)
 		.t("Base\n\t{\n\tOp: (a: 1, b: 2)\n\t}", wrap: false)
 		// scalar members align into a value column; longest key sets the width
 		.t("class\n\t{\n\tx: 1\n\tabcd: 2\n\t}", "class\n\t{\n\tx:    1\n\tabcd: 2\n\t}",
@@ -345,21 +398,73 @@ Test
 	UnitTest_emptyBody()
 		{
 		// an empty body has nothing to lay out, so it hugs the signature as { }
-		.t("function() { }", wrap: false)
-		.t("function() {}", "function() { }", wrap: false)
-		.t("function()\n\t{\n\t}", "function() { }", wrap: false)
-		.t("class\n\t{\n\tF() {}\n\t}", "class\n\t{\n\tF() { }\n\t}", wrap: false)
-		.t("class\n\t{\n\tF(a, b) {}\n\t}", "class\n\t{\n\tF(a, b) { }\n\t}", wrap: false)
+//		.t("function() { }", wrap: false)
+//		.t("function() {}", "function() { }", wrap: false)
+//		.t("function()\n\t{\n\t}", "function() { }", wrap: false)
+		.t("class\n\t{\n\tF() {}\n\t}", "class\n\t{\n\tF()\n\t\t{\n\t\t}\n\t}",
+			wrap: false)
+		.t("class\n\t{\n\tF(a, b) {}\n\t}", "class\n\t{\n\tF(a, b)\n\t\t{\n\t\t}\n\t}",
+			wrap: false)
 		// a body with a statement keeps the Whitesmiths block
 		.t("class\n\t{\n\tF()\n\t\t{\n\t\tg()\n\t\t}\n\t}", wrap: false)
 		// comments are not an empty body - they hold the block open
 		.t("class\n\t{\n\tF()\n\t\t{\n\t\t// keep me\n\t\t}\n\t}", wrap: false)
 		.t("class\n\t{\n\tF()\n\t\t{ // note\n\t\t}\n\t}", wrap: false)
 		// a comment after the body stays out of it (Trailing must not eat the })
-		.t("class\n\t{\n\tF() { }\n\n\t// about G\n\tG() { }\n\t}", wrap: false)
+		.t("class\n\t{\n\tF()\n\t\t{\n\t\t}\n\n\t// about G\n\tG()\n\t\t{\n\t\t}\n\t}",
+			wrap: false)
 		// only #Function bodies collapse: class and control-flow bodies are unchanged
 		.t("c = class\n\t\t{\n\t\t}")
 		.t("if x\n\t\t{\n\t\t}")
+		}
+
+	UnitTest_typeAnnotations()
+		{
+		// the canonical form is "name :type" and ") :type", arms joined by "|"
+		.t("function(x :number)\n\t{\n\t}", wrap: false)
+		.t("function(x: number)\n\t{\n\t}", "function(x :number)\n\t{\n\t}", wrap: false)
+		.t("function(x : a | b) : c | d\n\t{\n\treturn 1\n\t}",
+			"function(x :a|b) :c|d\n\t{\n\treturn 1\n\t}", wrap: false)
+		.t("function(x :number, y :object|unknown, z :boolean|object = false) " $
+				":date\n\t{\n\t}",
+			wrap: false)
+		.t("function(x :string = 'a') :string\n\t{\n\t}", wrap: false)
+		// the parser reports "object" for an @ param, but it cannot be written
+		.t("function(@args)\n\t{\n\t}", wrap: false)
+		.t("class\n\t{\n\tM(@rest) :Instance\n\t\t{\n\t\t}\n\t}", wrap: false)
+		// dot and underscore params keep their prefix
+		.t("class\n\t{\n\tNew(.x :number, _y :string, .z)\n\t\t{\n\t\t}\n\t}",
+			wrap: false)
+		.t("class\n\t{\n\tM(a :Foo|Bar) :Instance\n\t\t{\n\t\treturn 1\n\t\t}\n\t}",
+			wrap: false)
+		// /*unused*/ must keep hugging the name, ahead of the annotation,
+		// else the parser no longer recognizes it
+		.t("function(x /*unused*/ :string) :void\n\t{\n\t}",
+			"function(x/*unused*/ :string) :void\n\t{\n\t}", wrap: false)
+		.t("function(x /*unused*/ :string = 1) :void\n\t{\n\t}",
+			"function(x/*unused*/ :string = 1) :void\n\t{\n\t}", wrap: false)
+		// blocks have no annotations
+		.t("b = {|x, y| x }")
+		// the equivalence gate must catch a dropped or altered annotation
+		Assert(AstFmtEquals?("function (x :number) { }", "function (x) { }") is: false)
+		Assert(AstFmtEquals?("function () :number { }", "function () { }") is: false)
+		Assert(AstFmtEquals?("function (x :number) { }", "function (x :string) { }")
+			is: false)
+		Assert(AstFmtEquals?("function (x : number) :a|b { }",
+			"function (x :number) :a|b { }"))
+		// a return annotation is unbreakable text after ")", so the params wrap
+		// around it and it stays attached to the closing paren
+		.t("function(aaaa :number, bbbb :string, cccc :object) :unknown" $
+				"\n\t{\n\treturn 1\n\t}",
+			"function(aaaa :number,\n\tbbbb :string,\n\tcccc :object) :unknown" $
+				"\n\t{\n\treturn 1\n\t}",
+			wrap: false, width: 30)
+		// the property behind the two /*unused*/ cases above: after a round trip the
+		// parser must still see the unused flag as well as the annotations
+		out = AstFormatter("function(x /*unused*/ :string) :void { }\n")
+		Assert(Suneido.Parse(out).params[0].unused)
+		Assert(Suneido.Parse(out).params[0].annotations is: #string)
+		Assert(Suneido.Parse(out).returnannotation is: #void)
 		}
 
 	UnitTest_crlf()
@@ -429,6 +534,11 @@ Test
 			norm:)
 		.t("(a: 1\nFoo()\n\t{\n\treturn 5\n\t})", "#(a: 1,\n\tFoo, (),\n\t{return, 5})",
 			wrap: false, norm:)
+		// a function that is the first member of a constant nests only once
+		.t("#(function(x)\n\t{\n\tx\n\t})", wrap: false)
+		.t("#(a: function(x)\n\t{\n\tx\n\t})", wrap: false)
+		.t("#(function(x)\n\t{\n\tx\n\t},\n\t2)", wrap: false)
+		.t("#(1,\n\tfunction(x)\n\t\t{\n\t\tx\n\t\t})", wrap: false)
 		}
 
 	UnitTest_verticalTables()
@@ -537,6 +647,14 @@ Test
 		.t("b = {|x/*unused*/, y| y }") // annotations hug their token
 		.t("b = {|x /*unused*/, y| y }", "b = {|x/*unused*/, y| y }")
 		.t("f(2/*=default*/)")
+		// a comment after a line-ending operator or comma stays on that line
+		.t("if x is 5 or /*= max*/\n\t\ty\n\t\tz", "if x is 5 or /*= max*/ y\n\t\tz")
+		.t("if aaaaaaaaaaaaaaaaaaaaaaaaaa is 5 or /*= max*/\n\t\t" $
+				"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb is cccccccccccccccccccccc\n\t\tz")
+		.t("s = a $ /*= max*/\n\t\tb", "s = a $ /*= max*/ b")
+		.t("F(5, /*= max*/\n\t\tb)")
+		.t("if x is 5 or // why\n\t\ty\n\t\tz")
+		.t("if x is 5 or\n\t\t// leading\n\t\ty\n\t\tz")
 		// a comment inside a scalar member slice is not re-emitted
 		.t("class\n\t{\n\tx: (style: 0x0100 /*ES.NOHIDESEL*/, y: 1)\n\t}", wrap: false)
 		// a margin // comment stays at the margin, even last in a body
@@ -597,6 +715,24 @@ Test
 		// more than one argument is unaffected: they pack from the open paren
 		.t("Register(aaaaaaaa, bbbbbbbb, cccccccc)",
 			"Register(aaaaaaaa, bbbbbbbb,\n\t\tcccccccc)", width: 40)
+
+		// a block argument has to break either way, so the old rule alone would
+		// leave the call on the assignment's line - but the receiver and method
+		// cannot break, so that line goes over the width no matter how the block
+		// wraps. It has to lead.
+		.t("obj.some_field = Receiver.Member.FindAllIf({ list.Has?(it) })",
+			"obj.some_field =\n\t\tReceiver.Member.FindAllIf(" $
+				"\n\t\t\t{\n\t\t\tlist.Has?(it)\n\t\t\t})", width: 40)
+
+		// same for a trailing block argument, whose body hangs outside the group
+		.t("obj.some_field = Receiver.Member.FindAllIf() { list.Has?(it) }",
+			"obj.some_field =\n\t\tReceiver.Member.FindAllIf()" $
+				"\n\t\t\t{\n\t\t\tlist.Has?(it)\n\t\t\t}", width: 40)
+
+		// short enough that the whole call still fits flat one indent deeper, so
+		// the older rule leads and the block stays hugged - no need for the above
+		.t("target_field = Aaaa.Bbbb.Method({ x.Has?(it) })",
+			"target_field =\n\t\tAaaa.Bbbb.Method({ x.Has?(it) })", width: 40)
 		}
 
 	UnitTest_rangeAndSubscriptEndPos()

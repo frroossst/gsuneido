@@ -384,6 +384,8 @@ func (cg *cgen) statement(node ast.Statement, labels *Labels, lastStmt bool) {
 		cg.exprStmt(node.E, lastStmt)
 	case *ast.MultiAssign:
 		cg.multiAssign(node)
+	case *ast.AtAssign:
+		cg.atAssign(node, lastStmt)
 	default:
 		panic("unexpected statement type " + fmt.Sprintf("%T", node))
 	}
@@ -399,15 +401,25 @@ func (cg *cgen) returnStmt(node *ast.Return, lastStmt bool) {
 	if cg.isNew && len(node.Exprs) > 0 {
 		panic("New cannot return a value")
 	}
-	if len(node.Exprs) > 1 {
+	if node.ReturnSpread {
+		cg.expr2(node.Exprs[0], callNilOk)
 		if cg.isBlock {
-			panic("multiple return values not allowed from a block")
+			cg.emit(op.BlockReturnSpread)
+		} else {
+			cg.emit(op.ReturnSpread)
 		}
+		return
+	}
+	if len(node.Exprs) > 1 {
 		assert.That(!node.ReturnThrow)
 		for _, e := range node.Exprs {
 			cg.expr2(e, callNoNil)
 		}
-		cg.emit(op.ReturnMulti, byte(len(node.Exprs)))
+		if cg.isBlock {
+			cg.emit(op.BlockReturnMulti, byte(len(node.Exprs)))
+		} else {
+			cg.emit(op.ReturnMulti, byte(len(node.Exprs)))
+		}
 		return
 	}
 	var expr ast.Expr
@@ -639,12 +651,29 @@ func (cg *cgen) exprStmt(expr ast.Expr, lastStmt bool) {
 		cg.expr2(expr, callNilOk)
 	} else if _, ok := expr.(*ast.Constant); !ok {
 		cg.expr2(expr, callDiscard)
-		if !lastStmt {
-			if _, ok := expr.(*ast.Call); !ok {
-				cg.emit(op.Pop)
-			}
+		if !discardLeavesNothing(expr) {
+			cg.emit(op.Pop)
 		}
 	}
+}
+
+// discardLeavesNothing determines whether expr2 with callDiscard
+// leaves nothing on the stack.
+// WARNING: this must match expr2 - only Call and Trinary
+// (possibly parenthesized) discard their value.
+func discardLeavesNothing(e ast.Expr) bool {
+	for {
+		u, ok := e.(*ast.Unary)
+		if !ok || u.Tok != tok.LParen {
+			break
+		}
+		e = u.E
+	}
+	switch e.(type) {
+	case *ast.Call, *ast.Trinary:
+		return true
+	}
+	return false
 }
 
 func (cg *cgen) multiAssign(node *ast.MultiAssign) {
@@ -656,6 +685,16 @@ func (cg *cgen) multiAssign(node *ast.MultiAssign) {
 	cg.emit(op.PushReturn, byte(len(refs)))
 	for _, ref := range refs {
 		cg.store(ref)
+		cg.emit(op.Pop)
+	}
+}
+
+func (cg *cgen) atAssign(node *ast.AtAssign, lastStmt bool) {
+	ref := cg.lvalue(node.Lhs)
+	cg.call(node.Rhs.(*ast.Call), callNilOk)
+	cg.emit(op.Gather)
+	cg.store(ref)
+	if !lastStmt {
 		cg.emit(op.Pop)
 	}
 }
@@ -929,18 +968,36 @@ func isUnary(e ast.Expr, tok tok.Token) bool {
 }
 
 func (cg *cgen) trinary(node *ast.Trinary, ct calltype) {
-	// always leave a value on the stack
-	if ct == callDiscard {
-		ct = callNilOk
-	}
 	f, end := -1, -1
 	cg.expr(node.Cond)
 	f = cg.emitJump(op.QMark, f)
+	if ct == callDiscard {
+		// leave nothing on the stack;
+		// calls use Discard which clears ReturnMulti
+		cg.trinaryBranch(node.T)
+		end = cg.emitJump(op.Jump, end)
+		cg.placeLabel(f)
+		cg.trinaryBranch(node.F)
+		cg.placeLabel(end)
+		return
+	}
+	// always leave a value on the stack
 	cg.expr2(node.T, ct)
 	end = cg.emitJump(op.Jump, end)
 	cg.placeLabel(f)
 	cg.expr2(node.F, ct)
 	cg.placeLabel(end)
+}
+
+// trinaryBranch compiles a branch of a trinary in discard context,
+// leaving nothing on the stack.
+func (cg *cgen) trinaryBranch(e ast.Expr) {
+	if discardLeavesNothing(e) {
+		cg.expr2(e, callDiscard)
+	} else {
+		cg.expr2(e, callNilOk)
+		cg.emit(op.Pop)
+	}
 }
 
 func (cg *cgen) inExpr(node *ast.In) {

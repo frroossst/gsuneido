@@ -382,7 +382,6 @@ func (m *Map[K, V, H]) Iter() func() (K, V, bool) {
 		return func() (k K, v V, ok bool) { return }
 	}
 	gi := 0
-	grp := &m.groups[0]
 	i := -1
 	return func() (k K, v V, ok bool) {
 		if gi >= len(m.groups) {
@@ -394,8 +393,8 @@ func (m *Map[K, V, H]) Iter() func() (K, V, bool) {
 				if gi++; gi >= len(m.groups) {
 					return
 				}
-				grp = &m.groups[gi]
 			}
+			grp := &m.groups[gi]
 			c := uint8(grp.control >> (i * 8))
 			if c&0x80 != 0 {
 				return grp.keys[i], grp.vals[i], true
@@ -404,8 +403,8 @@ func (m *Map[K, V, H]) Iter() func() (K, V, bool) {
 	}
 }
 
-// Copy makes a shallow copy of the map
-func (m *Map[K, V, H]) Copy() *Map[K, V, H] {
+// Clone makes a shallow copy of the map
+func (m *Map[K, V, H]) Clone() *Map[K, V, H] {
 	newMap := *m
 	newMap.groups = slices.Clone(m.groups)
 	return &newMap

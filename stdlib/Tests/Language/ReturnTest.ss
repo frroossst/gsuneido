@@ -2,92 +2,78 @@
 Test
 	{
 	NoRet()
-		{ }
+		{
+		}
 
 	Test_passthrough()
 		{
-		f = function ()
-			{ ReturnTest.NoRet() }
+		f = function()
+			{
+			ReturnTest.NoRet()
+			}
 		f()
 
-		f = function ()
-			{ (ReturnTest.NoRet()) }
+		f = function()
+			{
+			return ReturnTest.NoRet()
+			}
 		f()
 
-		f = function ()
-			{ return ReturnTest.NoRet() }
-		f()
-
-		f = function ()
-			{ return (ReturnTest.NoRet()) }
-		f()
-
-		f = function ()
-			{ unused = ReturnTest.NoRet() }
+		f = function()
+			{
+			unused = ReturnTest.NoRet()
+			}
 		Assert({ f() } throws: "no return value")
 
-		f = function ()
-			{ (unused = ReturnTest.NoRet()) }
-		Assert({ f() } throws: "no return value")
-
-		f = function (cond)
-			{ cond ? ReturnTest.NoRet() : ReturnTest.NoRet() }
+		f = function(cond)
+			{
+			cond ? ReturnTest.NoRet() : ReturnTest.NoRet()
+			}
 		f(true)
 		f(false)
 
-		f = function (cond)
-			{ (cond ? ReturnTest.NoRet() : ReturnTest.NoRet()) }
+		f = function(cond)
+			{
+			return cond ? ReturnTest.NoRet() : ReturnTest.NoRet()
+			}
 		f(true)
 		f(false)
 
-		f = function (cond)
-			{ return cond ? ReturnTest.NoRet() : ReturnTest.NoRet() }
-		f(true)
-		f(false)
-
-		f = function (cond)
-			{ return (cond ? ReturnTest.NoRet() : ReturnTest.NoRet()) }
-		f(true)
-		f(false)
-
-		f = function (cond)
-			{ unused = cond ? ReturnTest.NoRet() : ReturnTest.NoRet() }
+		f = function(cond)
+			{
+			unused = cond ? ReturnTest.NoRet() : ReturnTest.NoRet()
+			}
 		Assert({ f(true) } throws: "no return value")
 		Assert({ f(false) } throws: "no return value")
 
-		f = function (cond)
-			{ unused = (cond ? ReturnTest.NoRet() : ReturnTest.NoRet()) }
-		Assert({ f(true) } throws: "no return value")
-		Assert({ f(false) } throws: "no return value")
-
-		f = function (cond)
-			{ cond ? ReturnTest.NoRet() : ReturnTest.NoRet(); 123 }
+		f = function(cond)
+			{
+			cond ? ReturnTest.NoRet() : ReturnTest.NoRet()
+			123
+			}
 		f(true)
 		f(false)
 
-		f = function (cond)
-			{ (cond ? ReturnTest.NoRet() : ReturnTest.NoRet()); 123 }
-		f(true)
-		f(false)
-
-		f = function () { }; b = { return f() }; b() // block return
+		f = function() { }
+		b = { return f() }
+		b() // block return
 		}
 
 	Test_return_throw()
 		{
 		// return throw requires a result
-		Assert({ "function() { return throw }".Compile() } throws: "syntax error")
+		Assert({ Suneido.Compile("function() { return throw }") } throws: "syntax error")
 
 		.rt("") // should not throw
 		.rt(true) // should not throw
-		unused = .rt("error") // should not throw
-		Assert({ .rt("error") } throws: "error")
+		unused = .rt(#error) // should not throw
+		Assert({ .rt(#error) } throws: #error)
 
 		unused = .passthru1() // should not throw
 		unused = .passthru2() // should not throw
-		Assert({ .passthru1() } throws: "error")
-		Assert({ .passthru2() } throws: "error")
-		Assert({ .discard() } throws: "error")
+		Assert({ .passthru1() } throws: #error)
+		Assert({ .passthru2() } throws: #error)
+		Assert({ .discard() } throws: #error)
 		}
 
 	rt(x)
@@ -97,17 +83,29 @@ Test
 
 	passthru1()
 		{
-		.rt("error")
+		.rt(#error)
 		}
 
 	passthru2()
 		{
-		return .rt("error")
+		return .rt(#error)
 		}
 
 	discard()
 		{
-		.rt("error")
+		.rt(#error)
 		return
+		}
+
+	Test_return_call()
+		{
+		none = function() { return }
+		single = function() { return 123 }
+		multi = function() { return 1, 2, 3 }
+		thru = function(fn) { return fn() }
+		Assert(#().Eval2(none) is: #())
+		Assert(thru(single) is: 123)
+		a,b,c = thru(multi)
+		Assert([a, b, c] is: [1, 2, 3])
 		}
 	}

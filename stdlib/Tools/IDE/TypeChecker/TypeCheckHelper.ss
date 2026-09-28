@@ -1,29 +1,16 @@
 // Copyright (C) 2026 Suneido Software Corp. All rights reserved worldwide.
+// BuiltDate > 20260819
 class
 	{
-	// LEGACY-TYPECHECK-BINARY
-	// the in-process checker is used as soon as the exe provides it, so a dev
-	// switches over just by updating their exe
-	// to retire the binary, delete the TypeCheckerLegacyBinary record - nothing
-	// here needs editing, the name is looked up indirectly so its absence is
-	// only reachable on an exe that has no TypeChecker
-	transport()
+	Policy()
 		{
-		return (.useBuiltin?)() ? TypeCheckerBuiltin : Global(#TypeCheckerLegacyBinary)
+		.getProps("").GetInit(#Policy, TypeCheckerPolicy())
 		}
 
-	// Transport is recorded here rather than in transport() so it is written
-	// once per process instead of on every call
-	useBuiltin?: MemoizeSingle
+	SetPolicy(policy)
 		{
-		Func()
-			{
-			builtin? = BuiltinNames().BinarySearch?(#TypeChecker)
-			if not Suneido.Member?(#TypeCheckProperties)
-				Suneido.TypeCheckProperties = Object()
-			Suneido.TypeCheckProperties.Transport = builtin? ? #builtin : #binary
-			return builtin?
-			}
+		Assert(Object?(policy))
+		.setProps(#Policy, policy)
 		}
 
 	getProps(key, def = #())
@@ -45,79 +32,34 @@ class
 		Suneido.TypeCheckProperties[key] = val
 		}
 
-	// LEGACY-TYPECHECK-BINARY
-	// false once there is no binary, which hides the picker
-	BinaryPath()
-		{
-		return (.transport()).Path()
-		}
-
-	// LEGACY-TYPECHECK-BINARY
-	SetBinaryPath(path)
-		{
-		(.transport()).SetPath(path)
-		}
-
-	BinaryExists?()
-		{
-		// never type check a live system
-		if not (.liveSystem?)()
-			return (.transport()).Available?()
-
-		return false
-		}
-
-	liveSystem?: MemoizeSingle
-		{
-		Func()
-			{
-			return ServerEval("Thread.List").Any?({ it.Has?("scheduler extra process") })
-			}
-		}
-
-	Policy()
-		{
-		.getProps("").GetInit(#Policy, TypeCheckerPolicy())
-		}
-
-	SetPolicy(policy)
-		{
-		Assert(Object?(policy))
-		.setProps(#Policy, policy)
-		}
-
-	// we skip lineage checking in two particular cases if the lib is not loaded
-	// or if we are passed in a function
 	Run(className, method, policy = false, references? = true,
-		skipLineageOrLibName = false, restartOnError? = true, src = false)
+		skipLineageOrLibName = false, src = false)
 		{
 		sources = .OrderedSrc(className, :skipLineageOrLibName, :src)
-		return .Check(sources, method, policy, references?, :restartOnError?)
+		return .Check(sources, method, policy, references?)
 		}
 
-	Check(orderedSrc, method, policy = false, references? = true, restartOnError? = true)
+	// the builtin checker only exists in exes built after this date
+	TypeCheckerAvailable?()
 		{
+		return BuiltDate() > #20260819
+		}
+
+	Check(orderedSrc, method, policy = false, references? = true)
+		{
+		if not .TypeCheckerAvailable?()
+			return Object(diagnostics: Object(errors: #(), warnings: #()), result: false)
 		if policy is false
 			policy = TypeCheckerPolicy()
 		refs = references? ? .references(orderedSrc) : #()
-		return (.transport()).Check(method, orderedSrc, refs, policy, :restartOnError?)
+		TypeCheckerSignatures()
+		if method is TypeCheckerMethods.Infer
+			return TypeChecker.Infer(orderedSrc, refs, policy)
+		if method is TypeCheckerMethods.Annotate
+			return TypeChecker.Annotate(orderedSrc, refs, policy)
+		throw "TypeChecker: unknown method: " $ Display(method)
 		}
 
-	// LEGACY-TYPECHECK-BINARY
-	Server()
-		{
-		return (.transport()).Start()
-		}
-
-	// LEGACY-TYPECHECK-BINARY
-	StopServer()
-		{
-		(.transport()).Stop()
-		}
-
-	// if skipLineageOrLibName is false, then we build the lineage via TypeCheckerLineage
-	// if it is a string then we assume it to be a valid lib name like stdlib, axonlib...
-	// and do a direct db query for that record
 	OrderedSrc(className, skipLineageOrLibName = false, src = false)
 		{
 		if String?(skipLineageOrLibName)
@@ -179,19 +121,28 @@ class
 		return references
 		}
 
-	FormatDiagnostics(diagnostics, library = false)
+	FormatDiagnostics(diagnostics, library = false, record = false)
 		{
 		if diagnostics is false or not Object?(diagnostics)
 			return #(), #()
 
 		// checker emits base-first, line-descending within each class;
 		// reversing the whole list yields leaf-first, line-ascending
-		errors = diagnostics.GetDefault(#errors, Object()).Reverse!()
-		warnings = diagnostics.GetDefault(#warnings, Object()).Reverse!()
+		errors = .forRecord(diagnostics.GetDefault(#errors, #()), record).Reverse!()
+		warnings = .forRecord(diagnostics.GetDefault(#warnings, #()), record).Reverse!()
 		errors.Map!({ .formatDiagnostic(#ERROR, it, library) })
 		warnings.Map!({ .formatDiagnostic(#WARNING, it, library) })
 
 		return errors, warnings
+		}
+
+	// compare the class exactly - filtering the formatted lines on a
+	// library $ ':' $ record prefix also matches record__webgui and record_Test
+	// copying is the point of the false branch too: Reverse!/Map! below would
+	// otherwise reverse the caller's diagnostics and replace them with strings
+	forRecord(diags, record)
+		{
+		return record is false ? diags.Copy() : diags.Filter({ it.class is record })
 		}
 
 	formatDiagnostic(kind, d, library)

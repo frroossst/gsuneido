@@ -75,6 +75,12 @@ func TestCodegen(t *testing.T) {
 	test("a = b", "Load b, Store a")
 	test("a,b = f()",
 		"Load f, CallFuncNilOk (), PushReturn 2, StorePop a, StorePop b")
+	test("@a = f()",
+		"Load f, CallFuncNilOk (), Gather, Store a")
+	test("@a = f(1, 2)",
+		"One, Int 2, Load f, CallFuncNilOk (?, ?), Gather, Store a")
+	test("@a = f(); b",
+		"Load f, CallFuncNilOk (), Gather, StorePop a, Load b")
 	test("_dyn = 123", "Int 123, Store _dyn")
 	test("++_x", "One, Dyload _x, Pop, LoadStore _x AddEq")
 	test("_x += 1", "One, Dyload _x, Pop, LoadStore _x AddEq")
@@ -119,6 +125,14 @@ func TestCodegen(t *testing.T) {
 
 	test("return 1, 2, 3", "One, Int 2, Int 3, ReturnMulti 3")
 
+	test("return @args", "Load args, ReturnSpread")
+	test("return @f()", "Load f, CallFuncNilOk (), ReturnSpread")
+
+	test("f() { return 1, 2 }",
+		"Closure, {One, Int 2, BlockReturnMulti 2, Load f}, CallFuncNilOk (block:)")
+	test("f() { return @Object() }",
+		"Closure, {Global Object, CallFuncNilOk (), BlockReturnSpread, Load f}, CallFuncNilOk (block:)")
+
 	test("throw 'fubar'", "Value 'fubar', Throw")
 
 	test("f()", "Load f, CallFuncNilOk ()")
@@ -159,14 +173,6 @@ func TestCodegen(t *testing.T) {
 	test("new c", "LoadValue c '*new*', CallMethNilOk ()")
 	test("new c()", "LoadValue c '*new*', CallMethNilOk ()")
 	test("new c(1)", "Load c, One, Value '*new*', CallMethNilOk (?)")
-
-	xtest := func(src, expected string) {
-		t.Helper()
-		classNum.Store(0)
-		ast := parseFunction("function () {\n" + src + "\n}")
-		assert.This(func() { codegen("", "", ast, nil) }).Panics(expected)
-	}
-	xtest("b = { return 1, 2, 3}", "not allowed")
 }
 
 func TestCodegen_OverloadedGlobalRef(t *testing.T) {
@@ -300,11 +306,10 @@ func TestControl(t *testing.T) {
 		0: Load a
         2: QMark 12
         5: Load b
-        7: CallFuncNilOk ()
+        7: CallFuncDiscard ()
         9: Jump 16
         12: Load c
-		14: CallFuncNilOk ()
-		16: Pop`)
+		14: CallFuncDiscard ()`)
 
 	test("(a ? b : c)", `
 		0: Load a
@@ -315,19 +320,21 @@ func TestControl(t *testing.T) {
 
 	test("a ? b : c;;", `
 		0: Load a
-        2: QMark 10
+        2: QMark 11
         5: Load b
-        7: Jump 12
-        10: Load c
-        12: Pop`)
+        7: Pop
+        8: Jump 14
+        11: Load c
+        13: Pop`)
 
 	test("(a ? b : c);;", `
 		0: Load a
-        2: QMark 10
+        2: QMark 11
         5: Load b
-        7: Jump 12
-        10: Load c
-        12: Pop`)
+        7: Pop
+        8: Jump 14
+        11: Load c
+        13: Pop`)
 
 	test("return a ? b : c", `
 		0: Load a
@@ -608,7 +615,7 @@ func TestAnnotations(t *testing.T) {
 		fn := codegen("", "", ast, nil).(*SuFunc)
 		actual := fn.ParamSpec.String()
 		assert.T(t).This(actual).Is(src)
-		}
+	}
 	// param annotations
 	test("function(x :string)")
 	test("function(x :string, y :number)")

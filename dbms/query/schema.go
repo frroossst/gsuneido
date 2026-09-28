@@ -4,12 +4,17 @@
 package query
 
 import (
+	"slices"
 	"sort"
 
 	. "github.com/apmckinlay/gsuneido/core"
 	"github.com/apmckinlay/gsuneido/db19"
+	"github.com/apmckinlay/gsuneido/db19/index/iface"
 	"github.com/apmckinlay/gsuneido/db19/meta"
+	"github.com/apmckinlay/gsuneido/db19/meta/schema"
+	"github.com/apmckinlay/gsuneido/db19/stats"
 	"github.com/apmckinlay/gsuneido/util/assert"
+	"github.com/apmckinlay/gsuneido/util/dnum"
 	"github.com/apmckinlay/gsuneido/util/str"
 	"github.com/apmckinlay/gsuneido/util/tsc"
 )
@@ -18,8 +23,8 @@ import (
 
 type schemaTable struct {
 	cache
-	tran QueryTran
-	state
+	tran  QueryTran
+	state iface.State
 	metrics
 }
 
@@ -64,10 +69,6 @@ func (*schemaTable) optimize(_ Mode, req Require) (Cost, Cost, any) {
 func (*schemaTable) setApproach(Require, any, QueryTran) {
 }
 
-func (*schemaTable) Lookup(*Thread, Sels) Row {
-	panic(assert.ShouldNotReachHere())
-}
-
 func (*schemaTable) Select(Sels) {
 	assert.ShouldNotReachHere()
 }
@@ -88,6 +89,39 @@ func (st *schemaTable) Metrics() *metrics {
 	return &st.metrics
 }
 
+func (*schemaTable) Clone() *Table {
+	panic("can't clone schema table")
+}
+
+func (*schemaTable) SetIndex(index []string, mode Mode) {
+}
+
+func (*schemaTable) UniqueIndexes() [][]string {
+	return nil
+}
+
+// schemaTableNames are the virtual schema tables.
+// Note: indexes does not include them.
+var schemaTableNames = []string{"tables", "columns", "indexes", "views", "dbstats"}
+
+// schemaTableCols returns the columns of a virtual schema table,
+// or nil if table is not one.
+func schemaTableCols(table string) []string {
+	switch table {
+	case "tables":
+		return tablesFields[0]
+	case "columns":
+		return columnsFields[0]
+	case "indexes":
+		return indexesFields[0]
+	case "views":
+		return viewsFields[0]
+	case "dbstats":
+		return statsFields[0]
+	}
+	return nil
+}
+
 //-------------------------------------------------------------------
 
 type Tables struct {
@@ -97,6 +131,10 @@ type Tables struct {
 }
 
 func (*Tables) String() string {
+	return "tables"
+}
+
+func (*Tables) Name() string {
 	return "tables"
 }
 
@@ -131,31 +169,31 @@ func (ts *Tables) SetTran(tran QueryTran) {
 
 func (ts *Tables) Rewind() {
 	ts.i = -1
-	ts.state = rewound
+	ts.state = iface.Rewound
 }
 
 func (ts *Tables) Get(_ *Thread, dir Dir) Row {
 	defer func(t uint64) { ts.tget += tsc.Read() - t }(tsc.Read())
 	ts.ensure()
-	if ts.state == eof {
+	if ts.state.Eof() {
 		return nil
 	}
 	if dir == Next {
-		if ts.state == rewound {
+		if ts.state.Rewound() {
 			ts.i = -1
 		}
 		ts.i++
 	} else { // Prev
-		if ts.state == rewound {
+		if ts.state.Rewound() {
 			ts.i = len(ts.info)
 		}
 		ts.i--
 	}
 	if ts.i < 0 || len(ts.info) <= ts.i {
-		ts.state = eof
+		ts.state = iface.Eof
 		return nil
 	}
-	ts.state = within
+	ts.state = iface.Within
 	ts.ngets++
 	return ts.row(ts.info[ts.i])
 }
@@ -187,61 +225,34 @@ func (ts *Tables) ensure() {
 	views.SetTran(ts.tran)
 	nviews, _ := views.Nrows()
 
+	stats := StatsTable{}
+	stats.SetTran(ts.tran)
+	nstats, _ := stats.Nrows()
+
 	ts.info = append(ts.info,
-		// +4 for tables, columns, indexes, views
-		&meta.Info{Table: "tables", Nrows: len(ts.info) + 4},
+		// +5 for tables, columns, indexes, views, dbstats
+		&meta.Info{Table: "tables", Nrows: len(ts.info) + 5},
 		&meta.Info{Table: "columns", Nrows: ncols},
 		&meta.Info{Table: "indexes", Nrows: nidxs},
 		&meta.Info{Table: "views", Nrows: nviews},
+		&meta.Info{Table: "dbstats", Nrows: nstats},
 	)
 	sort.Slice(ts.info,
 		func(i, j int) bool { return ts.info[i].Table < ts.info[j].Table })
 }
 
-//-------------------------------------------------------------------
-
-// TablesLookup is used to optimize lookups on tables.
-// It is inserted by Where Transform.
-type TablesLookup struct {
-	Tables
-	table string
-}
-
-func NewTablesLookup(tran QueryTran, table string) *TablesLookup {
-	tl := TablesLookup{table: table, tran: tran}
-	return &tl
-}
-
-func (tl *TablesLookup) String() string {
-	return "tables(" + tl.table + ")"
-}
-
-func (*TablesLookup) Nrows() (int, int) {
-	return 1, 1
-}
-
-func (tl *TablesLookup) Transform() Query {
-	return tl
-}
-
-func (tl *TablesLookup) Get(*Thread, Dir) Row {
-	defer func(t uint64) { tl.tget += tsc.Read() - t }(tsc.Read())
-	if tl.state != eof {
-		tl.state = eof
-		switch tl.table {
-		case "tables", "columns", "indexes", "views":
-			var rb RecordBuilder
-			rb.Add(SuStr(tl.table))
-			rec := rb.Build()
-			tl.ngets++
-			return Row{DbRec{Record: rec}}
-		default:
-			ti := tl.tran.GetInfo(tl.table)
-			if ti != nil {
-				tl.ngets++
-				return tl.row(ti)
-			}
-		}
+func (ts *Tables) Lookup(th *Thread, sels Sels) Row {
+	table := ToStr(Unpack(sels.MustGet("table")))
+	if schemaTableCols(table) != nil {
+		var rb RecordBuilder
+		rb.Add(SuStr(table))
+		rec := rb.Build()
+		ts.ngets++
+		return Row{DbRec{Record: rec}}
+	}
+	if ti := ts.tran.GetInfo(table); ti != nil {
+		ts.ngets++
+		return ts.row(ti)
 	}
 	return nil
 }
@@ -257,6 +268,10 @@ type Columns struct {
 }
 
 func (*Columns) String() string {
+	return "columns"
+}
+
+func (*Columns) Name() string {
 	return "columns"
 }
 
@@ -303,33 +318,33 @@ func (cs *Columns) SetTran(tran QueryTran) {
 
 func (cs *Columns) Rewind() {
 	cs.si = -1
-	cs.state = rewound
+	cs.state = iface.Rewound
 }
 
 func (cs *Columns) Get(_ *Thread, dir Dir) Row {
 	defer func(t uint64) { cs.tget += tsc.Read() - t }(tsc.Read())
 	cs.ensure()
-	if cs.state == eof {
+	if cs.state.Eof() {
 		return nil
 	}
 	var col string
 	var fld int
 	for {
 		if dir == Next {
-			if cs.state == rewound {
+			if cs.state.Rewound() {
 				cs.si, cs.ci = 0, -1
 			}
 			cs.ci++
 			for cs.ci >= len(cs.schema[cs.si].Columns)+len(cs.schema[cs.si].Derived) {
 				cs.si++
 				if cs.si >= len(cs.schema) {
-					cs.state = eof
+					cs.state = iface.Eof
 					return nil
 				}
 				cs.ci = 0
 			}
 		} else { // Prev
-			if cs.state == rewound {
+			if cs.state.Rewound() {
 				cs.si = len(cs.schema)
 				cs.ci = 0
 			}
@@ -337,7 +352,7 @@ func (cs *Columns) Get(_ *Thread, dir Dir) Row {
 			for cs.ci < 0 {
 				cs.si--
 				if cs.si < 0 {
-					cs.state = eof
+					cs.state = iface.Eof
 					return nil
 				}
 				cs.ci = len(cs.schema[cs.si].Columns) + len(cs.schema[cs.si].Derived) - 1
@@ -348,14 +363,18 @@ func (cs *Columns) Get(_ *Thread, dir Dir) Row {
 			break
 		}
 	}
-	cs.state = within
+	cs.state = iface.Within
+	cs.ngets++
 	schema := cs.schema[cs.si]
+	return cs.row(schema.Table, col, fld)
+}
+
+func (*Columns) row(table, col string, fld int) Row {
 	var rb RecordBuilder
-	rb.Add(SuStr(schema.Table))
+	rb.Add(SuStr(table))
 	rb.Add(SuStr(col))
 	rb.Add(IntVal(fld))
 	rec := rb.Build()
-	cs.ngets++
 	return Row{DbRec{Record: rec}}
 }
 
@@ -372,15 +391,41 @@ func (cs *Columns) ensure() {
 		return
 	}
 	cs.schema = cs.tran.GetAllSchema()
-	cs.schema = append(cs.schema,
-		&meta.Schema{Table: "tables", Columns: tablesFields[0]},
-		&meta.Schema{Table: "columns", Columns: columnsFields[0]},
-		&meta.Schema{Table: "indexes", Columns: indexesFields[0]},
-		&meta.Schema{Table: "views", Columns: viewsFields[0]},
-	)
+	for _, name := range schemaTableNames {
+		cs.schema = append(cs.schema,
+			&meta.Schema{Table: name, Columns: schemaTableCols(name)})
+	}
 	sort.Slice(cs.schema,
 		func(i, j int) bool { return cs.schema[i].Table < cs.schema[j].Table })
 	cs.nrows = cs.getNrows()
+}
+
+func (cs *Columns) Lookup(th *Thread, sels Sels) Row {
+	table := ToStr(Unpack(sels.MustGet("table")))
+	column := ToStr(Unpack(sels.MustGet("column")))
+	if cols := schemaTableCols(table); cols != nil {
+		// virtual schema table, not in the meta schema
+		if i := slices.Index(cols, column); i >= 0 {
+			return cs.row(table, column, i)
+		}
+		return nil
+	}
+	if !cs.tran.HasTable(table) {
+		return nil
+	}
+	if column == "-" {
+		return nil // not included in the columns table
+	}
+	ts := cs.tran.GetSchema(table)
+	fld := -1
+	if i := slices.Index(ts.Columns, column); i >= 0 {
+		fld = i
+	} else if !slices.ContainsFunc(ts.Derived,
+		// Derived are stored capitalized but reported uncapitalized
+		func(d string) bool { return str.UnCapitalize(d) == column }) {
+		return nil
+	}
+	return cs.row(table, column, fld)
 }
 
 //-------------------------------------------------------------------
@@ -395,6 +440,10 @@ type Indexes struct {
 }
 
 func (*Indexes) String() string {
+	return "indexes"
+}
+
+func (*Indexes) Name() string {
 	return "indexes"
 }
 
@@ -436,31 +485,31 @@ func (is *Indexes) SetTran(tran QueryTran) {
 }
 
 func (is *Indexes) Rewind() {
-	is.state = rewound
+	is.state = iface.Rewound
 }
 
 func (is *Indexes) Get(_ *Thread, dir Dir) Row {
 	defer func(t uint64) { is.tget += tsc.Read() - t }(tsc.Read())
 	is.ensure()
-	if is.state == eof {
+	if is.state.Eof() {
 		return nil
 	}
 	if dir == Next {
-		if is.state == rewound {
+		if is.state.Rewound() {
 			is.si, is.ci = 0, 0
 		} else {
 			is.ci++
 			if is.ci >= len(is.schema[is.si].Indexes) {
 				is.si++
 				if is.si >= len(is.schema) {
-					is.state = eof
+					is.state = iface.Eof
 					return nil
 				}
 				is.ci = 0
 			}
 		}
 	} else { // Prev
-		if is.state == rewound {
+		if is.state.Rewound() {
 			is.si = len(is.schema) - 1
 			is.ci = len(is.schema[is.si].Indexes) - 1
 		} else {
@@ -468,18 +517,22 @@ func (is *Indexes) Get(_ *Thread, dir Dir) Row {
 			if is.ci < 0 {
 				is.si--
 				if is.si < 0 {
-					is.state = eof
+					is.state = iface.Eof
 					return nil
 				}
 				is.ci = len(is.schema[is.si].Indexes) - 1
 			}
 		}
 	}
-	is.state = within
+	is.state = iface.Within
 	schema := is.schema[is.si]
+	is.ngets++
+	return is.row(schema.Table, &schema.Indexes[is.ci])
+}
+
+func (is *Indexes) row(table string, idx *schema.Index) Row {
 	var rb RecordBuilder
-	rb.Add(SuStr(schema.Table))
-	idx := schema.Indexes[is.ci]
+	rb.Add(SuStr(table))
 	rb.Add(SuStr(str.Join(",", idx.Columns)))
 	switch idx.Mode {
 	case 'k':
@@ -497,7 +550,6 @@ func (is *Indexes) Get(_ *Thread, dir Dir) Row {
 		rb.Add(SuInt(int(idx.Fk.Mode)))
 	}
 	rec := rb.Build()
-	is.ngets++
 	return Row{DbRec{Record: rec}}
 }
 
@@ -511,6 +563,19 @@ func (is *Indexes) ensure() {
 	is.nrows = is.getNrows()
 }
 
+func (is *Indexes) Lookup(th *Thread, sels Sels) Row {
+	table := ToStr(Unpack(sels.MustGet("table")))
+	cols := ToStr(Unpack(sels.MustGet("columns")))
+	if !is.tran.HasTable(table) {
+		return nil // note: indexes does not include the virtual schema tables
+	}
+	ts := is.tran.GetSchema(table)
+	if idx := ts.FindIndex(str.Split(cols, ",")); idx != nil {
+		return is.row(table, idx)
+	}
+	return nil
+}
+
 //-------------------------------------------------------------------
 
 type Views struct {
@@ -520,6 +585,10 @@ type Views struct {
 }
 
 func (*Views) String() string {
+	return "views"
+}
+
+func (*Views) Name() string {
 	return "views"
 }
 
@@ -554,33 +623,37 @@ func (vs *Views) SetTran(tran QueryTran) {
 
 func (vs *Views) Rewind() {
 	vs.i = -2
-	vs.state = rewound
+	vs.state = iface.Rewound
 }
 
 func (vs *Views) Get(_ *Thread, dir Dir) Row {
 	vs.ensure()
-	if vs.state == eof {
+	if vs.state.Eof() {
 		return nil
 	}
 	if dir == Next {
-		if vs.state == rewound {
+		if vs.state.Rewound() {
 			vs.i = -2
 		}
 		vs.i += 2
 	} else { // Prev
-		if vs.state == rewound {
+		if vs.state.Rewound() {
 			vs.i = len(vs.views)
 		}
 		vs.i -= 2
 	}
 	if vs.i < 0 || len(vs.views) <= vs.i {
-		vs.state = eof
+		vs.state = iface.Eof
 		return nil
 	}
-	vs.state = within
+	vs.state = iface.Within
+	return vs.row(vs.views[vs.i], vs.views[vs.i+1])
+}
+
+func (vs *Views) row(name, def string) Row {
 	var rb RecordBuilder
-	rb.Add(SuStr(vs.views[vs.i]))   // name
-	rb.Add(SuStr(vs.views[vs.i+1])) // definition
+	rb.Add(SuStr(name))
+	rb.Add(SuStr(def))
 	rec := rb.Build()
 	return Row{DbRec{Record: rec}}
 }
@@ -606,6 +679,14 @@ func (vs *Views) Swap(i, j int) {
 	vs.views[i+1], vs.views[j+1] = vs.views[j+1], vs.views[i+1]
 }
 
+func (vs *Views) Lookup(th *Thread, sels Sels) Row {
+	name := ToStr(Unpack(sels.MustGet("view_name")))
+	if def := vs.tran.GetView(name); def != "" {
+		return vs.row(name, def)
+	}
+	return nil
+}
+
 //-------------------------------------------------------------------
 
 type History struct {
@@ -616,6 +697,8 @@ type History struct {
 func (*History) String() string {
 	return "history"
 }
+
+// Name deliberately not implemented so dbms.get doesn't try to do Lookup
 
 func (his *History) Transform() Query {
 	return his
@@ -644,15 +727,15 @@ func (his *History) SetTran(tran QueryTran) {
 }
 
 func (his *History) Rewind() {
-	his.state = rewound
+	his.state = iface.Rewound
 }
 
 func (his *History) Get(_ *Thread, dir Dir) Row {
 	defer func(t uint64) { his.tget += tsc.Read() - t }(tsc.Read())
-	if his.state == eof {
+	if his.state.Eof() {
 		return nil
 	}
-	if his.state == rewound {
+	if his.state.Rewound() {
 		his.off = 0
 	}
 	var state *db19.DbState
@@ -662,14 +745,183 @@ func (his *History) Get(_ *Thread, dir Dir) Row {
 		state = db19.PrevState(his.tran.GetStore(), his.off)
 	}
 	if state == nil {
-		his.state = eof
+		his.state = iface.Eof
 		return nil
 	}
-	his.state = within
+	his.state = iface.Within
 	his.off = state.Off
 	var rb RecordBuilder
 	rb.Add(SuDateFromUnixMilli(state.Asof))
 	rec := rb.Build()
 	his.ngets++
 	return Row{DbRec{Record: rec}}
+}
+
+func (his *History) Lookup(th *Thread, sels Sels) Row {
+	panic("not implemented")
+}
+
+//-------------------------------------------------------------------
+
+type StatsTable struct {
+	schemaTable
+	stats  stats.Stats
+	tables []string
+	si     int
+	ci     int
+	nrows  int
+}
+
+func (*StatsTable) String() string {
+	return "dbstats"
+}
+
+func (*StatsTable) Name() string {
+	return "dbstats"
+}
+
+func (st *StatsTable) Transform() Query {
+	return st
+}
+
+func (*StatsTable) Keys() [][]string {
+	return [][]string{{"table", "column"}}
+}
+
+var statsFields = [][]string{{"table", "column", "distinct", "quantiles", "common"}}
+
+func (*StatsTable) Columns() []string {
+	return statsFields[0]
+}
+
+func (*StatsTable) Header() *Header {
+	return NewHeader(statsFields, statsFields[0])
+}
+
+func (st *StatsTable) Nrows() (int, int) {
+	st.ensure()
+	return st.nrows, st.nrows
+}
+
+func (st *StatsTable) SetTran(tran QueryTran) {
+	st.tran = tran
+	st.stats = nil
+}
+
+func (st *StatsTable) Rewind() {
+	st.si = -1
+	st.state = iface.Rewound
+}
+
+func (st *StatsTable) Get(_ *Thread, dir Dir) Row {
+	defer func(t uint64) { st.tget += tsc.Read() - t }(tsc.Read())
+	st.ensure()
+	if st.state.Eof() {
+		return nil
+	}
+	var table, col string
+	var cs stats.ColStats
+	if dir == Next {
+		if st.state.Rewound() {
+			st.si, st.ci = 0, -1
+		}
+		st.ci++
+		for st.si >= len(st.tables) ||
+			st.ci >= len(st.stats[st.tables[st.si]].Columns) {
+			st.si++
+			if st.si >= len(st.tables) {
+				st.state = iface.Eof
+				return nil
+			}
+			st.ci = 0
+		}
+	} else { // Prev
+		if st.state.Rewound() {
+			st.si = len(st.tables)
+			st.ci = 0
+		}
+		st.ci--
+		for st.ci < 0 {
+			st.si--
+			if st.si < 0 {
+				st.state = iface.Eof
+				return nil
+			}
+			st.ci = len(st.stats[st.tables[st.si]].Columns) - 1
+		}
+	}
+	table = st.tables[st.si]
+	cols := sortedCols(st.stats[table])
+	col = cols[st.ci]
+	cs = st.stats[table].Columns[col]
+	st.state = iface.Within
+	st.ngets++
+	return st.row(table, col, cs)
+}
+
+func (*StatsTable) row(table string, col string, cs stats.ColStats) Row {
+	var rb RecordBuilder
+	rb.Add(SuStr(table))
+	rb.Add(SuStr(col))
+	rb.Add(IntVal(cs.Cardinality))
+	rb.Add(formatQuantiles(cs.Quantiles))
+	rb.Add(formatTops(cs.Tops))
+	rec := rb.Build()
+	return Row{DbRec{Record: rec}}
+}
+
+func sortedCols(ts stats.TableStats) []string {
+	cols := make([]string, 0, len(ts.Columns))
+	for col := range ts.Columns {
+		cols = append(cols, col)
+	}
+	sort.Strings(cols)
+	return cols
+}
+
+func formatQuantiles(quantiles []string) *SuObject {
+	parts := &SuObject{}
+	for _, q := range quantiles {
+		parts.Add(Unpack(q))
+	}
+	return parts
+}
+
+func formatTops(tops []stats.Top) *SuObject {
+	parts := &SuObject{}
+	for _, t := range tops {
+		part := &SuObject{}
+		part.Add(SuDnum{Dnum: dnum.FromFloat(t.Frac)})
+		part.Add(Unpack(t.Value))
+		parts.Add(part)
+	}
+	return parts
+}
+
+func (st *StatsTable) ensure() {
+	if st.stats != nil {
+		return
+	}
+	st.stats = st.tran.Stats()
+	st.tables = make([]string, 0, len(st.stats))
+	for table := range st.stats {
+		st.tables = append(st.tables, table)
+	}
+	sort.Strings(st.tables)
+	st.nrows = 0
+	for _, table := range st.tables {
+		st.nrows += len(st.stats[table].Columns)
+	}
+}
+
+func (st *StatsTable) Lookup(th *Thread, sels Sels) Row {
+	table := ToStr(Unpack(sels.MustGet("table")))
+	column := ToStr(Unpack(sels.MustGet("column")))
+	stats := st.tran.Stats()
+	if ts, ok := stats[table]; ok {
+		if cs, ok := ts.Columns[column]; ok {
+			return st.row(table, column, cs)
+		}
+	}
+	return nil
 }

@@ -26,32 +26,39 @@ Expressions that can be applied to an index:
 */
 
 type span struct {
-	// org is inclusive (>=)
+	// org is the lower bound: > val if inc, else >= val
 	org side
-	// end is exclusive (<)
+	// end is the upper bound: <= val if inc, else < val
 	end side
 }
 
 type side struct {
 	val string
-	inc bool
+	inc bool // whether to increment, affects inclusive/exclusive
 }
 
 // perField returns the spans for each field, or nil if there is a conflict.
 // It is called by NewWhere. The result is later used by perIndex.
 // It depends on CanEvalRaw already being done.
-func perField(exprs []ast.Expr, fields []string) map[string][]span {
-	result := make(map[string][]span)
+// The third return value is the count of expressions with no columns or multiple columns.
+func perField(exprs []ast.Expr, fields []string) (map[string][]span, []string, int) {
+	colSpans := make(map[string][]span)
+	var unspanable []string
+	var dataExprCount int
 	for _, expr := range exprs {
 		if col, espans := exprToSpans(expr, fields); espans != nil {
-			x := intersectSpans(result[col], espans)
+			x := intersectSpans(colSpans[col], espans)
 			if x == nil {
-				return nil // conflict
+				return nil, nil, 0 // conflict
 			}
-			result[col] = x
+			colSpans[col] = x
+		} else if len(expr.Columns()) == 1 {
+			unspanable = append(unspanable, expr.Columns()[0])
+		} else {
+			dataExprCount++
 		}
 	}
-	return result
+	return colSpans, unspanable, dataExprCount
 }
 
 // exprToSpans returns the spans for an expression, or nil if not indexable

@@ -43,6 +43,9 @@ const (
 	// PushReturn <uint8> pushes multiple return values onto the stack.
 	// It is used by multiple assignment.
 	PushReturn
+	// Gather creates an object from call return values.
+	// It is used by @var = call.
+	Gather
 
 	// load and store -----------------------------------------------
 
@@ -237,6 +240,12 @@ const (
 	// ReturnMulti <uint8> returns multiple values from the stack.
 	// It is used by multiple return.
 	ReturnMulti
+	// ReturnSpread returns the values from an object.
+	// If the object has named members, it panics.
+	// If the object is empty, it returns nil.
+	// If the object has one value, it returns that value.
+	// If the object has multiple values, it returns them as multiple values.
+	ReturnSpread
 
 	// blocks -------------------------------------------------------
 
@@ -250,6 +259,12 @@ const (
 	BlockReturn
 	// BlockReturnNil pushes nil and then does BlockReturn
 	BlockReturnNil
+	// BlockReturnMulti <uint8> returns multiple values from the stack
+	// like ReturnMulti, but from a block i.e. does BlockReturn
+	BlockReturnMulti
+	// BlockReturnSpread returns the values from an object like ReturnSpread,
+	// but from a block i.e. does BlockReturn
+	BlockReturnSpread
 
 	// combination op codes -----------------------------------------
 

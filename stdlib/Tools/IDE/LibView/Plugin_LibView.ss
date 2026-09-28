@@ -2,7 +2,8 @@
 #(
 	ExtensionPoints: (
 		(Tools),
-		(New)),
+		(New)
+		),
 	Contributions: (
 		(LibView, Tools, Find_References_to_Current, R, "Ctrl+R",
 			target: function(libview)
@@ -36,10 +37,10 @@
 				libview.Save() // for diff to current
 				Window([#QualityChecker, libview], w: 800, h: 1000, keep_placement:)
 				}),
-		(LibView, Tools, Type_Checker, "", "",
+		(LibView, Tools, Type_Checker, "",
 			target: function(libview)
 				{
-				Window([#TypeChecker, libview])
+				TypeCheckerControl(libview)
 				}),
 		(LibView, Tools, Version_Control_Settings, "",
 			target: function()
@@ -58,7 +59,9 @@
 				if LibEmptyFolders.RemoveAll() > 0
 					SvcTable.Publish(#TreeChange, type: #lib, force:)
 				}),
-		(LibView, Tools, Auto_Format_and_Send, F,
+		(LibView, Tools, Formatting_Tools, F,
+			tip: "Format the current record, review the diff, then send it to version " $
+				"control or apply it locally",
 			target: function(libview)
 				{
 				LibViewAutoFormatSend(libview)
@@ -97,4 +100,6 @@ Contributions:
 	(MyPlugin, myExtensionPoint2, "...")
 	(OtherPlugin, itsExtensionPoint, "...")
 	)
-)')))
+)')
+		)
+	)

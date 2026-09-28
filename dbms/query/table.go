@@ -32,6 +32,8 @@ func NewTable(t QueryTran, name string) Query {
 		tbl = &Views{}
 	case "history":
 		tbl = &History{}
+	case "dbstats":
+		tbl = &StatsTable{}
 	default:
 		tbl = &Table{name: name}
 	}
@@ -54,6 +56,11 @@ type Table struct {
 	indexEncode bool
 	cursorMode  bool
 	req         Require
+}
+
+func (tbl *Table) Clone() *Table {
+	tbl2 := *tbl
+	return &tbl2
 }
 
 func (tbl *Table) isSingleton() bool {

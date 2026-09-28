@@ -11,12 +11,15 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/index"
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/meta"
+	"github.com/apmckinlay/gsuneido/db19/stats"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 )
 
 // testTran has hard coded table schemas for tests
 // See also: sizeTran
-type testTran struct{}
+type testTran struct {
+	stats stats.Stats // optional, nil means no stats
+}
 
 var _ QueryTran = (*testTran)(nil)
 
@@ -75,6 +78,10 @@ func (testTran) GetSchema(table string) *Schema {
 		return schema
 	}
 	return nil
+}
+
+func (testTran) HasTable(table string) bool {
+	return testSchemas[table] != nil
 }
 
 var testInfo = map[string]*meta.Info{
@@ -245,4 +252,11 @@ func (t testTran) IndexIter(string, int) index.IndexIter {
 
 func (t testTran) Num() int {
 	return 0
+}
+
+func (t testTran) BusyAdd(string, int) {
+}
+
+func (t testTran) Stats() stats.Stats {
+	return t.stats
 }

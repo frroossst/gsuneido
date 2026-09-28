@@ -475,7 +475,7 @@ func (ob *SuObject) mustBeMutable() {
 		// two threads could (rarely) get in here at the same time
 		// (on different objects, since we lock)
 		ob.list = slc.Clone(ob.list)
-		ob.named = *ob.named.Copy()
+		ob.named = *ob.named.Clone()
 		// must do this last because if count goes to zero
 		// then another thread could modify
 		ob.copyCount.Add(-1)
@@ -1098,7 +1098,7 @@ func (ob *SuObject) PackSize(hash *uint64) int {
 	return ob.PackSize2(hash, newPackStack())
 }
 
-func (ob *SuObject) PackSize2(hash *uint64, stack packStack) int {
+func (ob *SuObject) PackSize2(hash *uint64, stack PackStack) int {
 	// must check stack before locking to avoid recursive deadlock
 	stack.push(ob)
 	ob.RLock()
@@ -1120,7 +1120,7 @@ func (ob *SuObject) PackSize2(hash *uint64, stack packStack) int {
 	return ps
 }
 
-func packSize(x Value, hash *uint64, stack packStack) int {
+func packSize(x Value, hash *uint64, stack PackStack) int {
 	if p, ok := x.(Packable); ok {
 		n := p.PackSize2(hash, stack)
 		return varint.Len(uint64(n)) + n

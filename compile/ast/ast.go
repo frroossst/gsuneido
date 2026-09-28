@@ -759,13 +759,17 @@ func (a *If) Children(fn func(Node) Node) {
 type Return struct {
 	Exprs []Expr
 	stmtNodeT
-	ReturnThrow bool
+	ReturnThrow  bool
+	ReturnSpread bool
 }
 
 func (a *Return) String() string {
 	s := "Return("
 	if a.ReturnThrow {
 		s = "ReturnThrow("
+	}
+	if a.ReturnSpread {
+		s = "ReturnSpread("
 	}
 	sep := ""
 	for _, e := range a.Exprs {
@@ -1066,6 +1070,21 @@ func (a *Switch) Children(fn func(Node) Node) {
 	for i := range a.Default {
 		childStmt(fn, &a.Default[i])
 	}
+}
+
+type AtAssign struct {
+	stmtNodeT
+	Lhs Expr // *Ident
+	Rhs Expr // *Call
+}
+
+func (a *AtAssign) String() string {
+	return "AtAssign(" + a.Lhs.String() + " " + a.Rhs.String() + ")"
+}
+
+func (a *AtAssign) Children(fn func(Node) Node) {
+	childExpr(fn, &a.Lhs)
+	childExpr(fn, &a.Rhs)
 }
 
 type ExprPos struct {

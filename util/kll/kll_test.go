@@ -50,6 +50,81 @@ func TestQuery(t *testing.T) {
 	assert.Msg(m - 500).That(ints.Abs(m-500) < 25) // 2.5%
 }
 
+func TestQuantiles(t *testing.T) {
+	sk := New[int]()
+	n := 50
+	for range 1_000_000 {
+		sk.Insert(rand.IntN(1000))
+	}
+	qs := sk.Quantiles(n)
+	assert.This(len(qs)).Is(n)
+	for i, v := range qs {
+		q := float64(i) / float64(n-1)
+		got := sk.Query(q)
+		assert.Msg(i, v, got).This(v).Is(got)
+	}
+	assert.Msg(qs[0] - 0).That(qs[0] >= 0)
+	assert.Msg(qs[n-1] - 999).That(qs[n-1] <= 999)
+	// quantiles should be non-decreasing
+	for i := 1; i < n; i++ {
+		assert.Msg(i).That(qs[i-1] <= qs[i])
+	}
+}
+
+func TestQuantiles2(t *testing.T) {
+	sk := New[int]()
+	r := 100
+	for i := range r {
+		sk.Insert(i)
+	}
+	n := 11
+	qs := sk.Quantiles(n)
+	assert.This(len(qs)).Is(n)
+	fmt.Println(qs)
+	for i, v := range qs {
+		q := float64(i) / float64(n-1)
+		got := sk.Query(q)
+		assert.Msg(i, v, got).This(v).Is(got)
+	}
+	assert.That(qs[0] >= 0)
+	assert.That(qs[n-1] <= r)
+	// quantiles should be non-decreasing
+	for i := 1; i < n; i++ {
+		assert.Msg(i).That(qs[i-1] <= qs[i])
+	}
+
+	qs = sk.Quantiles(2)
+	assert.This(qs).Is([]int{0, r - 1})
+}
+
+func TestQuantiles3(t *testing.T) {
+	sk := New[int]()
+	for i := range 51 {
+		sk.Insert(i)
+	}
+	qs := sk.Quantiles(51)
+	fmt.Println(qs[:10])
+	fmt.Println(qs[10:20])
+	fmt.Println(qs[20:30])
+	fmt.Println(qs[30:40])
+	fmt.Println(qs[40:50])
+	fmt.Println(qs[50:])
+}
+
+func TestQuantiles4(t *testing.T) {
+	sk := New[int]()
+	for i := range 10 {
+		sk.Insert(i)
+	}
+	qs := sk.Quantiles(51)
+	fmt.Println(qs[:10])
+	fmt.Println(qs[10:20])
+	fmt.Println(qs[20:30])
+	fmt.Println(qs[30:40])
+	fmt.Println(qs[40:50])
+	fmt.Println(qs[50:])
+}
+
 func TestLarge(t *testing.T) {
 	sk := New[int]()
 	for range 1_000_000 {

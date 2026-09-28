@@ -235,6 +235,21 @@ func (p *Parser) statement() (result ast.Statement) {
 	case tok.Continue:
 		p.Next()
 		return p.semi(&ast.Continue{})
+	case tok.At:
+		p.Next()
+		if !p.Token.IsIdent() || !isLocal(p.Text) {
+			p.Error("expecting local variable name after @")
+		}
+		id := &ast.Ident{Name: p.Text}
+		id.SetPos(p.Pos, p.EndPos)
+		p.Next()
+		p.Match(tok.Eq)
+		rhs := p.Expression()
+		if _, ok := rhs.(*ast.Call); !ok {
+			p.Error("@var = requires a call")
+		}
+		p.final[id.Name] = disqualified
+		return p.semi(&ast.AtAssign{Lhs: id, Rhs: rhs})
 	default:
 		exprs := p.exprList()
 		if len(exprs) == 1 {
@@ -451,12 +466,18 @@ func (p *Parser) isForIn() bool {
 func (p *Parser) forIn() *ast.ForIn {
 	parens := p.MatchIf(tok.LParen)
 	id := p.Text
+	if !isLocal(id) {
+		p.Error("for-in variable must be a local variable")
+	}
 	p.final[id] = disqualified
 	pos := p.Pos
 	p.MatchIdent()
 	var var2 ast.Ident
 	if p.MatchIf(tok.Comma) {
 		var2.Name = p.Text
+		if !isLocal(var2.Name) {
+			p.Error("for-in variable must be a local variable")
+		}
 		p.final[var2.Name] = disqualified
 		var2.Pos = p.Pos
 		p.MatchIdent()
@@ -549,12 +570,14 @@ func (p *Parser) returnStmt() *ast.Return {
 	if p.newline || p.MatchIf(tok.Semicolon) || p.Token == tok.RCurly {
 		return &ast.Return{}
 	}
-	returnThrow := false
 	if p.MatchIf(tok.Throw) {
 		return &ast.Return{Exprs: []Expr{p.trailingExpr()}, ReturnThrow: true}
 	}
+	if p.MatchIf(tok.At) {
+		return &ast.Return{Exprs: []Expr{p.trailingExpr()}, ReturnSpread: true}
+	}
 	exprs := p.returnExprs()
-	return &ast.Return{Exprs: exprs, ReturnThrow: returnThrow}
+	return &ast.Return{Exprs: exprs}
 }
 
 func (p *Parser) returnExprs() []ast.Expr {
@@ -598,6 +621,9 @@ func (p *Parser) tryStmt() *ast.TryCatch {
 	if p.MatchIf(tok.Catch) {
 		if p.MatchIf(tok.LParen) {
 			catchVar = p.Text
+			if !isLocal(catchVar) {
+				p.Error("catch variable must be a local variable")
+			}
 			p.final[catchVar] = disqualified
 			varPos = p.Pos
 			unused = p.unusedAhead()

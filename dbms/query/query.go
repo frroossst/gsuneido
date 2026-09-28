@@ -47,6 +47,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/meta"
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
+	"github.com/apmckinlay/gsuneido/db19/stats"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/dbg"
@@ -246,14 +247,6 @@ type queryBase struct {
 	metrics
 }
 
-type state byte
-
-const (
-	rewound state = iota
-	within
-	eof
-)
-
 func (q *queryBase) Columns() []string {
 	return q.header.Columns
 }
@@ -346,6 +339,7 @@ type Cost = int
 
 type QueryTran interface {
 	GetSchema(table string) *schema.Schema
+	HasTable(table string) bool
 	GetInfo(table string) *meta.Info
 	GetAllInfo() []*meta.Info
 	GetAllSchema() []*meta.Schema
@@ -361,6 +355,8 @@ type QueryTran interface {
 	Read(string, int, string, string)
 	IndexIter(table string, iIndex int) index.IndexIter
 	Num() int
+	BusyAdd(col string, weight int)
+	Stats() stats.Stats
 }
 
 // Setup prepares a parsed query for execution.

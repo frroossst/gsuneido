@@ -204,14 +204,18 @@ func TestReturnThrowDoesNotLeakIntoReturnType(t *testing.T) {
 	a.This(env.Returns["Calc"]).Is(TNumber)
 }
 
-func TestReturnThrowOnlyPathIsVoid(t *testing.T) {
+func TestReturnThrowOnlyPathIsUnknown(t *testing.T) {
 	a := assert.T(t)
 	_, env := runPasses(`class {
 		Always() {
 			return throw "nope"
 		}
 	}`, "T")
-	a.This(env.Returns["Always"]).Is(TVoid)
+	// return throw yields its value when the caller uses it (it only throws
+	// on discard), so the return type must not claim Void - now that Void
+	// is published to callsites, Void here would be a false "returns no
+	// value" error on every use. Unknown, not Void.
+	a.This(env.Returns["Always"]).Is(TUnknown)
 }
 
 func TestInlineInitParamWidensBoolDefault(t *testing.T) {
@@ -2273,6 +2277,22 @@ func TestParseAnnotationEmptyAlternativeIsError(t *testing.T) {
 	a := assert.T(t)
 	_, err := ParseTypeAnnotation("string||number")
 	a.That(err != nil)
+}
+
+func TestInvalidAnnotationTypeNameParamIsError(t *testing.T) {
+	a := assert.T(t)
+	_, env := runPasses(`class {
+		Foo(x: numbr) { return x }
+	}`, "T")
+	a.That(hasDiag(env, "Foo", SeverityError, `unknown type name "numbr"`))
+}
+
+func TestInvalidAnnotationTypeNameReturnIsError(t *testing.T) {
+	a := assert.T(t)
+	_, env := runPasses(`class {
+		Foo() : numbr { return 1 }
+	}`, "T")
+	a.That(hasDiag(env, "Foo", SeverityError, `unknown type name "numbr"`))
 }
 
 func TestAnnotationParamOverridesDefaultValueType(t *testing.T) {

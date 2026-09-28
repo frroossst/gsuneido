@@ -95,16 +95,6 @@ func (ts *Tables) ValueGet(key Value) Value {
 	return qryBase(ts, key)
 }
 
-func (tl *TablesLookup) ValueGet(key Value) Value {
-	switch key {
-	case SuStr("type"):
-		return SuStr("tablelookup")
-	case SuStr("name"):
-		return SuStr(tl.table)
-	}
-	return qryBase(tl, key)
-}
-
 func (cs *Columns) ValueGet(key Value) Value {
 	switch key {
 	case SuStr("type"):
@@ -143,6 +133,16 @@ func (his *History) ValueGet(key Value) Value {
 		return SuStr("history")
 	}
 	return qryBase(his, key)
+}
+
+func (st *StatsTable) ValueGet(key Value) Value {
+	switch key {
+	case SuStr("type"):
+		return SuStr("table")
+	case SuStr("name"):
+		return SuStr("dbstats")
+	}
+	return qryBase(st, key)
 }
 
 func (no *Nothing) ValueGet(key Value) Value {

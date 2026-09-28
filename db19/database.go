@@ -17,6 +17,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/meta"
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
+	"github.com/apmckinlay/gsuneido/db19/stats"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/options"
 	"github.com/apmckinlay/gsuneido/util/assert"
@@ -47,6 +48,9 @@ type Database struct {
 
 	closed    atomic.Bool
 	corrupted atomic.Bool
+
+	stats stats.Stats
+	busy  stats.BusyTally
 }
 
 const magic = "gsndo004"
@@ -54,6 +58,10 @@ const magicBase = "gsndo"
 const tailSize = 8 // len(shutdown/corrupt)
 const shutdown = "\x2b\xc1\x85\x63\x8d\x71\x65\x6d"
 const corrupt = "\xff\xff\xff\xff\xff\xff\xff\xff"
+
+// StatsTableName is the name of the system table that stores persistent
+// column statistics used by the query optimizer.
+const StatsTableName = "_stats_"
 
 // CreateDatabase creates an empty database in the named file.
 // NOTE: The returned Database does not have a checker.
@@ -128,6 +136,7 @@ func OpenDbStor(store *stor.Stor, mode stor.Mode, check bool) (db *Database, err
 			return nil, err
 		}
 	}
+	db.stats = ReadStats(db)
 	return db, nil
 }
 
@@ -666,4 +675,41 @@ func OffToRecCk(store *stor.Stor, off uint64) core.Record {
 	size := core.RecLen(buf)
 	cksum.MustCheck(buf[:size+cksum.Len])
 	return core.Record(hacks.BStoS(buf[:size]))
+}
+
+// ReadStats reads the record stored in the stats table by compact.go
+// and returns the parsed Stats.
+func ReadStats(db *Database) stats.Stats {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("ERROR ReadStats:", r)
+		}
+	}()
+	rt := db.NewReadTran()
+	defer rt.Abort()
+	ti := rt.GetInfo(StatsTableName)
+	if ti == nil || ti.Nrows == 0 {
+		return nil
+	}
+	iter := rt.IndexIter(StatsTableName, 0)
+	iter.Next(rt)
+	if iter.Eof() {
+		return nil
+	}
+	off := iter.CurOff()
+	rec := rt.GetRecord(off)
+	data := rec.GetStr(0)
+	if len(data) == 0 {
+		return nil
+	}
+	return stats.UnpackStats(data)
+}
+
+// BusyAdd adds a column with a given weight to the BusyTally.
+func (db *Database) BusyAdd(col string, weight int) {
+	db.busy.Add(col, weight)
+}
+
+func (db *Database) Stats() stats.Stats {
+	return db.stats
 }

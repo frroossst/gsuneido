@@ -18,6 +18,7 @@ import (
 	"github.com/apmckinlay/gsuneido/db19/index/ixkey"
 	"github.com/apmckinlay/gsuneido/db19/meta"
 	"github.com/apmckinlay/gsuneido/db19/meta/schema"
+	"github.com/apmckinlay/gsuneido/db19/stats"
 	"github.com/apmckinlay/gsuneido/db19/stor"
 	"github.com/apmckinlay/gsuneido/util/assert"
 	"github.com/apmckinlay/gsuneido/util/cksum"
@@ -37,6 +38,11 @@ func (t *tran) GetInfo(table string) *meta.Info {
 
 func (t *tran) GetSchema(table string) *schema.Schema {
 	return &t.getSchema(table).Schema
+}
+
+// HasTable returns true if the table exists (not a view or tombstone)
+func (t *tran) HasTable(table string) bool {
+	return t.meta.GetRoSchema(table) != nil
 }
 
 func (t *tran) getSchema(table string) *meta.Schema {
@@ -75,6 +81,14 @@ func (t *tran) GetView(name string) string {
 
 func (t *tran) GetStore() *stor.Stor {
 	return t.db.Store
+}
+
+func (t *tran) BusyAdd(col string, weight int) {
+	t.db.busy.Add(col, weight)
+}
+
+func (t *tran) Stats() stats.Stats {
+	return t.db.Stats()
 }
 
 //-------------------------------------------------------------------

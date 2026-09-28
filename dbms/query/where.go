@@ -29,9 +29,14 @@ import (
 
 type Where struct {
 	Query1
-	t         QueryTran
-	colSels   map[string][]span // from NewWhere, result of perField
-	mergedBuf map[string][]span // reusable buffer for mergedPerCol
+	t QueryTran
+
+	// results of perField, called by NewWhere
+	colSpans      map[string][]span
+	unspanable    []string
+	dataExprCount int // count of where exprs not tied to a single column
+
+	mergeSpans map[string][]span // reusable map for mergeColSpans
 	// tbl will be set if the source is a table, nil otherwise
 	tbl *Table
 	// idxSel is for the chosen index
@@ -69,8 +74,9 @@ type Where struct {
 	optInited      // used by optinit
 	optimized bool // set by setApproach, used by String
 
-	ixCtx  ixContext
-	ixExpr ast.Expr
+	ixCtx       ixContext
+	indexFilter ast.Expr
+	dataFilter  ast.Expr
 
 	srcIndex []string // set by setApproach, used by Lookup
 	wFixed   Fixed
@@ -105,6 +111,9 @@ func NewWhere(src Query, expr ast.Expr, t QueryTran) *Where {
 		expr = &ast.Nary{Tok: tok.And, Exprs: []ast.Expr{expr}}
 	}
 	w := &Where{source: src, expr: expr.(*ast.Nary), t: t}
+	// by default filter the data by the whole expression,
+	// setApproach may split it into indexFilter and dataFilter
+	w.dataFilter = expr.(*ast.Nary)
 	w.header = src.Header()
 	w.rowSiz.Set(src.rowSize())
 	w.singleTbl.Set(src.SingleTable())
@@ -115,9 +124,8 @@ func NewWhere(src Query, expr ast.Expr, t QueryTran) *Where {
 	if !w.conflict {
 		fields := w.source.Header().Physical()
 		w.expr.CanEvalRaw(fields)
-		w.colSels = perField(w.expr.Exprs, fields)
-		// fmt.Println("colSels", w.colSels)
-		w.conflict = (w.colSels == nil)
+		w.colSpans, w.unspanable, w.dataExprCount = perField(w.expr.Exprs, fields)
+		w.conflict = (w.colSpans == nil)
 	}
 	return w
 }
@@ -175,7 +183,7 @@ func (w *Where) exprsToFixed() (fixed Fixed, conflict bool) {
 }
 
 func addFixed(fixed Fixed, e ast.Expr) (Fixed, bool) {
-	// MAYBE: handle OR, could use colSels
+	// MAYBE: handle OR, could use colSpans
 	if b, ok := e.(*ast.Binary); ok && (b.Tok == tok.Is || b.Tok == tok.Lte) {
 		if id, ok := b.Lhs.(*ast.Ident); ok {
 			if c, ok := b.Rhs.(*ast.Constant); ok {
@@ -285,11 +293,12 @@ func (w *Where) calcNrows() (int, int) {
 	if w.singleton {
 		return 1, srcPop
 	}
-	if len(w.idxSels) == 0 {
-		return int(math.Round(float64(srcNrows) * unknownFrac)), srcPop
+	frac := w.wfrac
+	if len(w.idxSels) == 0 && w.tbl == nil { // perIndex was not run
+		frac = unknownFrac
 	}
-	est := int(math.Round(w.wfrac * float64(srcNrows)))
-	return est, srcPop
+	est := int(math.Round(frac * float64(srcNrows)))
+	return max(1, est), srcPop
 }
 
 func (w *Where) Transform() Query {
@@ -304,8 +313,6 @@ func (w *Where) Transform() Query {
 	switch q := src.(type) {
 	case *Nothing:
 		return NewNothing(w)
-	case *Tables:
-		return w.tablesLookup(q)
 	case *Where:
 		// combine consecutive where's
 		exprs := slc.With(q.expr.Exprs, w.expr.Exprs...)
@@ -433,34 +440,6 @@ func (w *Where) transform(src Query) Query {
 	return w
 }
 
-func (w *Where) tablesLookup(tables *Tables) Query {
-	// Optimize: tables where table = <string>
-	// This is to handle the speed issue from heavy use of TableExists?.
-	// It could be more general.
-	col, val := w.lookup1()
-	if col != "table" {
-		return w
-	}
-	s, ok := val.ToStr()
-	if !ok {
-		return NewNothing(w)
-	}
-	return NewTablesLookup(tables.tran, s)
-}
-
-func (w *Where) lookup1() (string, Value) {
-	if len(w.expr.Exprs) == 1 {
-		if b, ok := w.expr.Exprs[0].(*ast.Binary); ok && b.Tok == tok.Is {
-			if id, ok := b.Lhs.(*ast.Ident); ok {
-				if c, ok := b.Rhs.(*ast.Constant); ok {
-					return id.Name, c.Val
-				}
-			}
-		}
-	}
-	return "", nil
-}
-
 func (w *Where) leftJoinToJoin(lj *LeftJoin) bool {
 	flds := lj.source2.Header().Physical()
 	flds = set.Difference(flds, lj.by)
@@ -572,14 +551,14 @@ func (w *Where) optWhereIdx(mode Mode, req Require) (Cost, Cost, any) {
 		_, varCost, _ := w.tbl.optimize(mode, OrderReq(idx, 1.0))
 		irFrac := 1.0
 		ifFrac := 1.0
-		dfFrac := w.wfrac
+		df := true
 		isel := w.getIdxSel(idx)
 		if isel != nil {
-			irFrac = isel.prefixFrac * isel.skipFrac
+			irFrac = isel.indexRangeFrac
 			ifFrac = isel.indexFilterFrac
-			dfFrac = isel.dataFilterFrac
+			df = isel.hasDataFilter
 		}
-		cost := WhereCost(float64(varCost), float64(req.frac), irFrac, ifFrac, dfFrac)
+		cost := WhereCost(float64(varCost), float64(req.frac), irFrac, ifFrac, df)
 		cost += Cost(req.nseeks) * w.tbl.lookupCost(idx)
 		best.update(0, cost, bestIdx{index: idx, idxSel: isel})
 	}
@@ -591,11 +570,6 @@ func (w *Where) optWhereIdx(mode Mode, req Require) (Cost, Cost, any) {
 }
 
 func (w *Where) optWhereLookup(mode Mode, req Require) (Cost, Cost, any) {
-	if w.singleton {
-		isel := w.idxSels[0]
-		cost := w.tbl.lookupCost(isel.index)
-		return 0, cost, &whereApproach{index: isel.index, cost: cost, idxSel: isel, mode: mode}
-	}
 	best := newBest[[]string]()
 	for idxi, idx := range w.tbl.indexes {
 		if w.tbl.uniqueForLookup(idxi) && indexCovered(idx, req.cols, w.fixed) {
@@ -628,7 +602,12 @@ func (w *Where) optInit() {
 	w.optInited = optInitInProgress
 	w.tbl, _ = w.source.(*Table)
 	if !w.conflict && w.tbl != nil {
-		w.idxSels = w.perIndex(w.colSels)
+		if weight, _ := w.source.Nrows(); weight > 0 {
+			for col := range w.colSpans {
+				w.t.BusyAdd(w.tbl.Name()+"."+col, weight)
+			}
+		}
+		w.idxSels = w.perIndex()
 		// fmt.Println("idxSels", w.idxSels)
 	}
 	// detect singleton when fixed covers a key (for non-Table sources).
@@ -648,7 +627,7 @@ func (w *Where) optInit() {
 	w.optInited = optInitYes
 }
 
-func WhereCost(cost, inFrac, irFrac, ifFrac, dfFrac float64) Cost {
+func WhereCost(cost, inFrac, irFrac, ifFrac float64, df bool) Cost {
 	// Model the cost of reading via a particular index.
 	// We have 3 potential filter stages:
 	// 1. Index Range (irFrac)
@@ -672,7 +651,7 @@ func WhereCost(cost, inFrac, irFrac, ifFrac, dfFrac float64) Cost {
 	// because you still have to read everything
 
 	// apply inFrac
-	if ifFrac < 1 || dfFrac < 1 {
+	if ifFrac < 1 || df {
 		inFrac = .25 + (.75 * inFrac) // pessimistic guard
 	}
 	cost *= inFrac
@@ -708,11 +687,10 @@ func (w *Where) setApproach(req Require, approach any, tran QueryTran) {
 		if ap.idxSel != nil {
 			w.ixCtx.cols = ap.index
 			w.ixCtx.encodes = w.tbl.IndexEncodes(ap.index)
-			w.ixExpr = w.exprsFor(w.ixCtx.cols)
 			w.idxSelBase = ap.idxSel
 			w.idxSelActive = w.idxSelBase
-			w.tbl.setCost(float64(req.frac)*ap.idxSel.prefixFrac*ap.idxSel.skipFrac,
-				0, ap.cost)
+			w.indexFilter, w.dataFilter = w.splitExpr(ap.index)
+			w.tbl.setCost(float64(req.frac)*ap.idxSel.indexRangeFrac, 0, ap.cost)
 			w.idxSelPos = -1
 		} else {
 			w.tbl.setCost(float64(req.frac), 0, ap.cost)
@@ -722,13 +700,32 @@ func (w *Where) setApproach(req Require, approach any, tran QueryTran) {
 	w.rowCtx.Hdr = w.header
 }
 
-func (w *Where) exprsFor(cols []string) ast.Expr {
-	var exprs []ast.Expr
+func (w *Where) splitExpr(index []string) (indexFilter, dataFilter ast.Expr) {
+	is := w.idxSelBase
+	// fmt.Println("idxSel:", is)
+	rangeCols := is.RangeCols()
+	// fmt.Println("rangeCols:", rangeCols)
+
+	var ie, de []ast.Expr
 	for _, e := range w.expr.Exprs {
-		if set.HasSubset(cols, e.Columns()) {
-			exprs = append(exprs, e)
+		ecols := e.Columns()
+		if len(ecols) == 1 &&
+			slices.Contains(rangeCols, ecols[0]) &&
+			!slices.Contains(w.unspanable, ecols[0]) {
+			continue // covered by index range (prefix and skip scan)
+		}
+		if !set.HasSubset(index, ecols) {
+			de = append(de, e)
+		} else {
+			ie = append(ie, e)
 		}
 	}
+	// fmt.Println("indexFilter:", ie)
+	// fmt.Println("dataFilter:", de)
+	return exprs(ie), exprs(de)
+}
+
+func exprs(exprs []ast.Expr) ast.Expr {
 	if len(exprs) == 0 {
 		return nil
 	} else if len(exprs) == 1 {
@@ -766,10 +763,8 @@ func (w *Where) Get(th *Thread, dir Dir) Row {
 func (w *Where) get(th *Thread, dir Dir) Row {
 	if w.idxSelActive == nil {
 		w.nIn++
-		if w.tbl == nil {
-			return w.source.Get(th, dir)
-		}
-		return w.getFilter(th, dir)
+		assert.That(w.indexFilter == nil)
+		return w.source.Get(th, dir)
 	}
 	// loop over the prefix index ranges/points
 	for {
@@ -792,7 +787,11 @@ func (w *Where) get(th *Thread, dir Dir) Row {
 				w.tbl.SelectRaw(w.curPtrng.Org, w.curPtrng.End)
 			}
 		} else { // point
-			if row := w.tbl.LookupRaw(w.curPtrng.Org); row != nil {
+			// points bypass GetFilter, so apply the indexFilter to the key here
+			// (only if the key exists, otherwise it may be malformed garbage
+			// from sels that the index expression cannot evaluate)
+			if row := w.tbl.LookupRaw(w.curPtrng.Org); row != nil &&
+				(w.indexFilter == nil || w.ixFilter(th, w.curPtrng.Org)) {
 				w.nIn++
 				return row
 			}
@@ -800,19 +799,24 @@ func (w *Where) get(th *Thread, dir Dir) Row {
 	}
 }
 
+// ixFilter evaluates the indexFilter against an index key
+func (w *Where) ixFilter(th *Thread, key string) bool {
+	w.ixCtx.th = th
+	w.ixCtx.key = key
+	return w.indexFilter.Eval(&w.ixCtx) == True
+}
+
 func (w *Where) getFilter(th *Thread, dir Dir) Row {
 	var filterFunc func(string) bool
-	if w.ixExpr != nil {
-		w.ixCtx.th = th
+	if w.indexFilter != nil {
 		filterFunc = func(key string) bool {
-			w.ixCtx.key = key
-			return w.ixExpr.Eval(&w.ixCtx) == True
+			return w.ixFilter(th, key)
 		}
 	}
 	return w.tbl.GetFilter(dir, filterFunc)
 }
 
-// filter applies singleSels and the entire where expression
+// filter applies singleSels and the dataFilter expression
 func (w *Where) filter(th *Thread, row Row) bool {
 	if row == nil {
 		return true
@@ -821,13 +825,21 @@ func (w *Where) filter(th *Thread, row Row) bool {
 		!singletonFilter(w.header, row, w.singleSels) {
 		return false
 	}
+	if w.dataFilter == nil { // no data filter
+		return true
+	}
+	return w.filterExpr(th, row, w.dataFilter)
+}
+
+// filterExpr evaluates expr against a data row, setting up the row context
+func (w *Where) filterExpr(th *Thread, row Row, expr ast.Expr) bool {
 	if w.rowCtx.Tran == nil {
 		w.rowCtx.Tran = MakeSuTran(w.t)
 	}
 	w.rowCtx.Th = th
 	w.rowCtx.Row = row
 	defer func() { w.rowCtx.Th, w.rowCtx.Row = nil, nil }()
-	return w.expr.Eval(&w.rowCtx) == True
+	return expr.Eval(&w.rowCtx) == True
 }
 
 // advance moves to the next prefix index range
@@ -998,7 +1010,9 @@ func (w *Where) Simple(th *Thread) []Row {
 	rows := w.source.Simple(th)
 	dst := 0
 	for _, row := range rows {
-		if w.filter(th, row) {
+		// Simple reads all source rows with no index restriction, so it
+		// must evaluate the whole expression, not just the dataFilter
+		if w.filterExpr(th, row, w.expr) {
 			rows[dst] = row
 			dst++
 		}
