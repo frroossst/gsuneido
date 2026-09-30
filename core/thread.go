@@ -57,8 +57,6 @@ type thread1 struct {
 	// TrCache is per thread so no locking is required
 	trCache *cache.Cache[string, tr.Set]
 
-	Nonce string
-
 	profile profile
 
 	// rules is a stack of the currently running rules, used by SuRecord
@@ -96,6 +94,9 @@ type thread1 struct {
 
 	// ReturnMulti is used to return multiple values
 	ReturnMulti []Value
+
+	// perms hold the permissions temporarily during Auth
+	perms *Perms
 }
 
 // thread2 is the non-reset-able part of Thread
@@ -180,6 +181,14 @@ func (th *Thread) SetSession(s string) {
 
 func (th *Thread) SetSviews(sv *Sviews) {
 	th.sv = sv
+}
+
+func (th *Thread) SetPerms(p *Perms) {
+	th.perms = p
+}
+
+func (th *Thread) Perms() *Perms {
+	return th.perms
 }
 
 // Push pushes a value onto the value stack.
@@ -330,15 +339,16 @@ func (th *Thread) TraceCaller() {
 	}
 }
 
-// SetDbms is used to set up the main thread initially
-func (th *Thread) SetDbms(dbms IDbms) {
+// SetDbms is used to set up the main thread initially.
+// It returns the previous value (if any) to allow save & restore.
+func (th *Thread) SetDbms(dbms IDbms) IDbms {
+	prev := th.dbms
 	th.dbms = dbms
+	return prev
 }
 
 // GetDbms requires dependency injection
 var GetDbms = func() IDbms { panic("no dbms") }
-
-var DbmsAuth = false
 
 func (th *Thread) Dbms() IDbms {
 	if th.dbms == nil {
@@ -348,7 +358,7 @@ func (th *Thread) Dbms() IDbms {
 			th.dbms.SessionId(th, s)
 		}
 	}
-	return th.dbms.Unwrap()
+	return th.dbms
 }
 
 // Close closes the thread's dbms connection (if it has one)

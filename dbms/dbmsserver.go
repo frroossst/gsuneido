@@ -8,6 +8,7 @@ package dbms
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	_ "embed"
 	"fmt"
 	"io"
@@ -47,13 +48,12 @@ type serverConn struct {
 	sessions   map[uint32]*serverSession // the sessions on this connection
 	remoteAddr string
 	Sviews
-	idleCount    int          // guarded by serverConnsLock
-	sessionsLock sync.Mutex   // guards sessions
-	logSize      atomic.Int32 // cumulative size of logged data in bytes
-	nonce        string       // for authentication, shared across sessions
-	nonceOld     bool         // for two-phase expiration like tokens
-	// id is primarily used as a key to store the set of connections in a map
-	id uint32
+	idleCount    int                   // guarded by serverConnsLock
+	sessionsLock sync.Mutex            // guards sessions
+	logSize      atomic.Int32          // cumulative size of logged data in bytes
+	authTries    atomic.Int32          // sessions share the connection so must be atomic
+	id           uint32                // id is used as a key to store connections in a map
+	perms        atomic.Pointer[Perms] // set up by Auth e.g. the ServerEval whitelist
 }
 
 // serverSession handles one client session.
@@ -81,13 +81,7 @@ var ServerKey []byte
 // Server listens and accepts connections. It never returns.
 func Server(dbms *DbmsLocal) {
 	workers = mux.NewWorkers(doRequest)
-	cert, err := tls.X509KeyPair(ServerCert, ServerKey)
-	if err != nil {
-		Fatal("Failed to load embedded key pair:", err)
-	}
-	config := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-	}
+	config := serverTLSConfig()
 	// Listen for plain TCP connection to handle version mismatch
 	l, err := net.Listen("tcp", ":"+options.Port)
 	if err != nil {
@@ -107,12 +101,29 @@ func Server(dbms *DbmsLocal) {
 	}
 }
 
+// serverTLSConfig pins the client via the embedded client cert
+// and identifies this server via the embedded server key pair.
+func serverTLSConfig() *tls.Config {
+	cert, err := tls.X509KeyPair(ServerCert, ServerKey)
+	if err != nil {
+		Fatal("Failed to load embedded key pair:", err)
+	}
+	clientCAPool := x509.NewCertPool()
+	ok := clientCAPool.AppendCertsFromPEM(ClientCert)
+	if !ok {
+		Fatal("Failed to append embedded client cert to pool")
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    clientCAPool,
+	}
+}
+
 func background() {
 	for {
 		time.Sleep(backgroundInterval)
 		idleCheck()
-		expireTokens()
-		expireNonces()
 	}
 }
 
@@ -126,37 +137,6 @@ func idleCheck() {
 		if sc.idleCount > options.TimeoutMinutes {
 			sc.serverLog("closing idle connection")
 			sc.close()
-		}
-	}
-}
-
-func expireTokens() {
-	tokensLock.Lock()
-	defer tokensLock.Unlock()
-	for token, old := range tokens {
-		if old {
-			delete(tokens, token)
-		} else {
-			tokens[token] = true // mark it as old
-		}
-	}
-}
-
-func expireNonces() {
-	serverConnsLock.Lock()
-	defer serverConnsLock.Unlock()
-	expireNoncesLocked(serverConns)
-}
-
-// expireNoncesLocked marks fresh nonces as old and removes old nonces.
-// The caller must hold serverConnsLock.
-func expireNoncesLocked(conns map[uint32]*serverConn) {
-	for _, sc := range conns {
-		if sc.nonceOld {
-			sc.nonce = ""
-			sc.nonceOld = false
-		} else if sc.nonce != "" {
-			sc.nonceOld = true
 		}
 	}
 }
@@ -187,9 +167,7 @@ func newServerConn(dbms *DbmsLocal, conn net.Conn, config *tls.Config) {
 	msc := mux.NewServerConn(tlsConn)
 	sc := &serverConn{dbms: dbms, id: msc.Id(), conn: tlsConn, remoteAddr: addr,
 		sessions: make(map[uint32]*serverSession)}
-	if dbms.db.HaveUsers() {
-		sc.dbms = &DbmsUnauth{dbms: dbms}
-	}
+	sc.dbms = &DbmsUnauth{dbms: dbms}
 	serverConnsLock.Lock()
 	serverConns[sc.id] = sc
 	serverConnsLock.Unlock()
@@ -420,26 +398,27 @@ func cmdAdmin(ss *serverSession) {
 	ss.PutBool(true)
 }
 
+const maxAuthTries = 3
+
 func cmdAuth(ss *serverSession) {
-	s := ss.GetStr()
+	data := ss.GetVal() // consume even if closing so request's Remaining assert passes
+	// prevent brute force attacks
+	if ss.sc.authTries.Add(1) > maxAuthTries {
+		serverConnsLock.Lock()
+		defer serverConnsLock.Unlock()
+		ss.sc.close()
+		return
+	}
 	if _, ok := ss.sc.dbms.(*DbmsUnauth); !ok {
 		panic("already authorized")
 	}
-	result := ss.auth(s)
+	result, perms := auth(ss.thread, data)
 	if result {
+		ss.sc.authTries.Store(0)
+		ss.sc.perms.Store(perms)
 		ss.sc.dbms = ss.sc.dbms.(*DbmsUnauth).dbms // remove DbmsUnauth
 	}
 	ss.PutBool(true).PutBool(result)
-}
-
-func (ss *serverSession) auth(s string) bool {
-	nonce := ss.sc.nonce
-	ss.sc.nonce = ""
-	ss.sc.nonceOld = false
-	if AuthUser(ss.thread, s, nonce) {
-		return true
-	}
-	return AuthToken(s)
 }
 
 func cmdAsof(ss *serverSession) {
@@ -543,6 +522,10 @@ func cmdErase(ss *serverSession) {
 
 func cmdExec(ss *serverSession) {
 	ob := ss.GetVal()
+	fname := execName(ob)
+	if p := ss.sc.perms.Load(); p == nil || !p.ServerEvalAllowed(fname) {
+		panic("ServerEval: not permitted: " + fname)
+	}
 	v := ss.sc.dbms.Exec(ss.thread, ob)
 	ss.PutResult(v)
 }
@@ -770,12 +753,6 @@ func (sc *serverConn) limitLog(s string) string {
 	return ""
 }
 
-func cmdNonce(ss *serverSession) {
-	ss.sc.nonce = Nonce()
-	ss.sc.nonceOld = false
-	ss.PutBool(true).PutStr_(ss.sc.nonce)
-}
-
 func cmdOrder(ss *serverSession) {
 	order := ss.getQorC().Order()
 	ss.PutBool(true).PutStrs(order)
@@ -834,12 +811,6 @@ func cmdRewind(ss *serverSession) {
 	ss.PutBool(true)
 }
 
-func cmdRun(ss *serverSession) {
-	s := ss.GetStr()
-	v := ss.sc.dbms.Run(ss.thread, s)
-	ss.PutResult(v)
-}
-
 func cmdSessionId(ss *serverSession) {
 	s := ss.GetStr()
 	if s != "" {
@@ -863,11 +834,6 @@ func cmdStrategy(ss *serverSession) {
 func cmdTimestamp(ss *serverSession) {
 	ts := ss.sc.dbms.Timestamp()
 	ss.PutBool(true).PutVal(ts)
-}
-
-func cmdToken(ss *serverSession) {
-	tok := Token()
-	ss.PutBool(true).PutStr(tok)
 }
 
 func cmdTransaction(ss *serverSession) {
@@ -922,18 +888,15 @@ var cmds = []command{ // order must match commmands.go
 	cmdLibGet,
 	cmdLibraries,
 	cmdLog,
-	cmdNonce,
 	cmdOrder,
 	cmdOutput,
 	cmdQuery,
 	cmdReadCount,
 	cmdAction,
 	cmdRewind,
-	cmdRun,
 	cmdSessionId,
 	cmdSize,
 	cmdTimestamp,
-	cmdToken,
 	cmdTransaction,
 	cmdTransactions,
 	cmdUpdate,

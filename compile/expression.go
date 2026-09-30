@@ -384,7 +384,7 @@ func (p *Parser) arguments(opening tok.Token) []ast.Arg {
 	return args
 }
 
-var atArg = SuStr("@")
+var atArg = SuStr1("@")
 var at1Arg = SuStr("@+1")
 var blockArg = SuStr("block")
 
@@ -483,9 +483,9 @@ func (p *Parser) argNameAhead() (Value, bool) {
 	}
 	var name Value
 	if p.Token.IsIdent() {
-		name = SuStr(p.Text)		
+		name = SuStr(p.Text)
 	} else {
-		switch p.Token{
+		switch p.Token {
 		case tok.String:
 			name = SuStr(p.Text)
 		case tok.Number:

@@ -7,7 +7,6 @@ package commands
 
 type Command byte
 
-// command values must match jSuneido
 const (
 	Abort Command = iota
 	Admin
@@ -31,18 +30,15 @@ const (
 	LibGet
 	Libraries
 	Log
-	Nonce
 	Order
 	Output
 	Query
 	ReadCount
 	Action
 	Rewind
-	Run
 	SessionId
 	Size
 	Timestamp
-	Token
 	Transaction
 	Transactions
 	Update
